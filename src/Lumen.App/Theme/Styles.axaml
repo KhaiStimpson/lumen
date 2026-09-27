@@ -1,0 +1,257 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Typography -->
+  <Style Selector="TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+  </Style>
+  <Style Selector="TextBlock.h1">
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="-0.2" />
+  </Style>
+  <Style Selector="TextBlock.h2">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.h3">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.body">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="20" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="TextBlock.secondary">
+    <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+  </Style>
+  <Style Selector="TextBlock.caption">
+    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+  </Style>
+  <Style Selector="TextBlock.tertiary">
+    <Setter Property="Foreground" Value="{DynamicResource Text.Tertiary}" />
+  </Style>
+  <Style Selector="TextBlock.section">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="0.4" />
+    <Setter Property="Foreground" Value="{DynamicResource Text.Tertiary}" />
+  </Style>
+  <Style Selector="TextBlock.mono, SelectableTextBlock.mono">
+    <Setter Property="FontFamily" Value="{StaticResource CodeFont}" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector="TextBlock.added">
+    <Setter Property="Foreground" Value="{DynamicResource Diff.Added.Sign}" />
+    <Setter Property="FontFamily" Value="{StaticResource CodeFont}" />
+    <Setter Property="FontSize" Value="11.5" />
+  </Style>
+  <Style Selector="TextBlock.removed">
+    <Setter Property="Foreground" Value="{DynamicResource Diff.Removed.Sign}" />
+    <Setter Property="FontFamily" Value="{StaticResource CodeFont}" />
+    <Setter Property="FontSize" Value="11.5" />
+  </Style>
+
+  <!-- Surfaces -->
+  <Style Selector="Border.pane">
+    <Setter Property="Background" Value="{DynamicResource Surface.Pane}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+  </Style>
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource Surface.Raised}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Card}" />
+  </Style>
+  <Style Selector="Border.divider">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource Border.Subtle}" />
+  </Style>
+
+  <!-- Pills and key hints -->
+  <Style Selector="Border.pill">
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Pill}" />
+    <Setter Property="Padding" Value="8,2" />
+    <Setter Property="Background" Value="{DynamicResource Surface.Hover}" />
+  </Style>
+  <Style Selector="Border.pill > TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+  </Style>
+  <Style Selector="Border.pill.High">
+    <Setter Property="Background" Value="{DynamicResource Severity.High.Soft}" />
+  </Style>
+  <Style Selector="Border.pill.High > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Severity.High}" />
+  </Style>
+  <Style Selector="Border.pill.Medium">
+    <Setter Property="Background" Value="{DynamicResource Severity.Medium.Soft}" />
+  </Style>
+  <Style Selector="Border.pill.Medium > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Severity.Medium}" />
+  </Style>
+  <Style Selector="Border.pill.Low">
+    <Setter Property="Background" Value="{DynamicResource Severity.Low.Soft}" />
+  </Style>
+  <Style Selector="Border.pill.Low > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Severity.Low}" />
+  </Style>
+  <Style Selector="Border.pill.open">
+    <Setter Property="Background" Value="{DynamicResource Diff.Added.Bg}" />
+  </Style>
+  <Style Selector="Border.pill.open > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Diff.Added.Sign}" />
+  </Style>
+  <Style Selector="Border.kbd">
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="4,0" />
+    <Setter Property="MinWidth" Value="16" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}" />
+    <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
+  </Style>
+  <Style Selector="Border.kbd > TextBlock">
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="FontFamily" Value="{StaticResource CodeFont}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text.Tertiary}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+
+  <!-- Buttons: quiet by default, one obvious primary action -->
+  <Style Selector="Button">
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Control}" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="Padding" Value="11,6" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="Button.subtle">
+    <Setter Property="Background" Value="{DynamicResource Surface.Raised}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+  </Style>
+  <Style Selector="Button.subtle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface.Hover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+  </Style>
+  <Style Selector="Button.ghost">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+  </Style>
+  <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface.Hover}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+  </Style>
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent.OnAccent}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Accent.Hover}" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent.OnAccent}" />
+  </Style>
+  <Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Border.Strong}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text.Tertiary}" />
+  </Style>
+  <Style Selector="Button.link">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent.Hover}" />
+  </Style>
+  <Style Selector="Button.row">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="10,8" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+  <Style Selector="Button.row:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface.Hover}" />
+  </Style>
+  <Style Selector="Button.row.current /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface.Selected}" />
+  </Style>
+
+  <!-- Icons -->
+  <Style Selector="PathIcon">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+  </Style>
+  <Style Selector="Path.stroke">
+    <Setter Property="StrokeThickness" Value="1.6" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="StrokeJoin" Value="Round" />
+    <Setter Property="Stretch" Value="Uniform" />
+  </Style>
+
+  <!-- Tabs (RadioButtons styled as underline tabs) -->
+  <Style Selector="RadioButton.tab">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="Root" Background="Transparent" Padding="0,8" Margin="0,0,20,0" BorderThickness="0,0,0,2" BorderBrush="Transparent">
+          <ContentPresenter Content="{TemplateBinding Content}" TextElement.FontSize="12.5" TextElement.FontWeight="Medium" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="RadioButton.tab:checked /template/ Border#Root">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="RadioButton.tab:checked">
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+
+  <!-- Inputs -->
+  <Style Selector="TextBox">
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Control}" />
+    <Setter Property="FontSize" Value="12.5" />
+  </Style>
+  <Style Selector="TextBox.search">
+    <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="Padding" Value="30,6,10,6" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <!-- Tree: quiet selection, not the platform accent -->
+  <Style Selector="TreeViewItem">
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+  <Style Selector="TreeViewItem /template/ Border#PART_LayoutRoot">
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+  <Style Selector="TreeViewItem:pointerover /template/ Border#PART_LayoutRoot">
+    <Setter Property="Background" Value="{DynamicResource Surface.Hover}" />
+  </Style>
+  <Style Selector="TreeViewItem:selected /template/ Border#PART_LayoutRoot">
+    <Setter Property="Background" Value="{DynamicResource Surface.Selected}" />
+  </Style>
+  <Style Selector="TreeViewItem:selected:focus /template/ Border#PART_LayoutRoot">
+    <Setter Property="Background" Value="{DynamicResource Surface.Selected}" />
+  </Style>
+  <Style Selector="TreeViewItem:selected:pointerover /template/ Border#PART_LayoutRoot">
+    <Setter Property="Background" Value="{DynamicResource Surface.Selected}" />
+  </Style>
+  <Style Selector="TreeViewItem:selected /template/ ContentPresenter#PART_HeaderPresenter">
+    <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+  </Style>
+</Styles>

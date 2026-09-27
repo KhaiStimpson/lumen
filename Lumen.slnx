@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Lumen.Analysis/Lumen.Analysis.csproj" />
+    <Project Path="src/Lumen.App/Lumen.App.csproj" />
+    <Project Path="src/Lumen.Contracts/Lumen.Contracts.csproj" />
+    <Project Path="src/Lumen.Domain/Lumen.Domain.csproj" />
+    <Project Path="src/Lumen.Engine/Lumen.Engine.csproj" />
+    <Project Path="src/Lumen.GitHub/Lumen.GitHub.csproj" />
+    <Project Path="src/Lumen.Repository/Lumen.Repository.csproj" />
+    <Project Path="src/Lumen.Roslyn/Lumen.Roslyn.csproj" />
+    <Project Path="src/Lumen.Storage/Lumen.Storage.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Lumen.Analysis.Tests/Lumen.Analysis.Tests.csproj" />
+    <Project Path="tests/Lumen.Engine.Tests/Lumen.Engine.Tests.csproj" />
+    <Project Path="tests/Lumen.GitHub.Tests/Lumen.GitHub.Tests.csproj" />
+    <Project Path="tests/Lumen.Repository.Tests/Lumen.Repository.Tests.csproj" />
+    <Project Path="tests/Lumen.Storage.Tests/Lumen.Storage.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,285 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             xmlns:diff="using:Lumen.App.Diff"
+             x:Class="Lumen.App.Views.ExamineView"
+             x:DataType="vm:PullRequestViewModel">
+  <Grid RowDefinitions="Auto,*,Auto">
+    <!-- Header -->
+    <Grid ColumnDefinitions="Auto,*,Auto" Margin="18,14,18,10">
+      <Button Classes="ghost" Padding="8" Command="{Binding CloseExamineCommand}" ToolTip.Tip="Back to diff (Esc)" VerticalAlignment="Top">
+        <Path Data="{StaticResource Icon.Back}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="14" Height="14" />
+      </Button>
+      <StackPanel Grid.Column="1" Spacing="2" Margin="8,0,0,0">
+        <TextBlock Classes="h2" Text="Examine review point" />
+        <TextBlock Classes="caption" TextTrimming="CharacterEllipsis">
+          <Run Text="{Binding NumberLabel}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Title}" />
+          <Run Text="   /   " Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding CurrentPoint.Path, FallbackValue=''}" />
+        </TextBlock>
+      </StackPanel>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <Button Classes="subtle" Command="{Binding PreviousPointCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Path Data="{StaticResource Icon.ChevronLeft}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="11" Height="11" />
+            <TextBlock Text="Previous" />
+          </StackPanel>
+        </Button>
+        <TextBlock Classes="caption" Text="{Binding PositionLabel}" VerticalAlignment="Center" Margin="6,0" />
+        <Button Classes="subtle" Command="{Binding NextPointCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="Next" />
+            <Path Data="{StaticResource Icon.ChevronRight}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="11" Height="11" />
+          </StackPanel>
+        </Button>
+        <Button Classes="ghost" Padding="8" Command="{Binding CloseExamineCommand}" ToolTip.Tip="Close (Esc)" Margin="4,0,0,0">
+          <Path Data="{StaticResource Icon.Close}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="11" Height="11" />
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Row="1" ColumnDefinitions="5*,6*" Margin="16,0,16,0" ColumnSpacing="14">
+      <!-- Code stays visible (TDD §22) -->
+      <Border Classes="card" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*">
+          <Grid ColumnDefinitions="*,Auto" Margin="14,10">
+            <TextBlock FontSize="12.5" TextTrimming="CharacterEllipsis">
+              <Run Text="{Binding SelectedFile.Directory, FallbackValue=''}" Foreground="{DynamicResource Text.Tertiary}" /><Run Text="/" Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding SelectedFile.Name, FallbackValue=''}" FontWeight="SemiBold" />
+            </TextBlock>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="8,0,0,0">
+              <TextBlock Classes="added" Text="{Binding SelectedFile.AdditionsLabel, FallbackValue=''}" />
+              <TextBlock Classes="removed" Text="{Binding SelectedFile.DeletionsLabel, FallbackValue=''}" />
+            </StackPanel>
+          </Grid>
+          <diff:DiffEditor Grid.Row="1" Name="Code" ShowCards="False" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0"
+                           Diff="{Binding CurrentDiff}" Markers="{Binding Markers}" FocusRange="{Binding FocusRange}" />
+        </Grid>
+      </Border>
+
+      <!-- Evidence surface -->
+      <Border Grid.Column="1" Classes="card" Name="Panel" ClipToBounds="True">
+        <ScrollViewer Name="PanelScroll">
+          <StackPanel Name="PanelContent" Margin="24,20,24,24" Spacing="16">
+            <StackPanel Orientation="Horizontal" Spacing="9">
+              <Border Width="24" Height="24" CornerRadius="12"
+                      Background="{Binding CurrentPoint.Kind, FallbackValue='', Converter={x:Static views:Converters.KindToBrush}}">
+                <Path Data="{Binding CurrentPoint.Kind, FallbackValue='', Converter={x:Static views:Converters.KindToIcon}}" Fill="White"
+                      Width="11" Height="11" Stretch="Uniform" />
+              </Border>
+              <TextBlock Text="{Binding CurrentPoint.TypeLabel, FallbackValue=''}" FontWeight="SemiBold" FontSize="13.5" VerticalAlignment="Center" />
+              <Border Classes="pill" VerticalAlignment="Center"
+                      Classes.High="{Binding CurrentPoint.Severity, FallbackValue='', Converter={x:Static ObjectConverters.Equal}, ConverterParameter=High}"
+                      Classes.Medium="{Binding CurrentPoint.Severity, FallbackValue='', Converter={x:Static ObjectConverters.Equal}, ConverterParameter=Medium}"
+                      Classes.Low="{Binding CurrentPoint.Severity, FallbackValue='', Converter={x:Static ObjectConverters.Equal}, ConverterParameter=Low}">
+                <TextBlock Text="{Binding CurrentPoint.Severity, FallbackValue=''}" />
+              </Border>
+              <Border Classes="pill" VerticalAlignment="Center"><TextBlock Text="{Binding CurrentPoint.Tag, FallbackValue=''}" /></Border>
+              <TextBlock Classes="caption" VerticalAlignment="Center" Text="{Binding CurrentPoint.EvidenceLabel, FallbackValue=''}" />
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+              <TextBlock Classes="h1" Text="Why this matters" />
+              <TextBlock Text="{Binding CurrentPoint.Title, FallbackValue=''}" FontWeight="SemiBold" FontSize="15" TextWrapping="Wrap" />
+              <TextBlock Classes="body secondary" Text="{Binding CurrentPoint.WhyItMatters, FallbackValue=''}" />
+            </StackPanel>
+
+            <!-- Comparison surface (TDD §22: pattern deviation) -->
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12" IsVisible="{Binding CurrentPoint.Current, FallbackValue=False, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <Border Background="{DynamicResource Compare.Current.Bg}" BorderBrush="{DynamicResource Compare.Current.Border}" BorderThickness="1"
+                      CornerRadius="{StaticResource Radius.Card}" Padding="14,12">
+                <StackPanel Spacing="8">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Path Data="{StaticResource Icon.Close}" Stroke="{DynamicResource Compare.Current.Title}" Classes="stroke" Width="11" Height="11" />
+                    <TextBlock Text="{Binding CurrentPoint.Current.Title, FallbackValue=''}" Foreground="{DynamicResource Compare.Current.Title}"
+                               FontWeight="SemiBold" FontSize="13" />
+                  </StackPanel>
+                  <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding CurrentPoint.Current.Caption, FallbackValue=''}" />
+                  <Border Classes="card" CornerRadius="7" ClipToBounds="True">
+                    <diff:CodeSnippet Height="170" Code="{Binding CurrentPoint.Current.Snippet, FallbackValue=''}"
+                                      Path="{Binding CurrentPoint.Current.Path, FallbackValue=''}"
+                                      StartLine="{Binding CurrentPoint.Current.StartLine, FallbackValue=1}"
+                                      HighlightLines="{Binding CurrentPoint.Current.HighlightLines, FallbackValue={x:Null}}"
+                                      HighlightBrushKey="Diff.Removed.Bg" />
+                  </Border>
+                  <TextBlock Classes="caption tertiary" TextWrapping="Wrap">
+                    <Run Text="{Binding CurrentPoint.Current.FileName, FallbackValue=''}" FontWeight="Medium" /><Run Text=" · also " /><Run Text="{Binding CurrentPoint.Current.PointsLabel, FallbackValue=''}" />
+                  </TextBlock>
+                </StackPanel>
+              </Border>
+
+              <Border Grid.Column="1" Background="{DynamicResource Compare.Precedent.Bg}" BorderBrush="{DynamicResource Compare.Precedent.Border}" BorderThickness="1"
+                      CornerRadius="{StaticResource Radius.Card}" Padding="14,12">
+                <StackPanel Spacing="8">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Path Data="{StaticResource Icon.Verified}" Stroke="{DynamicResource Compare.Precedent.Title}" Classes="stroke" Width="12" Height="12" />
+                    <TextBlock Text="{Binding CurrentPoint.Precedent.Title, FallbackValue=''}" Foreground="{DynamicResource Compare.Precedent.Title}"
+                               FontWeight="SemiBold" FontSize="13" />
+                  </StackPanel>
+                  <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding CurrentPoint.Precedent.Caption, FallbackValue=''}" />
+                  <Border Classes="card" CornerRadius="7" ClipToBounds="True">
+                    <diff:CodeSnippet Height="170" Code="{Binding CurrentPoint.Precedent.Snippet, FallbackValue=''}"
+                                      Path="{Binding CurrentPoint.Precedent.Path, FallbackValue=''}"
+                                      StartLine="{Binding CurrentPoint.Precedent.StartLine, FallbackValue=1}"
+                                      HighlightLines="{Binding CurrentPoint.Precedent.HighlightLines, FallbackValue={x:Null}}"
+                                      HighlightBrushKey="Diff.Added.Bg" />
+                  </Border>
+                  <TextBlock Classes="caption tertiary" TextWrapping="Wrap">
+                    <Run Text="{Binding CurrentPoint.Precedent.FileName, FallbackValue=''}" FontWeight="Medium" /><Run Text=" · also " /><Run Text="{Binding CurrentPoint.Precedent.PointsLabel, FallbackValue=''}" />
+                  </TextBlock>
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <!-- Progressive disclosure -->
+            <StackPanel Spacing="12">
+              <Border BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1">
+                <StackPanel Orientation="Horizontal">
+                  <RadioButton Classes="tab" GroupName="examine" IsChecked="{Binding IsPrecedentTab}" Content="Precedent in this codebase" />
+                  <RadioButton Classes="tab" GroupName="examine" IsChecked="{Binding IsEvidenceTab}" Content="Evidence" />
+                  <RadioButton Classes="tab" GroupName="examine" IsChecked="{Binding IsCommentTab}" Content="Comment" />
+                </StackPanel>
+              </Border>
+
+              <!-- Precedent -->
+              <StackPanel Spacing="10" IsVisible="{Binding IsPrecedentTab}">
+                <TextBlock Classes="caption" Text="{Binding CurrentPoint.Model.Evidence[0].Summary, FallbackValue=''}" />
+                <ItemsControl ItemsSource="{Binding CurrentPoint.PrecedentExamples, FallbackValue={x:Null}}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <UniformGrid Columns="2" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PrecedentExampleViewModel">
+                      <Border Classes="card" Margin="0,0,10,10" Padding="12,10">
+                        <StackPanel Spacing="8">
+                          <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Path Data="{StaticResource Icon.File}" Stroke="{DynamicResource Accent}" Classes="stroke" Width="12" Height="12" Margin="0,2,8,0" VerticalAlignment="Top" />
+                            <StackPanel Grid.Column="1" Spacing="1">
+                              <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" FontSize="12.5" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Classes="caption tertiary" Text="{Binding Directory}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <Button Grid.Column="2" Classes="subtle" Padding="8,3" FontSize="11.5" Content="View file"
+                                    Command="{Binding $parent[views:ExamineView].((vm:PullRequestViewModel)DataContext).OpenSourceCommand}"
+                                    CommandParameter="{Binding}" />
+                          </Grid>
+                          <Border Background="{DynamicResource Surface.Sunken}" CornerRadius="6" ClipToBounds="True">
+                            <diff:CodeSnippet Height="120" Code="{Binding Snippet}" Path="{Binding Path}" StartLine="{Binding StartLine}"
+                                              HighlightLines="{Binding HighlightLines}" HighlightBrushKey="Diff.Added.Bg" />
+                          </Border>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Spacing="6" IsVisible="{Binding CurrentPoint.HasExceptions, FallbackValue=False}">
+                  <TextBlock Classes="section" Text="EXCEPTIONS IN THIS CODEBASE" />
+                  <ItemsControl ItemsSource="{Binding CurrentPoint.Exceptions, FallbackValue={x:Null}}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:PrecedentExampleViewModel">
+                        <Button Classes="row" Margin="-8,0" Padding="10,5"
+                                Command="{Binding $parent[views:ExamineView].((vm:PullRequestViewModel)DataContext).OpenSourceCommand}"
+                                CommandParameter="{Binding}">
+                          <TextBlock FontSize="12">
+                            <Run Text="{Binding TypeName}" FontWeight="Medium" /><Run Text="   " /><Run Text="{Binding Directory}" Foreground="{DynamicResource Text.Tertiary}" />
+                          </TextBlock>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </StackPanel>
+
+              <!-- Evidence: every claim with its provenance (TDD §14) -->
+              <StackPanel Spacing="12" IsVisible="{Binding IsEvidenceTab}">
+                <ItemsControl ItemsSource="{Binding CurrentPoint.Evidence, FallbackValue={x:Null}}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:EvidenceItemViewModel">
+                      <Grid ColumnDefinitions="22,*" Margin="0,0,0,10">
+                        <TextBlock Text="{Binding Glyph}" FontWeight="Bold" FontSize="12.5"
+                                   Foreground="{DynamicResource Marker.Verified}" IsVisible="{Binding !IsCounterEvidence}" />
+                        <TextBlock Text="{Binding Glyph}" FontWeight="Bold" FontSize="12.5"
+                                   Foreground="{DynamicResource Marker.Correctness}" IsVisible="{Binding IsCounterEvidence}" />
+                        <StackPanel Grid.Column="1" Spacing="2">
+                          <TextBlock Text="{Binding Summary}" FontSize="12.5" TextWrapping="Wrap" />
+                          <TextBlock Classes="caption tertiary" Text="{Binding Provenance}" />
+                        </StackPanel>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <StackPanel Spacing="6">
+                  <TextBlock Classes="section" Text="AFFECTED LOCATIONS" />
+                  <ItemsControl ItemsSource="{Binding CurrentPoint.Locations, FallbackValue={x:Null}}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:LocationViewModel">
+                        <Button Classes="row" Margin="-8,0" Padding="10,5"
+                                Command="{Binding $parent[views:ExamineView].((vm:PullRequestViewModel)DataContext).GoToLocationCommand}"
+                                CommandParameter="{Binding}">
+                          <TextBlock FontSize="12">
+                            <Run Text="{Binding Symbol}" FontWeight="Medium" /><Run Text="   " /><Run Text="{Binding Label}" Foreground="{DynamicResource Text.Tertiary}" />
+                          </TextBlock>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+
+                <TextBlock Classes="caption tertiary" TextWrapping="Wrap">
+                  <Run Text="Why this surfaced: " FontWeight="Medium" /><Run Text="{Binding CurrentPoint.RoutingReason, FallbackValue=''}" />
+                </TextBlock>
+              </StackPanel>
+
+              <!-- Comment -->
+              <StackPanel Spacing="8" IsVisible="{Binding IsCommentTab}">
+                <TextBlock Classes="caption" TextWrapping="Wrap">
+                  <Run Text="Posts a review comment on GitHub at " /><Run Text="{Binding CurrentPoint.FileName, FallbackValue=''}" FontWeight="Medium" /><Run Text=":" /><Run Text="{Binding CurrentPoint.Line, FallbackValue=''}" FontWeight="Medium" /><Run Text=". Edit freely — it's your comment." />
+                </TextBlock>
+                <TextBox Classes="composer" Text="{Binding CurrentPoint.CommentDraft, FallbackValue=''}" AcceptsReturn="True" TextWrapping="Wrap"
+                         MinHeight="110" FontSize="12.5" IsEnabled="{Binding CurrentPoint.IsOpen, FallbackValue=False}" />
+                <TextBlock Classes="caption" Foreground="{DynamicResource Severity.High}" Text="{Binding CurrentPoint.PostError, FallbackValue=''}"
+                           TextWrapping="Wrap" IsVisible="{Binding CurrentPoint.PostError, FallbackValue={x:Null}, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <TextBlock Classes="caption" Foreground="{DynamicResource Marker.Verified}" Text="Posted to GitHub."
+                           IsVisible="{Binding CurrentPoint.IsCommented, FallbackValue=False}" />
+              </StackPanel>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+
+    <!-- One obvious next action (TDD §2.2) -->
+    <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" Margin="16,12,16,16">
+      <Button Classes="subtle" Command="{Binding DismissCommand}" CommandParameter="{x:Null}">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Path Data="{StaticResource Icon.Close}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="10" Height="10" />
+          <TextBlock Text="Dismiss" />
+          <Border Classes="kbd"><TextBlock Text="D" /></Border>
+        </StackPanel>
+      </Button>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+        <Button Classes="subtle" Command="{Binding StartCommentCommand}" CommandParameter="{x:Null}" IsVisible="{Binding !IsCommentTab}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Path Data="{StaticResource Icon.Comment}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="12" Height="12" />
+            <TextBlock Text="Leave comment" />
+            <Border Classes="kbd"><TextBlock Text="C" /></Border>
+          </StackPanel>
+        </Button>
+        <Button Classes="primary" Command="{Binding PostCommentCommand}" CommandParameter="{x:Null}" IsVisible="{Binding IsCommentTab}"
+                IsEnabled="{Binding CurrentPoint.IsOpen, FallbackValue=False}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Post comment" Foreground="{DynamicResource Accent.OnAccent}" />
+            <TextBlock Text="Ctrl ↵" FontSize="10.5" Opacity="0.75" Foreground="{DynamicResource Accent.OnAccent}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button Classes="primary" Command="{Binding NextPointCommand}" IsVisible="{Binding !IsCommentTab}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Next point" Foreground="{DynamicResource Accent.OnAccent}" />
+            <Border Classes="kbd" Background="Transparent" BorderBrush="#66FFFFFF"><TextBlock Text="J" Foreground="{DynamicResource Accent.OnAccent}" /></Border>
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </Grid>
+  </Grid>
+</UserControl>

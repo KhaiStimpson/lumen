@@ -1,0 +1,54 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             x:Class="Lumen.App.Views.OpenPullRequestView"
+             x:DataType="vm:OpenPullRequestViewModel">
+  <Grid>
+    <Border Classes="card" Width="560" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="32,30"
+            BoxShadow="0 12 40 0 #14000000">
+      <StackPanel Spacing="18">
+        <StackPanel Spacing="6">
+          <TextBlock Classes="h1" Text="Review a pull request" />
+          <TextBlock Classes="body secondary"
+                     Text="Lumen reads the code, compares it with how this repository usually solves the same problems, and points you to the few places that deserve your judgement." />
+        </StackPanel>
+
+        <StackPanel Spacing="8">
+          <TextBlock Classes="section" Text="PULL REQUEST" />
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBox Name="Reference" Text="{Binding Reference}" Watermark="https://github.com/owner/repo/pull/123  or  owner/repo#123"
+                     MinHeight="38" VerticalContentAlignment="Center">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding OpenCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+            <Button Grid.Column="1" Classes="primary" Content="Open" Command="{Binding OpenCommand}" MinHeight="38" Padding="18,0" VerticalContentAlignment="Center" />
+          </Grid>
+          <TextBlock Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+                     Foreground="{DynamicResource Severity.High}" FontSize="12" />
+        </StackPanel>
+
+        <StackPanel Spacing="4" IsVisible="{Binding Recent.Count, Converter={x:Static views:Converters.IsPositive}}">
+          <TextBlock Classes="section" Text="RECENT" Margin="0,4,0,2" />
+          <ItemsControl ItemsSource="{Binding Recent}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <Button Classes="row" Command="{Binding $parent[ItemsControl].((vm:OpenPullRequestViewModel)DataContext).OpenRecentCommand}"
+                        CommandParameter="{Binding}">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Data="{StaticResource Icon.File}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="12" Height="12" />
+                    <TextBlock Text="{Binding}" FontSize="12.5" />
+                  </StackPanel>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                   Text="Uses your GitHub CLI sign-in (gh auth login). Code is analysed locally; nothing is sent to AI services in this version." />
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

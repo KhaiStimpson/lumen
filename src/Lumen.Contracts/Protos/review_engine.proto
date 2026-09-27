@@ -1,0 +1,278 @@
+syntax = "proto3";
+
+package lumen.v1;
+
+option csharp_namespace = "Lumen.Contracts";
+
+import "google/protobuf/timestamp.proto";
+
+// The desktop client <-> local review engine boundary (TDD §47–48).
+service ReviewEngine {
+  rpc Ping (PingRequest) returns (PingReply);
+
+  // Opens (or re-attaches to) a pull request and streams its analysis. Late subscribers receive a replay.
+  rpc WatchPullRequest (WatchPullRequestRequest) returns (stream PullRequestEvent);
+
+  rpc GetFileDiff (GetFileDiffRequest) returns (FileDiff);
+
+  // A file at the PR head, e.g. to open a precedent example in full.
+  rpc GetSourceFile (GetSourceFileRequest) returns (SourceFile);
+
+  rpc SetReviewPointState (SetReviewPointStateRequest) returns (SetReviewPointStateReply);
+
+  rpc PostReviewComment (PostReviewCommentRequest) returns (PostReviewCommentReply);
+}
+
+message PingRequest {}
+
+message PingReply {
+  string version = 1;
+  int32 process_id = 2;
+}
+
+message PullRequestRef {
+  string owner = 1;
+  string name = 2;
+  int32 number = 3;
+}
+
+message WatchPullRequestRequest {
+  PullRequestRef pull_request = 1;
+  // Re-fetch from GitHub even if an analysis for this PR is already running or complete.
+  bool refresh = 2;
+}
+
+message PullRequestEvent {
+  oneof event {
+    AnalysisProgress progress = 1;
+    PullRequestSnapshot snapshot = 2;
+    ReviewPoint review_point_added = 3;
+    ReviewPointStateChanged review_point_state_changed = 4;
+    ConventionsFound conventions = 5;
+    AnalysisComplete complete = 6;
+    AnalysisFailed failed = 7;
+  }
+}
+
+message AnalysisProgress {
+  string stage = 1;
+  string message = 2;
+}
+
+enum FileChangeKind {
+  FILE_CHANGE_KIND_MODIFIED = 0;
+  FILE_CHANGE_KIND_ADDED = 1;
+  FILE_CHANGE_KIND_DELETED = 2;
+  FILE_CHANGE_KIND_RENAMED = 3;
+}
+
+message ChangedFileSummary {
+  string path = 1;
+  string old_path = 2;
+  FileChangeKind kind = 3;
+  int32 additions = 4;
+  int32 deletions = 5;
+  bool is_binary = 6;
+  bool is_mechanical = 7;
+  string mechanical_reason = 8;
+}
+
+message PullRequestSnapshot {
+  PullRequestRef pull_request = 1;
+  string title = 2;
+  string author = 3;
+  string state = 4;
+  bool is_draft = 5;
+  string base_ref = 6;
+  string head_ref = 7;
+  string url = 8;
+  string body = 9;
+  string base_sha = 10;
+  string head_sha = 11;
+  string merge_base_sha = 12;
+  google.protobuf.Timestamp updated_at = 13;
+  repeated ChangedFileSummary files = 14;
+  string viewer_login = 15;
+  int32 review_thread_count = 16;
+}
+
+message GetFileDiffRequest {
+  PullRequestRef pull_request = 1;
+  string path = 2;
+}
+
+enum DiffLineKind {
+  DIFF_LINE_KIND_CONTEXT = 0;
+  DIFF_LINE_KIND_ADDED = 1;
+  DIFF_LINE_KIND_REMOVED = 2;
+}
+
+message DiffLine {
+  DiffLineKind kind = 1;
+  // 0 when the line does not exist on that side.
+  int32 old_number = 2;
+  int32 new_number = 3;
+  string text = 4;
+}
+
+message DiffHunk {
+  int32 old_start = 1;
+  int32 old_count = 2;
+  int32 new_start = 3;
+  int32 new_count = 4;
+  string header = 5;
+  repeated DiffLine lines = 6;
+}
+
+message FileDiff {
+  string path = 1;
+  repeated DiffHunk hunks = 2;
+}
+
+message GetSourceFileRequest {
+  PullRequestRef pull_request = 1;
+  string path = 2;
+}
+
+message SourceFile {
+  string path = 1;
+  string text = 2;
+  bool exists = 3;
+}
+
+message CodeLocation {
+  string path = 1;
+  int32 start_line = 2;
+  int32 end_line = 3;
+  string symbol = 4;
+}
+
+enum ReviewSeverity {
+  REVIEW_SEVERITY_LOW = 0;
+  REVIEW_SEVERITY_MEDIUM = 1;
+  REVIEW_SEVERITY_HIGH = 2;
+}
+
+enum ReviewPointState {
+  REVIEW_POINT_STATE_VISIBLE = 0;
+  REVIEW_POINT_STATE_EXAMINED = 1;
+  REVIEW_POINT_STATE_DISMISSED = 2;
+  REVIEW_POINT_STATE_COMMENTED = 3;
+  REVIEW_POINT_STATE_RESOLVED = 4;
+}
+
+enum EvidenceState {
+  EVIDENCE_STATE_UNVERIFIED = 0;
+  EVIDENCE_STATE_VERIFIED = 1;
+  EVIDENCE_STATE_STRONG = 2;
+  EVIDENCE_STATE_CONFLICTING = 3;
+  EVIDENCE_STATE_HUMAN_DECISION = 4;
+}
+
+message PrecedentExample {
+  CodeLocation location = 1;
+  string type_name = 2;
+  string snippet = 3;
+  int32 snippet_start_line = 4;
+}
+
+message Evidence {
+  string id = 1;
+  // e.g. "RepositoryPrecedent", "StaticAnalysis".
+  string source = 2;
+  // Provenance: the component that produced it, e.g. "peer-pattern/v1".
+  string producer = 3;
+  string summary = 4;
+  bool is_counter_evidence = 5;
+  google.protobuf.Timestamp created_at = 6;
+  string convention = 7;
+  int32 supporting = 8;
+  int32 peer_count = 9;
+  repeated PrecedentExample examples = 10;
+  CodeLocation location = 11;
+}
+
+message ComparisonSide {
+  string title = 1;
+  string caption = 2;
+  CodeLocation source = 3;
+  string snippet = 4;
+  int32 snippet_start_line = 5;
+  repeated int32 highlight_lines = 6;
+  repeated string points = 7;
+}
+
+message ComparisonSurface {
+  ComparisonSide current = 1;
+  ComparisonSide precedent = 2;
+}
+
+message ReviewPoint {
+  string id = 1;
+  // ReviewPointType name, e.g. "PatternDeviation".
+  string type = 2;
+  ReviewSeverity severity = 3;
+  ReviewPointState state = 4;
+  EvidenceState evidence_state = 5;
+  string title = 6;
+  string summary = 7;
+  string why_it_matters = 8;
+  string suggested_comment = 9;
+  CodeLocation anchor = 10;
+  repeated CodeLocation other_locations = 11;
+  repeated Evidence evidence = 12;
+  ComparisonSurface comparison = 13;
+  double priority = 14;
+  string routing_reason = 15;
+}
+
+message ReviewPointStateChanged {
+  string review_point_id = 1;
+  ReviewPointState state = 2;
+}
+
+message Convention {
+  string id = 1;
+  string statement = 2;
+  string peer_group = 3;
+  int32 supporting = 4;
+  int32 peer_count = 5;
+  repeated CodeLocation examples = 6;
+}
+
+message ConventionsFound {
+  repeated Convention conventions = 1;
+}
+
+message AnalysisComplete {
+  int32 review_point_count = 1;
+  int32 suppressed_count = 2;
+  int64 duration_ms = 3;
+}
+
+message AnalysisFailed {
+  string message = 1;
+  bool is_authentication = 2;
+}
+
+message SetReviewPointStateRequest {
+  PullRequestRef pull_request = 1;
+  string review_point_id = 2;
+  ReviewPointState state = 3;
+}
+
+message SetReviewPointStateReply {}
+
+message PostReviewCommentRequest {
+  PullRequestRef pull_request = 1;
+  // Optional: the review point this comment responds to; it is marked Commented.
+  string review_point_id = 2;
+  string path = 3;
+  int32 line = 4;
+  string body = 5;
+}
+
+message PostReviewCommentReply {
+  int64 comment_id = 1;
+  string url = 2;
+}

@@ -1,0 +1,128 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             x:Class="Lumen.App.Views.ReviewCardView"
+             x:DataType="vm:CardContext"
+             FontFamily="{StaticResource UiFont}">
+  <Panel>
+    <!-- Full card at the primary location -->
+    <Border Name="Card" IsVisible="{Binding IsPrimary}"
+            Background="{DynamicResource Card.Deviation.Bg}" BorderBrush="{DynamicResource Card.Deviation.Border}"
+            BorderThickness="1" CornerRadius="{StaticResource Radius.Card}" ClipToBounds="True">
+      <Panel>
+        <!-- Open / examined -->
+        <Grid ColumnDefinitions="Auto,*" Margin="14,12,14,12" IsVisible="{Binding Point.IsOpen}">
+          <Border Width="24" Height="24" CornerRadius="12" VerticalAlignment="Top" Margin="0,1,12,0"
+                  Background="{Binding Point.Kind, Converter={x:Static views:Converters.KindToBrush}}">
+            <Path Data="{Binding Point.Kind, Converter={x:Static views:Converters.KindToIcon}}" Fill="White"
+                  Width="11" Height="11" Stretch="Uniform" />
+          </Border>
+
+          <StackPanel Grid.Column="1" Spacing="6">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="{Binding Point.TypeLabel}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
+                <Border Classes="pill" Classes.High="{Binding Point.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=High}"
+                        Classes.Medium="{Binding Point.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=Medium}"
+                        Classes.Low="{Binding Point.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=Low}">
+                  <TextBlock Text="{Binding Point.Severity}" />
+                </Border>
+                <TextBlock Text="{Binding Point.EvidenceLabel}" Classes="caption" VerticalAlignment="Center" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="{Binding Point.SupportLabel}" Classes="caption tertiary" VerticalAlignment="Center" />
+                <Border Classes="pill"><TextBlock Text="{Binding Point.Tag}" /></Border>
+              </StackPanel>
+            </Grid>
+
+            <TextBlock Text="{Binding Point.Title}" FontWeight="SemiBold" FontSize="13.5" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Point.Summary}" Classes="body secondary" FontSize="12.5" LineHeight="19" MaxLines="3"
+                       TextTrimming="WordEllipsis" />
+
+            <!-- Actions (hidden while composing) -->
+            <WrapPanel Orientation="Horizontal" Margin="0,4,0,0" IsVisible="{Binding !Point.IsComposing}">
+              <Button Classes="subtle" Margin="0,0,8,0" Command="{Binding PullRequest.ShowPrecedentCommand}" CommandParameter="{Binding Point}">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                  <Path Data="{StaticResource Icon.Book}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="12" Height="12" />
+                  <TextBlock Text="Show precedent" />
+                  <Border Classes="kbd"><TextBlock Text="P" /></Border>
+                </StackPanel>
+              </Button>
+              <Button Classes="subtle" Margin="0,0,8,0" Command="{Binding PullRequest.ExamineCommand}" CommandParameter="{Binding Point}">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                  <Path Data="{StaticResource Icon.Eye}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="13" Height="13" />
+                  <TextBlock Text="Why this matters" />
+                  <Border Classes="kbd"><TextBlock Text="↵" /></Border>
+                </StackPanel>
+              </Button>
+              <Button Classes="ghost" Margin="0,0,4,0" Command="{Binding PullRequest.StartCommentCommand}" CommandParameter="{Binding Point}">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                  <TextBlock Text="Comment" />
+                  <Border Classes="kbd"><TextBlock Text="C" /></Border>
+                </StackPanel>
+              </Button>
+              <Button Classes="ghost" Command="{Binding PullRequest.DismissCommand}" CommandParameter="{Binding Point}">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                  <TextBlock Text="Dismiss" />
+                  <Border Classes="kbd"><TextBlock Text="D" /></Border>
+                </StackPanel>
+              </Button>
+            </WrapPanel>
+
+            <!-- Comment composer -->
+            <StackPanel Spacing="8" Margin="0,4,0,0" IsVisible="{Binding Point.IsComposing}">
+              <TextBox Classes="composer" Text="{Binding Point.CommentDraft}" AcceptsReturn="True" TextWrapping="Wrap"
+                       MinHeight="84" MaxHeight="220" FontSize="12.5" />
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="caption" VerticalAlignment="Center" TextWrapping="Wrap"
+                           Text="{Binding Point.PostError, TargetNullValue='Posts a review comment on GitHub at this line.'}"
+                           Foreground="{DynamicResource Text.Secondary}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                  <Button Classes="ghost" Content="Cancel" Command="{Binding PullRequest.CancelCommentCommand}" CommandParameter="{Binding Point}" />
+                  <Button Classes="primary" Command="{Binding PullRequest.PostCommentCommand}" CommandParameter="{Binding Point}"
+                          IsEnabled="{Binding !Point.IsPosting}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="Post comment" Foreground="{DynamicResource Accent.OnAccent}" />
+                      <TextBlock Text="Ctrl ↵" FontSize="10.5" Opacity="0.75" Foreground="{DynamicResource Accent.OnAccent}" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                </StackPanel>
+              </Grid>
+            </StackPanel>
+          </StackPanel>
+        </Grid>
+
+        <!-- Dismissed: collapses to one quiet line with undo -->
+        <Grid ColumnDefinitions="*,Auto" Margin="14,8" IsVisible="{Binding Point.IsDismissed}">
+          <TextBlock Classes="caption" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+            <Run Text="Dismissed · " /><Run Text="{Binding Point.Title}" />
+          </TextBlock>
+          <Button Grid.Column="1" Classes="link" Content="Undo" Command="{Binding PullRequest.RestoreCommand}" CommandParameter="{Binding Point}" />
+        </Grid>
+
+        <!-- Commented -->
+        <Grid ColumnDefinitions="Auto,*,Auto" Margin="14,10" IsVisible="{Binding Point.IsCommented}">
+          <Path Data="{StaticResource Icon.Verified}" Stroke="{DynamicResource Marker.Verified}" Classes="stroke" Width="13" Height="13" Margin="0,0,10,0" />
+          <TextBlock Grid.Column="1" Classes="caption" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+            <Run Text="Commented on GitHub · " /><Run Text="{Binding Point.Title}" />
+          </TextBlock>
+          <Button Grid.Column="2" Classes="link" Content="View" Click="OnOpenPosted" IsVisible="{Binding Point.PostedUrl, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </Grid>
+      </Panel>
+    </Border>
+
+    <!-- Compact reference card at the other locations of a multi-location review point -->
+    <Border IsVisible="{Binding IsReference}" Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Border.Subtle}"
+            BorderThickness="1" CornerRadius="8" Padding="12,7">
+      <Grid ColumnDefinitions="Auto,*,Auto" Opacity="{Binding Point.IsDismissed, Converter={x:Static views:Converters.DimIf}}">
+        <Path Data="{Binding Point.Kind, Converter={x:Static views:Converters.KindToIcon}}"
+              Fill="{Binding Point.Kind, Converter={x:Static views:Converters.KindToBrush}}" Width="11" Height="11" Stretch="Uniform" Margin="0,0,10,0" />
+        <TextBlock Grid.Column="1" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+          <Run Text="{Binding Point.Tag}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Point.Title}" /><Run Text="  ·  same pattern as the primary location" Foreground="{DynamicResource Text.Tertiary}" />
+        </TextBlock>
+        <Button Grid.Column="2" Classes="link" Content="Examine" Command="{Binding PullRequest.ExamineCommand}" CommandParameter="{Binding Point}" />
+      </Grid>
+    </Border>
+  </Panel>
+</UserControl>

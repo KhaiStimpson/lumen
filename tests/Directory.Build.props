@@ -1,0 +1,8 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <PropertyGroup>
+    <!-- xUnit1030: tests must not use ConfigureAwait(false), which is what CA2007 asks for. -->
+    <NoWarn>$(NoWarn);CA2007</NoWarn>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>
