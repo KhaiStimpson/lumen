@@ -21,6 +21,8 @@
     <ProjectReference Include="..\Lumen.Roslyn\Lumen.Roslyn.csproj" />
     <ProjectReference Include="..\Lumen.Analysis\Lumen.Analysis.csproj" />
     <ProjectReference Include="..\Lumen.Storage\Lumen.Storage.csproj" />
+    <ProjectReference Include="..\Lumen.Jev\Lumen.Jev.csproj" />
+    <ProjectReference Include="..\Lumen.Agents\Lumen.Agents.csproj" />
   </ItemGroup>
 
 </Project>

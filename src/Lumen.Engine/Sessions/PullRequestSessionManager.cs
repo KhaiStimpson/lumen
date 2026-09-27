@@ -15,6 +15,7 @@ public sealed partial class PullRequestSessionManager(
     IRepositoryWorkspace workspace,
     IReviewStore store,
     ReviewPointPipeline pipeline,
+    InvestigationCoordinator investigations,
     ILogger<PullRequestSessionManager> logger) : IDisposable
 {
     private readonly ConcurrentDictionary<PullRequestKey, PullRequestSession> _sessions = new();
@@ -90,6 +91,9 @@ public sealed partial class PullRequestSessionManager(
             });
             LogAnalysisComplete(logger, key, result.ReviewPoints.Count, result.Suppressed.Count, stopwatch.ElapsedMilliseconds);
             session.MarkFinished(failed: false);
+
+            // The review is complete and usable; investigations only add evidence to it from here on.
+            await investigations.RunAsync(session, result).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

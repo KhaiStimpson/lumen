@@ -184,6 +184,9 @@ public static class ProtoMapper
             case StaticAnalysisEvidence analysis:
                 proto.Location = ToProto(analysis.Location);
                 break;
+            case AgentInvestigationEvidence { Location: { } location }:
+                proto.Location = ToProto(location);
+                break;
         }
 
         return proto;

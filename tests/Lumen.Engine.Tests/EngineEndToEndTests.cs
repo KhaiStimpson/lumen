@@ -28,6 +28,8 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
                 services.AddSingleton<IGitHubClient>(_gitHub);
                 services.RemoveAll<IRepositoryWorkspace>();
                 services.AddSingleton<IRepositoryWorkspace>(new FakeWorkspace(checkout));
+                services.RemoveAll<ISecretStore>();
+                services.AddSingleton<ISecretStore>(new Lumen.Storage.UnavailableSecretStore());
             });
         await _engine.StartAsync();
     }

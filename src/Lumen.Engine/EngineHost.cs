@@ -1,4 +1,9 @@
+using Lumen.Agents;
+using Lumen.Agents.ClaudeCode;
+using Lumen.Agents.Execution;
+using Lumen.Agents.Investigations;
 using Lumen.Analysis;
+using Lumen.Jev;
 using Lumen.Contracts;
 using Lumen.Domain;
 using Lumen.Engine.Hosting;
@@ -73,12 +78,20 @@ public static class EngineHost
             {
                 CacheRoot = options.DataDirectory,
             }));
-        services.AddSingleton<IReviewStore>(_ => new SqliteReviewStore(Path.Combine(options.DataDirectory, "lumen.db")));
+        services.AddSingleton(_ => new SqliteReviewStore(Path.Combine(options.DataDirectory, "lumen.db")));
+        services.AddSingleton<IReviewStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
+        services.AddSingleton<IAttentionEvaluationStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
+        services.AddSingleton<IInvestigationStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
+
+        services.AddSingleton(_ => EngineSettings.Load(options.DataDirectory));
+        services.AddSingleton<ISecretStore>(_ => OperatingSystem.IsWindows() ? new WindowsCredentialStore() : new UnavailableSecretStore());
 
         services.AddSingleton<IChangeDetector, PeerPatternDetector>();
-        services.AddSingleton<IAttentionPolicy, RuleBasedAttentionPolicy>();
+        services.AddSingleton<RuleBasedAttentionPolicy>();
+        AddJev(services);
         services.AddSingleton<IReviewPointExplainer, PeerDeviationExplainer>();
         services.AddSingleton<ReviewPointPipeline>();
+        AddAgents(services, options);
         services.AddSingleton<PullRequestSessionManager>();
 
         if (options.ParentProcessId is { } parent)
@@ -94,5 +107,61 @@ public static class EngineHost
         var app = builder.Build();
         app.MapGrpcService<ReviewEngineService>();
         return app;
+    }
+
+    /// <summary>JEV on top of the rules (TDD §38). Without a key or permission it is a pass-through to the rules.</summary>
+    internal static void AddJev(IServiceCollection services)
+    {
+        services.AddSingleton(sp =>
+        {
+            var jev = sp.GetRequiredService<EngineSettings>().Jev;
+            return new OpenRouterOptions { Model = jev.Model, RequireZeroDataRetention = jev.RequireZeroDataRetention };
+        });
+        services.AddHttpClient<ISystemOneEvaluator, OpenRouterSystemOneEvaluator>();
+        services.AddSingleton(sp =>
+        {
+            var settings = sp.GetRequiredService<EngineSettings>();
+            return new JevAttentionPolicy(
+                sp.GetRequiredService<RuleBasedAttentionPolicy>(),
+                sp.GetRequiredService<ISystemOneEvaluator>(),
+                sp.GetRequiredService<IAttentionEvaluationStore>(),
+                () => settings.Privacy,
+                new JevPolicyOptions { Enabled = settings.Jev.Enabled, OverallTimeout = TimeSpan.FromSeconds(settings.Jev.TimeoutSeconds) },
+                sp.GetRequiredService<TimeProvider>(),
+                sp.GetRequiredService<ILogger<JevAttentionPolicy>>());
+        });
+        services.AddSingleton<IAttentionPolicy>(sp => sp.GetRequiredService<JevAttentionPolicy>());
+    }
+
+    /// <summary>Investigation agents (TDD §11–13, §35–37), sandboxed to the engine's data directory (§41).</summary>
+    internal static void AddAgents(IServiceCollection services, EngineOptions options)
+    {
+        services.AddSingleton<IProcessRunner>(_ => new SandboxedProcessRunner(new CommandPolicy
+        {
+            AllowedExecutables = new HashSet<string>(StringComparer.Ordinal) { ClaudeCodeProvider.Executable },
+            AllowedWorkingRoots = [options.DataDirectory],
+        }));
+        services.AddSingleton<IAgentProvider>(sp => new ClaudeCodeProvider(
+            sp.GetRequiredService<IProcessRunner>(),
+            Path.Combine(options.DataDirectory, "agent-state")));
+        services.AddSingleton<IAgentWorktreeFactory>(_ => new GitAgentWorktreeFactory(Path.Combine(options.DataDirectory, "agents")));
+        services.AddSingleton<IInvestigator, RepositoryPatternInvestigator>();
+        services.AddSingleton(sp =>
+        {
+            var agents = sp.GetRequiredService<EngineSettings>().Agents;
+            return new InvestigationScheduler(
+                sp.GetServices<IInvestigator>(),
+                sp.GetRequiredService<IAgentProvider>(),
+                sp.GetRequiredService<IInvestigationStore>(),
+                sp.GetRequiredService<IAgentWorktreeFactory>(),
+                new InvestigationSchedulerOptions
+                {
+                    MaxConcurrent = agents.MaxConcurrent,
+                    MaxPerPullRequest = agents.MaxInvestigationsPerPullRequest,
+                    AllowMeteredUsage = agents.AllowMeteredUsage,
+                },
+                sp.GetRequiredService<ILogger<InvestigationScheduler>>());
+        });
+        services.AddSingleton<InvestigationCoordinator>();
     }
 }

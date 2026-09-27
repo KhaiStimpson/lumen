@@ -51,7 +51,17 @@ message PullRequestEvent {
     ConventionsFound conventions = 5;
     AnalysisComplete complete = 6;
     AnalysisFailed failed = 7;
+    // A review point already sent, replaced in full (e.g. after an investigation added evidence).
+    ReviewPoint review_point_updated = 8;
+    InvestigationStatus investigation_status = 9;
   }
+}
+
+// Background investigations; may continue after AnalysisComplete (TDD §49: at most "Analysing N areas…").
+message InvestigationStatus {
+  int32 active = 1;
+  // Why investigations are not running, when they were wanted but could not start (e.g. "Not signed in").
+  string detail = 2;
 }
 
 message AnalysisProgress {
