@@ -4,9 +4,22 @@
              xmlns:views="using:Lumen.App.Views"
              x:Class="Lumen.App.Views.ConnectionsView"
              x:DataType="vm:ConnectionsViewModel">
-  <!-- Each service is its own connection with its own billing (TDD §39): subscription and metered never blur. -->
+  <!-- Each service is its own connection with its own billing (TDD §39): subscription and metered never blur.
+       The switches save to the engine's settings.json and apply without a restart (TDD §40). -->
   <StackPanel Spacing="20">
-    <StackPanel Spacing="10">
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+      <StackPanel Spacing="2">
+        <TextBlock Classes="h3" Text="Cloud AI" />
+        <TextBlock Classes="caption secondary" TextWrapping="Wrap"
+                   Text="The master switch. When it's off, nothing is sent to any AI service." />
+      </StackPanel>
+      <ToggleSwitch Name="AllowCloudReasoning" Grid.Column="1" Classes="setting" IsChecked="{Binding AllowCloudReasoning}"
+                    IsEnabled="{Binding IsLoaded}" />
+    </Grid>
+
+    <Border Classes="divider" />
+
+    <StackPanel Spacing="12">
       <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
         <Ellipse Width="8" Height="8" VerticalAlignment="Center"
                  Fill="{Binding JevState, Converter={x:Static views:Converters.ConnectionToBrush}}" />
@@ -19,11 +32,29 @@
       <StackPanel Spacing="4" Margin="18,0,0,0">
         <TextBlock Name="JevStatus" Classes="body" Text="{Binding JevStatus}" TextWrapping="Wrap" />
         <TextBlock Classes="caption tertiary" Text="{Binding JevModel}" FontFamily="{StaticResource CodeFont}" />
-        <TextBlock Classes="caption secondary" Text="{Binding JevSends, StringFormat='Sends: {0}'}" TextWrapping="Wrap"
-                   IsVisible="{Binding IsLoaded}" />
       </StackPanel>
 
-      <StackPanel Spacing="8" Margin="18,0,0,0" IsVisible="{Binding CanStoreKey}">
+      <StackPanel Spacing="10" Margin="18,0,0,0" IsEnabled="{Binding AllowCloudReasoning}">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+          <StackPanel Spacing="2">
+            <TextBlock Classes="body" Text="Use JEV to route attention" />
+            <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="{Binding JevSends, StringFormat='Sends: {0}'}" />
+          </StackPanel>
+          <ToggleSwitch Name="JevEnabled" Grid.Column="1" Classes="setting" IsChecked="{Binding JevEnabled}"
+                        IsEnabled="{Binding IsLoaded}" />
+        </Grid>
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" IsEnabled="{Binding JevEnabled}">
+          <StackPanel Spacing="2">
+            <TextBlock Classes="body" Text="Include convention wording" />
+            <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                       Text="Short pattern descriptions, e.g. &quot;classes that take AppDbContext&quot;. Never source code." />
+          </StackPanel>
+          <ToggleSwitch Name="AllowCodeSnippetsToJev" Grid.Column="1" Classes="setting" IsChecked="{Binding AllowCodeSnippetsToJev}"
+                        IsEnabled="{Binding IsLoaded}" />
+        </Grid>
+      </StackPanel>
+
+      <StackPanel Spacing="8" Margin="18,4,0,0" IsVisible="{Binding CanStoreKey}">
         <TextBlock Classes="section" Text="{Binding KeyLabel}" />
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
           <TextBox Name="OpenRouterKey" Text="{Binding KeyInput}" PasswordChar="•" RevealPassword="False"
@@ -46,7 +77,7 @@
 
     <Border Classes="divider" />
 
-    <StackPanel Spacing="10">
+    <StackPanel Spacing="12">
       <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
         <Ellipse Width="8" Height="8" VerticalAlignment="Center"
                  Fill="{Binding ClaudeState, Converter={x:Static views:Converters.ConnectionToBrush}}" />
@@ -58,17 +89,23 @@
       </Grid>
       <StackPanel Spacing="4" Margin="18,0,0,0">
         <TextBlock Classes="body" Text="{Binding ClaudeStatus}" TextWrapping="Wrap" />
-        <TextBlock Classes="caption secondary" Text="{Binding InvestigationsStatus, StringFormat='Investigations: {0}'}"
-                   TextWrapping="Wrap" IsVisible="{Binding IsLoaded}" />
         <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
                    Text="Uses your own signed-in Claude Code CLI. Sign in with: claude" />
       </StackPanel>
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="18,0,0,0" IsEnabled="{Binding AllowCloudReasoning}">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="Run investigations" />
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                     Text="Claude Code reads this repository to check a finding, so repository code is sent to Anthropic." />
+          <TextBlock Classes="caption secondary" TextWrapping="Wrap" Text="{Binding InvestigationsStatus}"
+                     IsVisible="{Binding IsLoaded}" />
+        </StackPanel>
+        <ToggleSwitch Name="InvestigationsEnabled" Grid.Column="1" Classes="setting" IsChecked="{Binding InvestigationsEnabled}"
+                      IsEnabled="{Binding IsLoaded}" />
+      </Grid>
     </StackPanel>
 
     <TextBlock Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"
                Foreground="{DynamicResource Severity.High}" FontSize="12" TextWrapping="Wrap" />
-
-    <TextBlock Classes="caption tertiary" TextWrapping="Wrap" IsVisible="{Binding IsLoaded}"
-               Text="{Binding SettingsPath, StringFormat='Privacy and on/off switches live in {0}'}" />
   </StackPanel>
 </UserControl>

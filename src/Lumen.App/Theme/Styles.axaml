@@ -187,6 +187,17 @@
     <Setter Property="Background" Value="{DynamicResource Surface.Selected}" />
   </Style>
 
+  <!-- Settings switches: no On/Off captions (the row says what it does), accent when on -->
+  <Style Selector="ToggleSwitch.setting">
+    <Setter Property="OnContent" Value="{x:Null}" />
+    <Setter Property="OffContent" Value="{x:Null}" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="ToggleSwitch.setting:checked /template/ Border#SwitchKnobBounds">
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+  </Style>
+
   <!-- Icons -->
   <Style Selector="PathIcon">
     <Setter Property="Width" Value="14" />

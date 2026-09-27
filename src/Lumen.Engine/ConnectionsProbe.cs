@@ -11,7 +11,7 @@ namespace Lumen.Engine;
 /// the credential store and never read back out of it here.
 /// </summary>
 public sealed class ConnectionsProbe(
-    EngineSettings settings,
+    EngineSettingsStore store,
     string dataDirectory,
     ISecretStore secrets,
     IOpenRouterKeyCheck keyCheck,
@@ -19,14 +19,39 @@ public sealed class ConnectionsProbe(
 {
     public async Task<Connections> GetAsync(CancellationToken cancellationToken)
     {
-        var jev = JevAsync(cancellationToken);
-        var claude = ClaudeAsync(cancellationToken);
+        var settings = store.Current;
+        var jev = JevAsync(settings, cancellationToken);
+        var claude = ClaudeAsync(settings, cancellationToken);
         return new Connections
         {
             Jev = await jev.ConfigureAwait(false),
             Claude = await claude.ConfigureAwait(false),
             SettingsPath = EngineSettings.PathIn(dataDirectory),
+            Settings = new ConnectionSettings
+            {
+                AllowCloudReasoning = settings.Privacy.AllowCloudReasoning,
+                JevEnabled = settings.Jev.Enabled,
+                AllowCodeSnippetsToJev = settings.Privacy.AllowCodeSnippetsToJev,
+                InvestigationsEnabled = settings.Agents.Enabled && settings.Privacy.AllowCodeToAgents,
+            },
         };
+    }
+
+    /// <summary>Only the panel's switches change; model, limits and everything else in settings.json are kept.</summary>
+    public void UpdateSettings(ConnectionSettings changes)
+    {
+        ArgumentNullException.ThrowIfNull(changes);
+        store.Update(current => current with
+        {
+            Privacy = current.Privacy with
+            {
+                AllowCloudReasoning = changes.AllowCloudReasoning,
+                AllowCodeSnippetsToJev = changes.AllowCodeSnippetsToJev,
+                AllowCodeToAgents = changes.InvestigationsEnabled,
+            },
+            Jev = current.Jev with { Enabled = changes.JevEnabled },
+            Agents = current.Agents with { Enabled = changes.InvestigationsEnabled },
+        });
     }
 
     /// <exception cref="ArgumentException">The key is blank.</exception>
@@ -49,7 +74,7 @@ public sealed class ConnectionsProbe(
 
     public bool RemoveOpenRouterKey() => secrets.Delete(SecretNames.OpenRouterApiKey);
 
-    private async Task<JevConnection> JevAsync(CancellationToken cancellationToken)
+    private async Task<JevConnection> JevAsync(EngineSettings settings, CancellationToken cancellationToken)
     {
         var stored = HasKey();
         var connection = new JevConnection
@@ -65,7 +90,7 @@ public sealed class ConnectionsProbe(
         if (!settings.Jev.Enabled || !settings.Privacy.AllowsJev)
         {
             connection.State = ConnectionState.Off;
-            connection.Detail = "Off in settings (jev.enabled / privacy.allowCloudReasoning)";
+            connection.Detail = settings.Privacy.AllowsJev ? "Turned off" : "Off: cloud AI is turned off";
         }
         else if (!stored)
         {
@@ -82,7 +107,7 @@ public sealed class ConnectionsProbe(
         return connection;
     }
 
-    private async Task<AgentConnection> ClaudeAsync(CancellationToken cancellationToken)
+    private async Task<AgentConnection> ClaudeAsync(EngineSettings settings, CancellationToken cancellationToken)
     {
         var auth = await agent.GetAuthenticationStateAsync(cancellationToken).ConfigureAwait(false);
         var agents = settings.Agents;
@@ -100,7 +125,7 @@ public sealed class ConnectionsProbe(
             InvestigationsEnabled = settings.AgentsAllowed,
             InvestigationsDetail = settings.AgentsAllowed
                 ? $"On · up to {agents.MaxInvestigationsPerPullRequest} per pull request · {(agents.AllowMeteredUsage ? "metered usage allowed" : "subscription only")}"
-                : "Off (settings: agents.enabled and privacy.allowCodeToAgents must both be true)",
+                : settings.Privacy.AllowCloudReasoning && !settings.Privacy.LocalModelsOnly ? "Off" : "Off: cloud AI is turned off",
         };
     }
 

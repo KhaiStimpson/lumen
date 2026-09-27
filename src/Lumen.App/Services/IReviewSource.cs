@@ -24,4 +24,7 @@ public interface IReviewSource : IAsyncDisposable
     Task<Connections> SetOpenRouterKeyAsync(string key, CancellationToken cancellationToken);
 
     Task<Connections> RemoveOpenRouterKeyAsync(CancellationToken cancellationToken);
+
+    /// <summary>Saves the panel's switches to the engine's settings.json; they apply without a restart.</summary>
+    Task<Connections> UpdateConnectionSettingsAsync(ConnectionSettings settings, CancellationToken cancellationToken);
 }

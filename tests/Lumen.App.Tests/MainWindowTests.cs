@@ -256,6 +256,38 @@ public sealed class MainWindowTests
     }
 
     [AvaloniaFact]
+    public async Task ConnectionsSwitchesSaveThroughTheEngine()
+    {
+        await using var session = await Session.OpenAsync();
+        var (window, connections) = (session.Window, session.ViewModel.Connections);
+        await session.ViewModel.OpenConnectionsCommand.ExecuteAsync(null);
+        await Fixture.PumpAsync();
+
+        ToggleSwitch Switch(string name) => window.GetVisualDescendants().OfType<ToggleSwitch>().Single(t => t.Name == name);
+        Assert.True(Switch("JevEnabled").IsChecked);
+        Assert.False(Switch("InvestigationsEnabled").IsChecked);
+
+        Switch("InvestigationsEnabled").IsChecked = true;
+        await Fixture.WaitUntilAsync(() => connections.Status!.Claude.InvestigationsEnabled);
+        Assert.True(session.Source.ConnectionSettings.InvestigationsEnabled);
+        Assert.StartsWith("On", connections.InvestigationsStatus, StringComparison.Ordinal);
+
+        Switch("JevEnabled").IsChecked = false;
+        await Fixture.WaitUntilAsync(() => connections.JevState == ConnectionState.Off);
+        Assert.False(session.Source.ConnectionSettings.JevEnabled);
+        Assert.False(Switch("AllowCodeSnippetsToJev").IsEffectivelyEnabled);
+        await Fixture.PumpAsync(20);
+        Capture(window, "06-connections-settings.png");
+
+        // Cloud AI is the master switch: the per-service switches keep their values but can't be changed.
+        Switch("AllowCloudReasoning").IsChecked = false;
+        await Fixture.WaitUntilAsync(() => !session.Source.ConnectionSettings.AllowCloudReasoning);
+        Assert.Equal("Off: cloud AI is turned off", connections.JevStatus);
+        Assert.False(Switch("InvestigationsEnabled").IsEffectivelyEnabled);
+        Assert.True(session.Source.ConnectionSettings.InvestigationsEnabled);
+    }
+
+    [AvaloniaFact]
     public async Task ConnectionsPanelIsModalAndEscapeClosesIt()
     {
         await using var session = await Session.OpenAsync();
@@ -272,6 +304,27 @@ public sealed class MainWindowTests
 
         await session.PressAsync(PhysicalKey.J);
         Assert.NotSame(first, pr.CurrentPoint);
+    }
+
+    [AvaloniaFact]
+    public async Task ClickingOutsideTheConnectionsCardClosesIt()
+    {
+        await using var session = await Session.OpenAsync();
+        var (window, vm) = (session.Window, session.ViewModel);
+        await vm.OpenConnectionsCommand.ExecuteAsync(null);
+        await Fixture.PumpAsync();
+
+        var card = window.FindControl<Border>("ConnectionsCard")!;
+        var inside = card.TranslatePoint(new Point(40, 40), window)!.Value;
+        window.MouseDown(inside, MouseButton.Left);
+        window.MouseUp(inside, MouseButton.Left);
+        await Fixture.PumpAsync();
+        Assert.True(vm.IsConnectionsOpen);
+
+        window.MouseDown(new Point(60, 500), MouseButton.Left);
+        window.MouseUp(new Point(60, 500), MouseButton.Left);
+        await Fixture.PumpAsync();
+        Assert.False(vm.IsConnectionsOpen);
     }
 
     private static void Capture(Window window, string name)

@@ -6,8 +6,8 @@ no git remote; fast-forwarded into main). Status, design and deviations: [plan.m
 ## State
 
 P3.1–P4.4 are done and committed, plus an in-app **Connections** panel (plug button in the title bar; TDD §39) that
-stores the OpenRouter key through the engine and shows JEV/Claude status. `dotnet build Lumen.slnx` has 0 errors (the
-warnings are the pre-existing Avalonia `Watermark` ones) and `dotnet test Lumen.slnx` passes (298 tests). Only **P4.5, the live checks**, remains, and it needs you.
+stores the OpenRouter key through the engine, shows JEV/Claude status, and edits the Cloud AI, JEV and investigation switches live. `dotnet build Lumen.slnx` has 0 errors (the
+warnings are the pre-existing Avalonia `Watermark` ones) and `dotnet test Lumen.slnx` passes (303 tests). Only **P4.5, the live checks**, remains, and it needs you.
 
 ## Needs the user (nothing here has been done without asking)
 

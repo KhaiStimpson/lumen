@@ -47,7 +47,7 @@ public sealed class JevAttentionPolicyTests
         PrivacySettings? privacy = null,
         JevPolicyOptions? options = null,
         TimeProvider? time = null) =>
-        new(Rules, evaluator, store ?? new MemoryEvaluationStore(), () => privacy ?? new PrivacySettings(), options ?? new JevPolicyOptions(), time ?? TimeProvider.System, NullLogger<JevAttentionPolicy>.Instance);
+        new(Rules, evaluator, store ?? new MemoryEvaluationStore(), () => privacy ?? new PrivacySettings(), () => options ?? new JevPolicyOptions(), time ?? TimeProvider.System, NullLogger<JevAttentionPolicy>.Instance);
 
     private static async Task<IReadOnlyList<AttentionDecision>> RulesFor(params Candidate[] candidates)
     {
@@ -84,6 +84,24 @@ public sealed class JevAttentionPolicyTests
 
         Assert.Equal(await RulesFor(Candidate("a")), decisions);
         Assert.Empty(evaluator.States);
+    }
+
+    [Fact]
+    public async Task ReadsSettingsAtEachAnalysis()
+    {
+        var evaluator = FakeEvaluator.Answering(new Dictionary<string, double>());
+        var options = new JevPolicyOptions { Enabled = false };
+        var policy = new JevAttentionPolicy(
+            Rules, evaluator, new MemoryEvaluationStore(), () => new PrivacySettings(), () => options, TimeProvider.System,
+            NullLogger<JevAttentionPolicy>.Instance);
+
+        await ((IAttentionPolicy)policy).DecideAllAsync([Candidate("a")], Context(), CancellationToken.None);
+        Assert.Empty(evaluator.States);
+        Assert.Contains("disabled", policy.LastStatus, StringComparison.Ordinal);
+
+        options = new JevPolicyOptions { Enabled = true };
+        await ((IAttentionPolicy)policy).DecideAllAsync([Candidate("a")], Context(), CancellationToken.None);
+        Assert.Single(evaluator.States);
     }
 
     [Theory]

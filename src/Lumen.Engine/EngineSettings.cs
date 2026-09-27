@@ -74,3 +74,27 @@ public sealed record EngineSettings
         File.WriteAllText(PathIn(dataDirectory), JsonSerializer.Serialize(this, Json));
     }
 }
+
+/// <summary>
+/// The live settings. The Connections panel changes them while the engine runs; readers take <see cref="Current"/>
+/// at the moment they decide, so a change applies to the next JEV call or investigation without a restart.
+/// </summary>
+public sealed class EngineSettingsStore(EngineSettings initial, string dataDirectory)
+{
+    private readonly Lock _gate = new();
+
+    public EngineSettings Current { get; private set; } = initial;
+
+    /// <summary>Writes the changed settings to disk first, so the file and the engine never disagree.</summary>
+    public EngineSettings Update(Func<EngineSettings, EngineSettings> change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        lock (_gate)
+        {
+            var next = change(Current);
+            next.Save(dataDirectory);
+            Current = next;
+            return next;
+        }
+    }
+}

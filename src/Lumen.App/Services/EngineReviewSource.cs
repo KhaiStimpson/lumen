@@ -101,6 +101,11 @@ public sealed class EngineReviewSource : IReviewSource
             .RemoveOpenRouterKeyAsync(new RemoveOpenRouterKeyRequest(), cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
+    public async Task<Connections> UpdateConnectionSettingsAsync(ConnectionSettings settings, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .UpdateConnectionSettingsAsync(settings, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
     private async Task<ReviewEngine.ReviewEngineClient> ClientAsync(CancellationToken cancellationToken)
     {
         await _connectGate.WaitAsync(cancellationToken).ConfigureAwait(false);

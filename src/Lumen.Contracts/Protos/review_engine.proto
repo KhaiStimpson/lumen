@@ -29,6 +29,9 @@ service ReviewEngine {
   rpc SetOpenRouterKey (SetOpenRouterKeyRequest) returns (Connections);
 
   rpc RemoveOpenRouterKey (RemoveOpenRouterKeyRequest) returns (Connections);
+
+  // Saved to settings.json and applied to the next JEV call or investigation, without a restart.
+  rpc UpdateConnectionSettings (ConnectionSettings) returns (Connections);
 }
 
 message PingRequest {}
@@ -339,9 +342,22 @@ message AgentConnection {
   string investigations_detail = 6;
 }
 
+// The switches the Connections panel edits (TDD §40). Everything else stays in settings.json.
+message ConnectionSettings {
+  // privacy.allowCloudReasoning: the master switch for every outbound model call.
+  bool allow_cloud_reasoning = 1;
+  // jev.enabled
+  bool jev_enabled = 2;
+  // privacy.allowCodeSnippetsToJev: convention wording, not just counts and categories.
+  bool allow_code_snippets_to_jev = 3;
+  // agents.enabled and privacy.allowCodeToAgents together: investigations send repository code to the agent.
+  bool investigations_enabled = 4;
+}
+
 message Connections {
   JevConnection jev = 1;
   AgentConnection claude = 2;
   // Where the non-secret preferences live (jev.enabled, privacy.*, agents.*).
   string settings_path = 3;
+  ConnectionSettings settings = 4;
 }

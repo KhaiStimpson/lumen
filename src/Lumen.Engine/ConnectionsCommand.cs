@@ -61,7 +61,7 @@ public static class ConnectionsCommand
             AllowedWorkingRoots = [options.DataDirectory],
         });
         var probe = new ConnectionsProbe(
-            settings,
+            new EngineSettingsStore(settings, options.DataDirectory),
             options.DataDirectory,
             secrets,
             new OpenRouterSystemOneEvaluator(http, secrets, new OpenRouterOptions { Model = settings.Jev.Model }),

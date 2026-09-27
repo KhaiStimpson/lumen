@@ -15,7 +15,7 @@ namespace Lumen.Engine.Sessions;
 /// agents are off, unavailable or failing, the reviewer simply keeps the deterministic evidence (§55).
 /// </summary>
 public sealed partial class InvestigationCoordinator(
-    EngineSettings settings,
+    EngineSettingsStore settings,
     InvestigationScheduler scheduler,
     ILogger<InvestigationCoordinator> logger)
 {
@@ -49,7 +49,7 @@ public sealed partial class InvestigationCoordinator(
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(result);
 
-        if (!settings.AgentsAllowed || session.Checkout is not { } checkout)
+        if (!settings.Current.AgentsAllowed || session.Checkout is not { } checkout)
         {
             return;
         }

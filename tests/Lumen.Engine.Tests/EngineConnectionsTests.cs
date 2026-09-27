@@ -154,6 +154,65 @@ public sealed class EngineConnectionsTests : IAsyncDisposable
         Assert.Equal(StatusCode.FailedPrecondition, error.StatusCode);
     }
 
+    [Fact]
+    public async Task SettingsChangesAreSavedAndApplyWithoutARestart()
+    {
+        _secrets.Write(SecretNames.OpenRouterApiKey, Key);
+        var client = await StartAsync(new EngineSettings
+        {
+            Jev = new JevSettings { Model = "typesafe/jev-custom" },
+            Agents = new AgentSettings { MaxInvestigationsPerPullRequest = 7 },
+        });
+
+        var status = await client.UpdateConnectionSettingsAsync(new ConnectionSettings
+        {
+            AllowCloudReasoning = true,
+            JevEnabled = false,
+            AllowCodeSnippetsToJev = true,
+            InvestigationsEnabled = true,
+        });
+
+        Assert.Equal(ConnectionState.Off, status.Jev.State);
+        Assert.Equal("Turned off", status.Jev.Detail);
+        Assert.True(status.Settings.InvestigationsEnabled);
+        Assert.True(status.Claude.InvestigationsEnabled);
+
+        var live = _engine!.Services.GetRequiredService<EngineSettingsStore>().Current;
+        Assert.False(live.Jev.Enabled);
+        Assert.True(live.AgentsAllowed);
+
+        var saved = EngineSettings.Load(_dataDir);
+        Assert.False(saved.Jev.Enabled);
+        Assert.True(saved.Privacy.AllowCodeSnippetsToJev);
+        Assert.True(saved.Privacy.AllowCodeToAgents);
+        Assert.True(saved.Agents.Enabled);
+        Assert.Equal("typesafe/jev-custom", saved.Jev.Model);
+        Assert.Equal(7, saved.Agents.MaxInvestigationsPerPullRequest);
+    }
+
+    [Fact]
+    public async Task TurningOffCloudAiTurnsOffJevAndInvestigations()
+    {
+        _secrets.Write(SecretNames.OpenRouterApiKey, Key);
+        var client = await StartAsync(new EngineSettings
+        {
+            Privacy = new PrivacySettings { AllowCodeToAgents = true },
+            Agents = new AgentSettings { Enabled = true },
+        });
+
+        var status = await client.UpdateConnectionSettingsAsync(new ConnectionSettings
+        {
+            AllowCloudReasoning = false,
+            JevEnabled = true,
+            InvestigationsEnabled = true,
+        });
+
+        Assert.Equal(ConnectionState.Off, status.Jev.State);
+        Assert.Equal("Off: cloud AI is turned off", status.Jev.Detail);
+        Assert.False(status.Claude.InvestigationsEnabled);
+        Assert.Equal(0, _keyCheck.Calls);
+    }
+
     private sealed class MemorySecretStore : ISecretStore
     {
         private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);

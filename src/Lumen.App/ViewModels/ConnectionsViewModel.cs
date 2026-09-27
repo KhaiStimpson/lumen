@@ -12,6 +12,12 @@ namespace Lumen.App.ViewModels;
 /// </summary>
 public sealed partial class ConnectionsViewModel(IReviewSource source) : ObservableObject
 {
+    // Replies can overtake each other when switches flip quickly; only the newest request's reply is shown.
+    private int _sequence;
+
+    // Set while a reply is copied into the switches, so that copying isn't sent back as a change.
+    private bool _applying;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(
         nameof(IsLoaded), nameof(JevState), nameof(JevStatus), nameof(JevModel), nameof(JevSends), nameof(IsKeyStored), nameof(KeyLabel),
@@ -29,6 +35,20 @@ public sealed partial class ConnectionsViewModel(IReviewSource source) : Observa
 
     [ObservableProperty]
     public partial string? Error { get; private set; }
+
+    /// <summary>privacy.allowCloudReasoning: off means nothing goes to any AI service.</summary>
+    [ObservableProperty]
+    public partial bool AllowCloudReasoning { get; set; }
+
+    [ObservableProperty]
+    public partial bool JevEnabled { get; set; }
+
+    [ObservableProperty]
+    public partial bool AllowCodeSnippetsToJev { get; set; }
+
+    /// <summary>agents.enabled and privacy.allowCodeToAgents together.</summary>
+    [ObservableProperty]
+    public partial bool InvestigationsEnabled { get; set; }
 
     public bool IsLoaded => Status is not null;
 
@@ -82,25 +102,84 @@ public sealed partial class ConnectionsViewModel(IReviewSource source) : Observa
 
     private bool CanRemoveKey() => !IsBusy;
 
+    partial void OnAllowCloudReasoningChanged(bool value) => SaveSettings();
+
+    partial void OnJevEnabledChanged(bool value) => SaveSettings();
+
+    partial void OnAllowCodeSnippetsToJevChanged(bool value) => SaveSettings();
+
+    partial void OnInvestigationsEnabledChanged(bool value) => SaveSettings();
+
+    partial void OnStatusChanged(Connections? value)
+    {
+        if (value?.Settings is not { } settings)
+        {
+            return;
+        }
+
+        _applying = true;
+        try
+        {
+            AllowCloudReasoning = settings.AllowCloudReasoning;
+            JevEnabled = settings.JevEnabled;
+            AllowCodeSnippetsToJev = settings.AllowCodeSnippetsToJev;
+            InvestigationsEnabled = settings.InvestigationsEnabled;
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+
+    private async void SaveSettings()
+    {
+        if (_applying || Status is null)
+        {
+            return;
+        }
+
+        var settings = new ConnectionSettings
+        {
+            AllowCloudReasoning = AllowCloudReasoning,
+            JevEnabled = JevEnabled,
+            AllowCodeSnippetsToJev = AllowCodeSnippetsToJev,
+            InvestigationsEnabled = InvestigationsEnabled,
+        };
+        await RunAsync(ct => source.UpdateConnectionSettingsAsync(settings, ct)).ConfigureAwait(true);
+    }
+
     private async Task RunAsync(Func<CancellationToken, Task<Connections>> call)
     {
+        var sequence = ++_sequence;
         IsBusy = true;
         Error = null;
         try
         {
-            Status = await call(CancellationToken.None).ConfigureAwait(true);
+            var status = await call(CancellationToken.None).ConfigureAwait(true);
+            if (sequence == _sequence)
+            {
+                Status = status;
+            }
         }
         catch (RpcException ex)
         {
             Error = ex.Status.Detail;
+            RevertSwitches();
         }
         catch (EngineUnavailableException ex)
         {
             Error = ex.Message;
+            RevertSwitches();
         }
         finally
         {
-            IsBusy = false;
+            if (sequence == _sequence)
+            {
+                IsBusy = false;
+            }
         }
     }
+
+    /// <summary>After a failed save, the switches go back to what the engine last reported.</summary>
+    private void RevertSwitches() => OnStatusChanged(Status);
 }

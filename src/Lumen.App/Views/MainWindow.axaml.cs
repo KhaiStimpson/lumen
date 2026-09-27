@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -36,7 +37,16 @@ public sealed partial class MainWindow : Window
             }
         };
 
-        ConnectionsScrim.PointerPressed += (_, _) => ViewModel?.CloseConnectionsCommand.Execute(null);
+        // A click outside the card closes it (but not a click on the scroll bar).
+        ConnectionsScroller.PointerPressed += (_, e) =>
+        {
+            if (e.Source is Visual target
+                && !ConnectionsCard.IsVisualAncestorOf(target)
+                && target.FindAncestorOfType<Avalonia.Controls.Primitives.ScrollBar>(includeSelf: true) is null)
+            {
+                ViewModel?.CloseConnectionsCommand.Execute(null);
+            }
+        };
     }
 
     private MainWindowViewModel? ViewModel => DataContext as MainWindowViewModel;

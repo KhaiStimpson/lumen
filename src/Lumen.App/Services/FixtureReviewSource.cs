@@ -100,7 +100,15 @@ public sealed class FixtureReviewSource : IReviewSource
     /// <summary>Whether a key has been "stored"; the fixture keeps only this flag, never the key.</summary>
     public bool OpenRouterKeyStored { get; set; }
 
+    public ConnectionSettings ConnectionSettings { get; private set; } = new() { AllowCloudReasoning = true, JevEnabled = true };
+
     public Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken) => Task.FromResult(FixtureConnections());
+
+    public Task<Connections> UpdateConnectionSettingsAsync(ConnectionSettings settings, CancellationToken cancellationToken)
+    {
+        ConnectionSettings = settings.Clone();
+        return Task.FromResult(FixtureConnections());
+    }
 
     public Task<Connections> SetOpenRouterKeyAsync(string key, CancellationToken cancellationToken)
     {
@@ -116,14 +124,20 @@ public sealed class FixtureReviewSource : IReviewSource
 
     private Connections FixtureConnections() => new()
     {
+        Settings = ConnectionSettings.Clone(),
         Jev = new JevConnection
         {
-            State = OpenRouterKeyStored ? ConnectionState.Connected : ConnectionState.NotConnected,
-            Detail = OpenRouterKeyStored ? "Key valid · 4.82 credit remaining" : "No OpenRouter key",
+            State = !ConnectionSettings.AllowCloudReasoning || !ConnectionSettings.JevEnabled ? ConnectionState.Off
+                : OpenRouterKeyStored ? ConnectionState.Connected : ConnectionState.NotConnected,
+            Detail = !ConnectionSettings.AllowCloudReasoning ? "Off: cloud AI is turned off"
+                : !ConnectionSettings.JevEnabled ? "Turned off"
+                : OpenRouterKeyStored ? "Key valid · 4.82 credit remaining" : "No OpenRouter key",
             Model = "typesafe/jev-1.13",
             KeyStored = OpenRouterKeyStored,
             CanStoreKey = true,
-            Sends = "Counts and categories only — no code, paths or names",
+            Sends = ConnectionSettings.AllowCodeSnippetsToJev
+                ? "Counts, categories and convention wording"
+                : "Counts and categories only — no code, paths or names",
         },
         Claude = new AgentConnection
         {
@@ -131,7 +145,10 @@ public sealed class FixtureReviewSource : IReviewSource
             Detail = "Claude Pro via Claude Code",
             Version = "2.1.0",
             Billing = ConnectionBilling.Subscription,
-            InvestigationsDetail = "Off (settings: agents.enabled and privacy.allowCodeToAgents must both be true)",
+            InvestigationsEnabled = ConnectionSettings.AllowCloudReasoning && ConnectionSettings.InvestigationsEnabled,
+            InvestigationsDetail = ConnectionSettings.AllowCloudReasoning && ConnectionSettings.InvestigationsEnabled
+                ? "On · up to 3 per pull request · subscription only"
+                : "Off",
         },
         SettingsPath = @"%LOCALAPPDATA%\Lumen\settings.json",
     };

@@ -52,12 +52,15 @@ public sealed partial class JevAttentionPolicy(
     ISystemOneEvaluator evaluator,
     IAttentionEvaluationStore store,
     Func<PrivacySettings> privacy,
-    JevPolicyOptions options,
+    Func<JevPolicyOptions> currentOptions,
     TimeProvider time,
     ILogger<JevAttentionPolicy> logger) : IAttentionPolicy
 {
     private readonly Lock _gate = new();
     private DateTimeOffset _pausedUntil = DateTimeOffset.MinValue;
+
+    /// <summary>Read at each use, so a settings change applies to the next analysis without a restart.</summary>
+    private JevPolicyOptions Options => currentOptions();
 
     /// <summary>Human-readable state of the last attempt, for connection diagnostics.</summary>
     public string LastStatus { get; private set; } = "Not used yet";
@@ -94,13 +97,13 @@ public sealed partial class JevAttentionPolicy(
         // One request per change unit (TDD §38.1), split only if a unit has many candidates.
         var batches = surfaced
             .GroupBy(i => candidates[i].ChangeUnits.Count > 0 ? candidates[i].ChangeUnits[0].Id : candidates[i].Key, StringComparer.Ordinal)
-            .SelectMany(g => g.Chunk(Math.Max(1, options.MaxCandidatesPerRequest)))
+            .SelectMany(g => g.Chunk(Math.Max(1, Options.MaxCandidatesPerRequest)))
             .ToList();
 
         // Disposed only once every batch has finished, so a late batch never touches a disposed token or semaphore.
         var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        budget.CancelAfter(options.OverallTimeout);
-        var throttle = new SemaphoreSlim(Math.Max(1, options.MaxParallelRequests));
+        budget.CancelAfter(Options.OverallTimeout);
+        var throttle = new SemaphoreSlim(Math.Max(1, Options.MaxParallelRequests));
         var privacySettings = privacy();
         var ruleDecisions = decisions.ToArray();
 
@@ -129,7 +132,7 @@ public sealed partial class JevAttentionPolicy(
             TaskScheduler.Default);
 
         // Never wait on an evaluator past the budget, even one that ignores cancellation (§38.2).
-        await Task.WhenAny(all, Task.Delay(options.OverallTimeout + TimeSpan.FromMilliseconds(250), CancellationToken.None)).ConfigureAwait(false);
+        await Task.WhenAny(all, Task.Delay(Options.OverallTimeout + TimeSpan.FromMilliseconds(250), CancellationToken.None)).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
         var answered = 0;
@@ -160,7 +163,7 @@ public sealed partial class JevAttentionPolicy(
     private bool ShouldCallJev(out string reason)
     {
         reason = "";
-        if (!options.Enabled)
+        if (!Options.Enabled)
         {
             reason = "JEV disabled in settings";
         }
@@ -227,7 +230,7 @@ public sealed partial class JevAttentionPolicy(
                 .Where(a => a is not null)
                 .ToDictionary(a => a!.QuestionId[(id.Length + 1)..], a => a!, StringComparer.Ordinal);
 
-            combined[n] = Combine(ruleDecisions[batch[n]], answers, options.Thresholds, result.ResolvedModel ?? result.Model);
+            combined[n] = Combine(ruleDecisions[batch[n]], answers, Options.Thresholds, result.ResolvedModel ?? result.Model);
             records.AddRange(answers.Select(a => new AttentionEvaluationRecord
             {
                 Key = context.Snapshot.Key,
@@ -329,7 +332,7 @@ public sealed partial class JevAttentionPolicy(
         {
             lock (_gate)
             {
-                _pausedUntil = time.GetUtcNow() + options.PauseAfterPersistentFailure;
+                _pausedUntil = time.GetUtcNow() + Options.PauseAfterPersistentFailure;
             }
         }
     }

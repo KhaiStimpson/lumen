@@ -72,7 +72,8 @@
     <!-- Connections: a modal card over the current view; click outside or Escape to close. -->
     <Panel Name="ConnectionsOverlay" Grid.Row="1" IsVisible="{Binding IsConnectionsOpen}">
       <Border Name="ConnectionsScrim" Background="{DynamicResource Surface.Window}" Opacity="0.72" />
-      <Border Classes="card" Width="520" Margin="0,48,0,24" Padding="28,24" VerticalAlignment="Top" HorizontalAlignment="Center"
+      <ScrollViewer Name="ConnectionsScroller" VerticalScrollBarVisibility="Auto">
+      <Border Name="ConnectionsCard" Classes="card" Width="520" Margin="0,48,0,24" Padding="28,24" VerticalAlignment="Top" HorizontalAlignment="Center"
               BoxShadow="0 12 40 0 #24000000">
         <StackPanel Spacing="20">
           <Grid ColumnDefinitions="*,Auto">
@@ -89,6 +90,7 @@
           <views:ConnectionsView DataContext="{Binding Connections}" />
         </StackPanel>
       </Border>
+      </ScrollViewer>
     </Panel>
   </Grid>
 </Window>

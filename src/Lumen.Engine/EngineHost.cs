@@ -84,6 +84,7 @@ public static class EngineHost
         services.AddSingleton<IInvestigationStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
 
         services.AddSingleton(_ => EngineSettings.Load(options.DataDirectory));
+        services.AddSingleton(sp => new EngineSettingsStore(sp.GetRequiredService<EngineSettings>(), options.DataDirectory));
         services.AddSingleton<ISecretStore>(_ => OperatingSystem.IsWindows() ? new WindowsCredentialStore() : new UnavailableSecretStore());
 
         services.AddSingleton<IChangeDetector, PeerPatternDetector>();
@@ -94,7 +95,7 @@ public static class EngineHost
         AddAgents(services, options);
         services.AddSingleton<PullRequestSessionManager>();
         services.AddTransient(sp => new ConnectionsProbe(
-            sp.GetRequiredService<EngineSettings>(),
+            sp.GetRequiredService<EngineSettingsStore>(),
             options.DataDirectory,
             sp.GetRequiredService<ISecretStore>(),
             sp.GetRequiredService<IOpenRouterKeyCheck>(),
@@ -127,13 +128,17 @@ public static class EngineHost
         services.AddHttpClient<IOpenRouterKeyCheck, OpenRouterSystemOneEvaluator>();
         services.AddSingleton(sp =>
         {
-            var settings = sp.GetRequiredService<EngineSettings>();
+            var settings = sp.GetRequiredService<EngineSettingsStore>();
             return new JevAttentionPolicy(
                 sp.GetRequiredService<RuleBasedAttentionPolicy>(),
                 sp.GetRequiredService<ISystemOneEvaluator>(),
                 sp.GetRequiredService<IAttentionEvaluationStore>(),
-                () => settings.Privacy,
-                new JevPolicyOptions { Enabled = settings.Jev.Enabled, OverallTimeout = TimeSpan.FromSeconds(settings.Jev.TimeoutSeconds) },
+                () => settings.Current.Privacy,
+                () => new JevPolicyOptions
+                {
+                    Enabled = settings.Current.Jev.Enabled,
+                    OverallTimeout = TimeSpan.FromSeconds(settings.Current.Jev.TimeoutSeconds),
+                },
                 sp.GetRequiredService<TimeProvider>(),
                 sp.GetRequiredService<ILogger<JevAttentionPolicy>>());
         });

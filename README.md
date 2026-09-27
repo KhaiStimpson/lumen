@@ -49,14 +49,13 @@ deterministic review is unchanged.
   ```
 
 - **Investigation agents** run your own signed-in Claude Code CLI (`claude`) read-only on the checkout, on your Claude
-  subscription. They send repository code to Anthropic, so they need two explicit settings in
-  `%LOCALAPPDATA%\Lumen\settings.json`:
+  subscription. They send repository code to Anthropic, so they stay off until you turn on **Run investigations** in
+  Connections (which sets `privacy.allowCodeToAgents` and `agents.enabled` together).
 
-  ```json
-  { "privacy": { "allowCodeToAgents": true }, "agents": { "enabled": true } }
-  ```
-
-  Lumen never switches to metered API billing unless you also set `"agents": { "allowMeteredUsage": true }`.
+Connections also holds the **Cloud AI** master switch and the JEV switches. They save to
+`%LOCALAPPDATA%\Lumen\settings.json` and apply without a restart. The rest stays in that file: the JEV model and
+timeout, investigation limits, and `"agents": { "allowMeteredUsage": true }` (Lumen never switches to metered API
+billing without it).
 
 Check what's connected (costs nothing):
 

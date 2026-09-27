@@ -118,6 +118,20 @@ public sealed class ReviewEngineService(
         return await connections.GetAsync(context.CancellationToken).ConfigureAwait(false);
     }
 
+    public override async Task<Connections> UpdateConnectionSettings(ConnectionSettings request, ServerCallContext context)
+    {
+        try
+        {
+            connections.UpdateSettings(request);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new RpcException(new Status(StatusCode.Unavailable, $"Could not save settings: {ex.Message}"));
+        }
+
+        return await connections.GetAsync(context.CancellationToken).ConfigureAwait(false);
+    }
+
     private async Task RecordAsync(
         PullRequestSession session,
         string reviewPointId,
