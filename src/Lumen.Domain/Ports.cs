@@ -65,6 +65,18 @@ public interface IRepositoryWorkspace
         CancellationToken cancellationToken);
 }
 
+/// <summary>A throwaway worktree for an agent that may modify files (TDD §12). Removed on dispose.</summary>
+public interface IAgentWorktree : IAsyncDisposable
+{
+    string Path { get; }
+}
+
+public interface IAgentWorktreeFactory
+{
+    /// <summary>A detached worktree of <paramref name="checkout"/> at its head, never the user's working tree.</summary>
+    Task<IAgentWorktree> CreateAsync(IPullRequestCheckout checkout, string name, CancellationToken cancellationToken);
+}
+
 public enum ReviewAction
 {
     Dismissed,

@@ -79,6 +79,9 @@ public sealed record InvestigationRequest(InvestigationType Type, InvestigationB
 public sealed record AttentionDecision(AttentionAction Action, ReviewSeverity Severity, double Priority, string Reason)
 {
     public IReadOnlyList<InvestigationRequest> Investigations { get; init; } = [];
+
+    /// <summary>"rules", or "jev" when JEV answered for this candidate and its routing applies.</summary>
+    public string Source { get; init; } = "rules";
 }
 
 /// <summary>Decides whether a candidate deserves the reviewer's attention: rules, or JEV on top of them (TDD §10).</summary>

@@ -285,12 +285,12 @@ public sealed partial class JevAttentionPolicy(
 
         if (Above(Q.Mechanical, thresholds.SuppressMechanical))
         {
-            return rule with { Action = AttentionAction.Suppress, Priority = 0, Reason = $"{rule.Reason} · {summary} → mechanical" };
+            return rule with { Action = AttentionAction.Suppress, Priority = 0, Reason = $"{rule.Reason} · {summary} → mechanical", Source = "jev" };
         }
 
         if (Below(Q.HumanJudgement, thresholds.SuppressBelowJudgement) && Below(Q.PrecedentDeviation, thresholds.SuppressBelowDeviation))
         {
-            return rule with { Action = AttentionAction.Suppress, Priority = 0, Reason = $"{rule.Reason} · {summary} → no judgement needed" };
+            return rule with { Action = AttentionAction.Suppress, Priority = 0, Reason = $"{rule.Reason} · {summary} → no judgement needed", Source = "jev" };
         }
 
         var investigations = new List<InvestigationRequest>();
@@ -317,6 +317,7 @@ public sealed partial class JevAttentionPolicy(
             Priority = rule.Priority + boost,
             Reason = $"{rule.Reason} · {summary}",
             Investigations = investigations,
+            Source = "jev",
         };
     }
 
