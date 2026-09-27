@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Lumen.Domain;
 
 public enum ChangeKind
@@ -80,6 +82,10 @@ public enum EvidenceSource
     Coverage,
 }
 
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[JsonDerivedType(typeof(RepositoryPrecedentEvidence), "precedent")]
+[JsonDerivedType(typeof(StaticAnalysisEvidence), "static")]
+[JsonDerivedType(typeof(AgentInvestigationEvidence), "agent")]
 public abstract record Evidence
 {
     public required string Id { get; init; }

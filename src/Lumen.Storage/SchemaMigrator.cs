@@ -27,6 +27,43 @@ internal static class SchemaMigrator
             Value TEXT NOT NULL,
             UpdatedAt TEXT NOT NULL);
         """,
+        """
+        CREATE TABLE AttentionEvaluations (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            Repository TEXT NOT NULL,
+            PullRequest INTEGER NOT NULL,
+            HeadSha TEXT NOT NULL,
+            ChangeUnitId TEXT NOT NULL,
+            CandidateKey TEXT NOT NULL,
+            QuestionId TEXT NOT NULL,
+            QuestionSchemaVersion TEXT NOT NULL,
+            Choice TEXT NOT NULL,
+            Probabilities TEXT NULL,
+            Model TEXT NOT NULL,
+            ResolvedModel TEXT NULL,
+            Provider TEXT NOT NULL,
+            State TEXT NOT NULL,
+            LatencyMs INTEGER NOT NULL,
+            At TEXT NOT NULL);
+
+        CREATE INDEX IX_AttentionEvaluations_Head
+            ON AttentionEvaluations (Repository, PullRequest, HeadSha);
+
+        CREATE TABLE Investigations (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            Repository TEXT NOT NULL,
+            PullRequest INTEGER NOT NULL,
+            HeadSha TEXT NOT NULL,
+            CandidateKey TEXT NOT NULL,
+            Type TEXT NOT NULL,
+            Outcome TEXT NOT NULL,
+            Producer TEXT NOT NULL,
+            Result TEXT NOT NULL,
+            At TEXT NOT NULL);
+
+        CREATE INDEX IX_Investigations_Candidate
+            ON Investigations (Repository, PullRequest, HeadSha, CandidateKey, Type);
+        """,
     ];
 
     public static int LatestVersion => Migrations.Count;

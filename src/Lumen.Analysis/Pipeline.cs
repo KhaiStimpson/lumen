@@ -73,12 +73,33 @@ public enum AttentionAction
     Investigate,
 }
 
-public sealed record AttentionDecision(AttentionAction Action, ReviewSeverity Severity, double Priority, string Reason);
+/// <summary>An investigation the attention policy asks for (TDD §10.3). The engine decides whether it runs.</summary>
+public sealed record InvestigationRequest(InvestigationType Type, InvestigationBudget Budget);
 
-/// <summary>Decides whether a candidate deserves the reviewer's attention. Rule-based now; JEV later (TDD §10).</summary>
+public sealed record AttentionDecision(AttentionAction Action, ReviewSeverity Severity, double Priority, string Reason)
+{
+    public IReadOnlyList<InvestigationRequest> Investigations { get; init; } = [];
+}
+
+/// <summary>Decides whether a candidate deserves the reviewer's attention: rules, or JEV on top of them (TDD §10).</summary>
 public interface IAttentionPolicy
 {
     ValueTask<AttentionDecision> DecideAsync(Candidate candidate, CancellationToken cancellationToken);
+
+    /// <summary>Decides a detector's candidates together, so a policy can batch per change unit (TDD §38.1).</summary>
+    async ValueTask<IReadOnlyList<AttentionDecision>> DecideAllAsync(
+        IReadOnlyList<Candidate> candidates,
+        AnalysisContext context,
+        CancellationToken cancellationToken)
+    {
+        var decisions = new List<AttentionDecision>(candidates.Count);
+        foreach (var candidate in candidates)
+        {
+            decisions.Add(await DecideAsync(candidate, cancellationToken).ConfigureAwait(false));
+        }
+
+        return decisions;
+    }
 }
 
 public sealed record Explanation(

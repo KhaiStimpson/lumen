@@ -1,14 +1,18 @@
 using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Dapper;
 using Lumen.Domain;
 using Microsoft.Data.Sqlite;
 
 namespace Lumen.Storage;
 
-/// <summary>SQLite-backed <see cref="IReviewStore"/> (TDD §32–§33). Opens a pooled connection per operation.</summary>
-public sealed class SqliteReviewStore : IReviewStore, IAsyncDisposable
+/// <summary>SQLite-backed stores (TDD §32–§33). Opens a pooled connection per operation. Never holds credentials.</summary>
+public sealed class SqliteReviewStore : IReviewStore, IAttentionEvaluationStore, IInvestigationStore, IAsyncDisposable
 {
     private const int BusyTimeoutMilliseconds = 5000;
+
+    private static readonly JsonSerializerOptions ResultJson = new() { Converters = { new JsonStringEnumConverter() } };
 
     private readonly string _connectionString;
     private readonly SemaphoreSlim _initLock = new(1, 1);
@@ -158,6 +162,180 @@ public sealed class SqliteReviewStore : IReviewStore, IAsyncDisposable
         }
     }
 
+    public async Task RecordEvaluationsAsync(IReadOnlyList<AttentionEvaluationRecord> records, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(records);
+        if (records.Count == 0)
+        {
+            return;
+        }
+
+        const string sql = """
+            INSERT INTO AttentionEvaluations (Repository, PullRequest, HeadSha, ChangeUnitId, CandidateKey, QuestionId,
+                QuestionSchemaVersion, Choice, Probabilities, Model, ResolvedModel, Provider, State, LatencyMs, At)
+            VALUES (@Repository, @PullRequest, @HeadSha, @ChangeUnitId, @CandidateKey, @QuestionId,
+                @QuestionSchemaVersion, @Choice, @Probabilities, @Model, @ResolvedModel, @Provider, @State, @LatencyMs, @At);
+            """;
+
+        var rows = records.Select(r => new
+        {
+            Repository = r.Key.Repository.FullName,
+            PullRequest = r.Key.Number,
+            r.HeadSha,
+            r.ChangeUnitId,
+            r.CandidateKey,
+            r.QuestionId,
+            r.QuestionSchemaVersion,
+            r.Choice,
+            Probabilities = r.Probabilities is null ? null : JsonSerializer.Serialize(r.Probabilities),
+            r.Model,
+            r.ResolvedModel,
+            r.Provider,
+            State = r.StateJson,
+            r.LatencyMs,
+            At = r.At.ToString("O", CultureInfo.InvariantCulture),
+        }).ToList();
+
+        var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            using var transaction = connection.BeginTransaction();
+            await connection.ExecuteAsync(new CommandDefinition(sql, rows, transaction, cancellationToken: cancellationToken))
+                .ConfigureAwait(false);
+            transaction.Commit();
+        }
+    }
+
+    public async Task<IReadOnlyList<AttentionEvaluationRecord>> GetEvaluationsAsync(
+        PullRequestKey key,
+        string headSha,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        const string sql = """
+            SELECT HeadSha, ChangeUnitId, CandidateKey, QuestionId, QuestionSchemaVersion, Choice, Probabilities,
+                   Model, ResolvedModel, Provider, State, LatencyMs, At
+            FROM AttentionEvaluations
+            WHERE Repository = @Repository AND PullRequest = @PullRequest AND HeadSha = @HeadSha
+            ORDER BY Id;
+            """;
+
+        var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var rows = await connection.QueryAsync<EvaluationRow>(new CommandDefinition(
+                    sql,
+                    new { Repository = key.Repository.FullName, PullRequest = key.Number, HeadSha = headSha },
+                    cancellationToken: cancellationToken))
+                .ConfigureAwait(false);
+
+            return [.. rows.Select(r => new AttentionEvaluationRecord
+            {
+                Key = key,
+                HeadSha = r.HeadSha,
+                ChangeUnitId = r.ChangeUnitId,
+                CandidateKey = r.CandidateKey,
+                QuestionId = r.QuestionId,
+                QuestionSchemaVersion = r.QuestionSchemaVersion,
+                Choice = r.Choice,
+                Probabilities = r.Probabilities is null ? null : JsonSerializer.Deserialize<Dictionary<string, double>>(r.Probabilities),
+                Model = r.Model,
+                ResolvedModel = r.ResolvedModel,
+                Provider = r.Provider,
+                StateJson = r.State,
+                LatencyMs = r.LatencyMs,
+                At = DateTimeOffset.Parse(r.At, CultureInfo.InvariantCulture),
+            })];
+        }
+    }
+
+    public async Task SaveInvestigationAsync(
+        PullRequestKey key,
+        string headSha,
+        string candidateKey,
+        InvestigationResult result,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(result);
+
+        const string sql = """
+            INSERT INTO Investigations (Repository, PullRequest, HeadSha, CandidateKey, Type, Outcome, Producer, Result, At)
+            VALUES (@Repository, @PullRequest, @HeadSha, @CandidateKey, @Type, @Outcome, @Producer, @Result, @At);
+            """;
+
+        var parameters = new
+        {
+            Repository = key.Repository.FullName,
+            PullRequest = key.Number,
+            HeadSha = headSha,
+            CandidateKey = candidateKey,
+            Type = result.Type.ToString(),
+            Outcome = result.Outcome.ToString(),
+            result.Producer,
+            Result = JsonSerializer.Serialize(result, ResultJson),
+            At = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+        };
+
+        var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            await connection.ExecuteAsync(new CommandDefinition(sql, parameters, cancellationToken: cancellationToken))
+                .ConfigureAwait(false);
+        }
+    }
+
+    public async Task<InvestigationResult?> FindInvestigationAsync(
+        PullRequestKey key,
+        string headSha,
+        string candidateKey,
+        InvestigationType type,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        const string sql = """
+            SELECT Result FROM Investigations
+            WHERE Repository = @Repository AND PullRequest = @PullRequest AND HeadSha = @HeadSha
+              AND CandidateKey = @CandidateKey AND Type = @Type
+            ORDER BY Id DESC LIMIT 1;
+            """;
+
+        var parameters = new
+        {
+            Repository = key.Repository.FullName,
+            PullRequest = key.Number,
+            HeadSha = headSha,
+            CandidateKey = candidateKey,
+            Type = type.ToString(),
+        };
+
+        var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var json = await connection
+                .QuerySingleOrDefaultAsync<string?>(new CommandDefinition(sql, parameters, cancellationToken: cancellationToken))
+                .ConfigureAwait(false);
+            return json is null ? null : JsonSerializer.Deserialize<InvestigationResult>(json, ResultJson);
+        }
+    }
+
+    public async Task<int> CountInvestigationsAsync(PullRequestKey key, string headSha, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            return await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                    "SELECT COUNT(*) FROM Investigations WHERE Repository = @Repository AND PullRequest = @PullRequest AND HeadSha = @HeadSha;",
+                    new { Repository = key.Repository.FullName, PullRequest = key.Number, HeadSha = headSha },
+                    cancellationToken: cancellationToken))
+                .ConfigureAwait(false);
+        }
+    }
+
     public ValueTask DisposeAsync()
     {
         if (_disposed)
@@ -233,4 +411,19 @@ public sealed class SqliteReviewStore : IReviewStore, IAsyncDisposable
             _initLock.Release();
         }
     }
+
+    private sealed record EvaluationRow(
+        string HeadSha,
+        string ChangeUnitId,
+        string CandidateKey,
+        string QuestionId,
+        string QuestionSchemaVersion,
+        string Choice,
+        string? Probabilities,
+        string Model,
+        string? ResolvedModel,
+        string Provider,
+        string State,
+        long LatencyMs,
+        string At);
 }

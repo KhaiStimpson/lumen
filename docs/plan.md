@@ -67,6 +67,51 @@ Three review points, 14 suppressed candidates, generated EF migrations collapsed
 3. **Command palette** (§30) is deferred; `Ctrl+K` currently focuses "Go to file".
 4. **OpenTelemetry** (§43) is deferred; the engine logs structured events via `ILogger` to `engine.log`.
 
+---
+
+# Phase 3 (JEV) and Phase 4 (investigation agents)
+
+Research first, recorded in `docs/research/` — [openrouter-jev.md](research/openrouter-jev.md),
+[agent-providers.md](research/agent-providers.md). Design rule for both: **nothing new may block or break the
+deterministic slice.** JEV and agents only add signal on top of it, and every failure falls back to what exists today.
+
+## Shape
+
+```text
+Detectors ─► candidates ─► IAttentionPolicy.DecideAllAsync(candidates, context)
+                              JevAttentionPolicy
+                                 ├─ RuleBasedAttentionPolicy  (always runs; the floor and the fallback, §38.2)
+                                 └─ ISystemOneEvaluator        (OpenRouter; one request per change unit, §38.1)
+                                      state  = source-free SystemOneState (from AttentionSignals, §10.1, §40)
+                                      output = choice + probabilities per typed question (§10.2), persisted
+                           ─► explainer (templates) ─► ReviewPoint streamed as today
+                           ─► InvestigationPlanner ─► InvestigationScheduler (priority queue, budgets, §35–36)
+                                                         └─ role (Repository Pattern Investigator)
+                                                              └─ IAgentProvider → AgentSession (ClaudeCodeProvider, §37)
+                                                         ◄─ InvestigationResult (§13), grounded + persisted
+                           ─► EvidenceAggregator merges it into the point (§14) ─► ReviewPointUpdated
+```
+
+## Steps
+
+- [ ] **P3.1 Research** — OpenRouter (is there a "Decisions API" / `typesafe/jev-*`?), Claude Code / Codex headless + auth
+- [ ] **P3.2 Settings and secrets** — engine `settings.json` (privacy §40, JEV, agents; all off-by-default where code or
+      usage is involved); `ISecretStore` over Windows Credential Manager (§39A); `Lumen.Engine.exe connections` CLI to
+      set the OpenRouter key from stdin and show connection status
+- [ ] **P3.3 JEV evaluator** — `ISystemOneEvaluator`, versioned question set, `OpenRouterSystemOneEvaluator` (strict JSON
+      schema, bounded enums, ZDR/no-training routing, timeouts), persisted evaluations in SQLite
+- [ ] **P3.4 JevAttentionPolicy** — batch decisions per change unit; combine with rule decision (JEV may suppress,
+      re-rank and route to investigation, never surface what deterministic rules rejected); any failure → rules
+- [ ] **P4.1 Agent abstractions** — `IAgentProvider`, `AgentSession`, capabilities, auth/billing state; sandboxed process
+      runner (explicit cwd, executable allowlist, scrubbed env, timeout, output caps, process-tree kill)
+- [ ] **P4.2 ClaudeCodeProvider** — detect CLI + sign-in without spending usage; headless stream-json; refuse metered
+      billing unless explicitly allowed (§37.5)
+- [ ] **P4.3 Investigations** — `InvestigationResult` contract, agent worktrees under the data dir, scheduler with
+      budgets and per-PR caps, Repository Pattern Investigator, grounding of cited sources, result cache in SQLite
+- [ ] **P4.4 Surface** — `ReviewPointUpdated` + `InvestigationStatus` events; "Analysing N areas…"; agent evidence with
+      provenance in Examine → Evidence
+- [ ] **P4.5 Live checks (opt-in, with the user's go-ahead)** — JEV against OpenRouter, one investigation on PR #58
+
 ## Deferred (explicitly out of slice)
 
 JEV, agents and providers (Claude Code / Codex), review memory and Before Review mode, command palette, split diff,

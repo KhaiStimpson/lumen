@@ -5,7 +5,11 @@ namespace Lumen.Analysis;
 public sealed record PipelineResult(
     IReadOnlyList<ReviewPoint> ReviewPoints,
     IReadOnlyList<RepositoryConvention> Conventions,
-    IReadOnlyList<(Candidate Candidate, AttentionDecision Decision)> Suppressed);
+    IReadOnlyList<(Candidate Candidate, AttentionDecision Decision)> Suppressed)
+{
+    /// <summary>The decision behind each surfaced review point, by review point id; drives investigation planning.</summary>
+    public IReadOnlyDictionary<string, AttentionDecision> Decisions { get; init; } = new Dictionary<string, AttentionDecision>();
+}
 
 /// <summary>Detectors → attention policy → explainer → ranked review points.</summary>
 public sealed class ReviewPointPipeline(
@@ -24,15 +28,16 @@ public sealed class ReviewPointPipeline(
         var points = new List<ReviewPoint>();
         var conventions = new List<RepositoryConvention>();
         var suppressed = new List<(Candidate, AttentionDecision)>();
+        var decisions = new Dictionary<string, AttentionDecision>(StringComparer.Ordinal);
 
         foreach (var detector in _detectors)
         {
             var detection = await detector.DetectAsync(context, cancellationToken).ConfigureAwait(false);
             conventions.AddRange(detection.Conventions);
 
-            foreach (var candidate in detection.Candidates)
+            var decided = await policy.DecideAllAsync(detection.Candidates, context, cancellationToken).ConfigureAwait(false);
+            foreach (var (candidate, decision) in detection.Candidates.Zip(decided))
             {
-                var decision = await policy.DecideAsync(candidate, cancellationToken).ConfigureAwait(false);
                 if (decision.Action == AttentionAction.Suppress)
                 {
                     suppressed.Add((candidate, decision));
@@ -64,6 +69,7 @@ public sealed class ReviewPointPipeline(
                 };
 
                 points.Add(point);
+                decisions[point.Id] = decision;
                 if (onReviewPoint is not null)
                 {
                     await onReviewPoint(point).ConfigureAwait(false);
@@ -71,7 +77,7 @@ public sealed class ReviewPointPipeline(
             }
         }
 
-        return new PipelineResult(Rank(points), conventions, suppressed);
+        return new PipelineResult(Rank(points), conventions, suppressed) { Decisions = decisions };
     }
 
     /// <summary>Highest priority first; ties broken by file and line so the order is stable and readable.</summary>
