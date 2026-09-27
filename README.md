@@ -34,6 +34,35 @@ over a per-user named pipe with gRPC. The engine keeps a blobless clone and a wo
 | `--reduced-motion` | Reduced-motion equivalents for every transition (also follows the OS setting) |
 | `--capture <dir> --capture-script diff,next,examine,evidence,comment,dark` | Render states to PNGs and exit (design review without a human) |
 
+### JEV and investigation agents (optional)
+
+Both are off until you connect them, and a review never waits on either: if they're missing, slow or failing, the
+deterministic review is unchanged.
+
+- **JEV** (attention routing via OpenRouter's Decisions API, `typesafe/jev-1.13`) receives counts and categories only —
+  no code, paths or names. It's metered by OpenRouter. Store a key in Windows Credential Manager (read from the
+  console, never from the command line):
+
+  ```bash
+  src/Lumen.Engine/bin/Debug/net10.0/Lumen.Engine.exe connections set-openrouter-key
+  ```
+
+- **Investigation agents** run your own signed-in Claude Code CLI (`claude`) read-only on the checkout, on your Claude
+  subscription. They send repository code to Anthropic, so they need two explicit settings in
+  `%LOCALAPPDATA%\Lumen\settings.json`:
+
+  ```json
+  { "privacy": { "allowCodeToAgents": true }, "agents": { "enabled": true } }
+  ```
+
+  Lumen never switches to metered API billing unless you also set `"agents": { "allowMeteredUsage": true }`.
+
+Check what's connected (costs nothing):
+
+```bash
+src/Lumen.Engine/bin/Debug/net10.0/Lumen.Engine.exe connections
+```
+
 ### Keyboard
 
 | Key | |
@@ -61,7 +90,9 @@ Peers = classes sharing a base type, constructor dependency, or name role — ta
                                    │
 A trait most peers share, that is distinctive to the role (lift), and that the changed class lacks
                                    ▼
-Attention policy (rule-based now; JEV later) ─► Explainer (templates now; agents later) ─► ReviewPoint + evidence
+Attention policy (rules; JEV on top when connected) ─► Explainer (templates) ─► ReviewPoint + evidence
+                                   │
+Investigations (optional, in the background) ─► agent evidence with provenance ─► the review point is updated
 ```
 
 Every claim carries provenance (`peer-pattern/v1`), counter-evidence (peers that don't follow the convention),
@@ -80,7 +111,9 @@ confidence percentage.
 | `Lumen.Roslyn` | Type facts, repository index, peer-pattern detector, template explainer |
 | `Lumen.GitHub` | REST client and `gh` token source |
 | `Lumen.Repository` | git CLI: blobless clone, PR fetch, merge-base, worktrees, diff |
-| `Lumen.Storage` | SQLite: review interactions (dismissals persist across pushes) and cache |
+| `Lumen.Jev` | JEV: typed attention questions, source-free state, OpenRouter Decisions API, `JevAttentionPolicy` |
+| `Lumen.Agents` | Agent providers (Claude Code), sandboxed process runner, investigators, scheduler |
+| `Lumen.Storage` | SQLite: review interactions, JEV answers, investigation results, cache; Windows Credential Manager |
 
 ## Tests
 
@@ -95,3 +128,7 @@ Opt-in suites that touch the network or a local clone:
 | `LUMEN_LIVE_PR=owner/repo#n` | Full engine against real GitHub (read-only) |
 | `LUMEN_LIVE_PR` + `LUMEN_RECORD_FIXTURE=<dir>` | Re-record a UI fixture |
 | `LUMEN_GOLDEN_CHECKOUT=<clone at PR head>`, `LUMEN_GOLDEN_BASE=origin/dev` | Print the pipeline's review points, suppressions and conventions |
+| `LUMEN_LIVE_JEV=1` | One real Decisions API call with a synthetic state (needs a stored OpenRouter key; metered, a fraction of a cent) |
+| `LUMEN_LIVE_CLAUDE=1` | One real pattern investigation through your Claude Code sign-in (uses subscription quota; refuses metered billing) |
+
+`LUMEN_LIVE_PR` runs the real engine, so it will also call JEV if a key is stored and agents if they're enabled.

@@ -1,35 +1,29 @@
 # Handoff — Phase 3 (JEV) / Phase 4 (agents)
 
 Branch `phase3-4-jev-agents`, worktree `C:\Dev\repos\lumen\.claude\worktrees\phase3-4` (branched from main @ 5b8ebfb;
-no git remote). The plan and checklist live in [plan.md](plan.md) under "Phase 3 (JEV) and Phase 4".
+no git remote, not merged). Status, design and deviations: [plan.md](plan.md) → "Phase 3 (JEV) and Phase 4".
 
-## Done
+## State
 
-- Research reports: [research/openrouter-jev.md](research/openrouter-jev.md), [research/agent-providers.md](research/agent-providers.md)
-  (the researchers hit a usage limit right after writing; check each report's "could not determine" section).
-- Commit 19a348b: Domain `InvestigationResult`/`AgentInvestigationEvidence`/`PrivacySettings`/`ISecretStore`,
-  `AttentionEvaluationRecord` + `IAttentionEvaluationStore`/`IInvestigationStore`; SQLite migration 2; `WindowsCredentialStore`;
-  `IAttentionPolicy.DecideAllAsync` (default loops `DecideAsync`) + `AttentionDecision.Investigations`; `PipelineResult.Decisions`.
-- Uncommitted: `src/Lumen.Agents` (csproj, `Execution/SandboxedCommand.cs`, `Execution/CommandPolicy.cs`) — not yet in `Lumen.slnx`.
+P3.1–P4.4 are done and committed; `dotnet build Lumen.slnx` has 0 errors (the 2 warnings are the pre-existing Avalonia
+`Watermark` ones) and `dotnet test Lumen.slnx` passes (289 tests). Only **P4.5, the live checks**, remains, and it needs you.
 
-## Next
+## Needs the user (nothing here has been done without asking)
 
-1. Finish `Lumen.Agents`: `SandboxedProcessRunner` (resolve `.exe` on PATH only, scrubbed env, stdin prompt, timeout,
-   output cap, process-tree kill), `IAgentProvider`/`AgentSession` (§37.1), `ClaudeCodeProvider`
-   (`claude auth status --json`; `claude -p --output-format stream-json --verbose`; never `--bare`; abort if the init
-   event shows an API key source). Add project + `tests/Lumen.Agents.Tests` to `Lumen.slnx`.
-2. `Lumen.Jev`: `ISystemOneEvaluator`, versioned questions, OpenRouter evaluator (strict JSON schema, no-training/ZDR
-   routing), `JevAttentionPolicy` wrapping `RuleBasedAttentionPolicy` (fallback on any failure; never surfaces what rules reject).
-3. Engine: `settings.json` (privacy/JEV/agents; agents off by default), `connections` CLI (key from stdin → Credential
-   Manager), investigation planner/scheduler, `ReviewPointUpdated` + `InvestigationStatus` proto events.
-4. App: "Analysing N areas…" status; agent evidence label in Examine → Evidence.
+1. **JEV live check**: store an OpenRouter key (`Lumen.Engine.exe connections set-openrouter-key`), then run
+   `LUMEN_LIVE_JEV=1 dotnet test tests/Lumen.Jev.Tests --filter LiveJevTests`. Metered; roughly $0.00002 per call.
+   If it returns 503, the TypeSafe endpoint may not be ZDR-eligible — set `"jev": { "requireZeroDataRetention": false }`
+   (the state is source-free either way) and say so in plan.md.
+2. **Claude live check**: `LUMEN_LIVE_CLAUDE=1 dotnet test tests/Lumen.Agents.Tests --filter LiveClaudeCodeTests`.
+   Uses Claude Pro quota (currently signed in, per `claude auth status`). This also confirms the unverified bits: the
+   `structured_output` field on the `result` event and whether `--json-schema` + `--restricted` behave as expected.
+3. **PR #58 end to end** with `settings.json` `{ "privacy": { "allowCodeToAgents": true }, "agents": { "enabled": true } }`,
+   then record results in plan.md "How it behaves on PR #58".
 
-## Needs the user
+Never post to GitHub without an explicit go-ahead.
 
-- An OpenRouter API key (and OK to spend a few cents) for the live JEV test.
-- A go-ahead before any live Claude Code investigation (uses their Pro subscription quota; `claude auth status` shows signed in).
-- Never post to GitHub without an explicit go-ahead.
+## Loose ends worth knowing
 
-## Checks
-
-`dotnet build Lumen.slnx` and `dotnet test Lumen.slnx` were green at the last commit (storage tests updated for schema v2).
+- The researchers stopped at a usage limit right after writing their reports; the OpenRouter claims were re-verified
+  against the raw `openapi.yaml`. `typesafe/jev-latest`/`jev-router` are unverified (not used).
+- `LUMEN_LIVE_PR` builds the real engine, so it will call JEV/agents if they're configured.
