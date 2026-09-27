@@ -30,9 +30,13 @@ public sealed partial class InvestigationScheduler : IDisposable
     private readonly IAgentProvider _provider;
     private readonly IInvestigationStore _store;
     private readonly IAgentWorktreeFactory _worktrees;
-    private readonly InvestigationSchedulerOptions _options;
+    private readonly Func<InvestigationSchedulerOptions> _currentOptions;
     private readonly ILogger<InvestigationScheduler> _logger;
-    private readonly SemaphoreSlim _throttle;
+
+    // A counting gate rather than a SemaphoreSlim, so a change to MaxConcurrent applies without a restart.
+    private readonly Lock _gate = new();
+    private readonly Queue<TaskCompletionSource> _waiting = new();
+    private int _running;
 
     public InvestigationScheduler(
         IEnumerable<IInvestigator> investigators,
@@ -41,14 +45,25 @@ public sealed partial class InvestigationScheduler : IDisposable
         IAgentWorktreeFactory worktrees,
         InvestigationSchedulerOptions options,
         ILogger<InvestigationScheduler> logger)
+        : this(investigators, provider, store, worktrees, () => options, logger)
+    {
+    }
+
+    /// <param name="currentOptions">Read at each use, so Settings changes apply to the next investigation.</param>
+    public InvestigationScheduler(
+        IEnumerable<IInvestigator> investigators,
+        IAgentProvider provider,
+        IInvestigationStore store,
+        IAgentWorktreeFactory worktrees,
+        Func<InvestigationSchedulerOptions> currentOptions,
+        ILogger<InvestigationScheduler> logger)
     {
         _investigators = [.. investigators];
         _provider = provider;
         _store = store;
         _worktrees = worktrees;
-        _options = options;
+        _currentOptions = currentOptions;
         _logger = logger;
-        _throttle = new SemaphoreSlim(Math.Max(1, options.MaxConcurrent));
     }
 
     public IInvestigator? Find(ReviewPoint point, InvestigationType type) =>
@@ -90,7 +105,7 @@ public sealed partial class InvestigationScheduler : IDisposable
             }
         }
 
-        var allowance = Math.Max(0, _options.MaxPerPullRequest - await _store.CountInvestigationsAsync(key, checkout.HeadSha, cancellationToken).ConfigureAwait(false));
+        var allowance = Math.Max(0, _currentOptions().MaxPerPullRequest - await _store.CountInvestigationsAsync(key, checkout.HeadSha, cancellationToken).ConfigureAwait(false));
         var skipped = Math.Max(0, fresh.Count - allowance);
         fresh = [.. fresh.Take(allowance)];
         if (fresh.Count == 0)
@@ -99,7 +114,7 @@ public sealed partial class InvestigationScheduler : IDisposable
         }
 
         var auth = await _provider.GetAuthenticationStateAsync(cancellationToken).ConfigureAwait(false);
-        if (!auth.IsUsable || (auth.Billing != AgentBilling.Subscription && !_options.AllowMeteredUsage))
+        if (!auth.IsUsable || (auth.Billing != AgentBilling.Subscription && !_currentOptions().AllowMeteredUsage))
         {
             var reason = auth.IsUsable ? $"{auth.Detail}; metered usage is not enabled" : auth.Detail;
             LogProviderUnavailable(_logger, _provider.Id, reason);
@@ -113,7 +128,7 @@ public sealed partial class InvestigationScheduler : IDisposable
 
         await Task.WhenAll(fresh.Select(async item =>
         {
-            await _throttle.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await EnterAsync(cancellationToken).ConfigureAwait(false);
             try
             {
                 if (unavailable is not null)
@@ -137,7 +152,7 @@ public sealed partial class InvestigationScheduler : IDisposable
             }
             finally
             {
-                _throttle.Release();
+                Exit();
                 onActiveChanged(Interlocked.Decrement(ref remaining));
             }
         })).ConfigureAwait(false);
@@ -164,7 +179,56 @@ public sealed partial class InvestigationScheduler : IDisposable
         }
     }
 
-    public void Dispose() => _throttle.Dispose();
+    private int MaxConcurrent => Math.Max(1, _currentOptions().MaxConcurrent);
+
+    private async Task EnterAsync(CancellationToken cancellationToken)
+    {
+        TaskCompletionSource turn;
+        lock (_gate)
+        {
+            if (_running < MaxConcurrent)
+            {
+                _running++;
+                return;
+            }
+
+            turn = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _waiting.Enqueue(turn);
+        }
+
+        using (cancellationToken.Register(() => turn.TrySetCanceled(cancellationToken)))
+        {
+            await turn.Task.ConfigureAwait(false);
+        }
+    }
+
+    private void Exit()
+    {
+        lock (_gate)
+        {
+            _running--;
+
+            // A cancelled waiter can't take its turn; skip it and hand the slot on.
+            while (_running < MaxConcurrent && _waiting.TryDequeue(out var next))
+            {
+                if (next.TrySetResult())
+                {
+                    _running++;
+                }
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        lock (_gate)
+        {
+            while (_waiting.TryDequeue(out var waiter))
+            {
+                waiter.TrySetCanceled();
+            }
+        }
+    }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Agent provider {Provider} unavailable: {Reason}; showing deterministic evidence only")]
     private static partial void LogProviderUnavailable(ILogger logger, string provider, string reason);

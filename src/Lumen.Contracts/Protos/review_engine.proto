@@ -32,6 +32,12 @@ service ReviewEngine {
 
   // Saved to settings.json and applied to the next JEV call or investigation, without a restart.
   rpc UpdateConnectionSettings (ConnectionSettings) returns (Connections);
+
+  // Review settings: global defaults in settings.json, each repository's overrides beside it. They apply to the next
+  // analysis of a pull request; nothing re-runs on its own (the app offers Re-analyse).
+  rpc GetReviewSettings (ReviewSettingsRequest) returns (ReviewSettingsReply);
+
+  rpc UpdateReviewSettings (UpdateReviewSettingsRequest) returns (ReviewSettingsReply);
 }
 
 message PingRequest {}
@@ -352,6 +358,15 @@ message ConnectionSettings {
   bool allow_code_snippets_to_jev = 3;
   // agents.enabled and privacy.allowCodeToAgents together: investigations send repository code to the agent.
   bool investigations_enabled = 4;
+
+  // Cloud AI limits. Unset on an update leaves the saved value alone.
+  optional string jev_model = 5;
+  optional double jev_timeout_seconds = 6;
+  optional bool jev_require_zero_data_retention = 7;
+  optional int32 max_investigations_per_pull_request = 8;
+  optional int32 max_concurrent_investigations = 9;
+  // Never switch an investigation from subscription to metered billing without this opt-in (TDD §37.5).
+  optional bool allow_metered_usage = 10;
 }
 
 message Connections {
@@ -360,4 +375,52 @@ message Connections {
   // Where the non-secret preferences live (jev.enabled, privacy.*, agents.*).
   string settings_path = 3;
   ConnectionSettings settings = 4;
+}
+
+// How picky convention detection is. The detector's looser pre-filter is derived from minimum_support.
+message ReviewSensitivity {
+  int32 minimum_peers = 1;
+  // 0..1
+  double minimum_support = 2;
+  double minimum_lift = 3;
+  int32 max_points_per_type = 4;
+  int32 max_examples = 5;
+}
+
+message ReviewRules {
+  // Unset on a repository while it inherits the global sensitivity.
+  ReviewSensitivity sensitivity = 1;
+  // Type or member names never treated as a convention.
+  repeated string ignored_names = 2;
+  // Gitignore-style path patterns treated as mechanical.
+  repeated string mechanical_paths = 3;
+  // Path patterns whose changes are never flagged.
+  repeated string skipped_paths = 4;
+}
+
+// Owner and name empty: the global settings only.
+message ReviewSettingsRequest {
+  string owner = 1;
+  string name = 2;
+}
+
+message ReviewSettingsReply {
+  ReviewRules global = 1;
+  // Present when a repository was asked for; its lists add to the global ones.
+  ReviewRules repository = 2;
+  repeated string built_in_ignored_names = 3;
+  repeated string built_in_mechanical_paths = 4;
+  string settings_path = 5;
+  string repository_settings_path = 6;
+  // The presets' numbers, so the app can show which one the current values match.
+  ReviewSensitivity quiet = 7;
+  ReviewSensitivity balanced = 8;
+  ReviewSensitivity thorough = 9;
+}
+
+// Owner and name empty: replaces the global settings. Otherwise replaces that repository's overrides.
+message UpdateReviewSettingsRequest {
+  string owner = 1;
+  string name = 2;
+  ReviewRules rules = 3;
 }

@@ -213,7 +213,7 @@ public sealed class EngineConnectionsTests : IAsyncDisposable
         Assert.Equal(0, _keyCheck.Calls);
     }
 
-    private sealed class MemorySecretStore : ISecretStore
+    internal sealed class MemorySecretStore : ISecretStore
     {
         private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
 
@@ -226,7 +226,7 @@ public sealed class EngineConnectionsTests : IAsyncDisposable
         public bool Delete(string name) => _values.Remove(name);
     }
 
-    private sealed class FakeKeyCheck : IOpenRouterKeyCheck
+    internal sealed class FakeKeyCheck : IOpenRouterKeyCheck
     {
         public OpenRouterKeyStatus Result { get; set; } = new(true, "Key valid");
 
@@ -239,7 +239,7 @@ public sealed class EngineConnectionsTests : IAsyncDisposable
         }
     }
 
-    private sealed class SignedInAgent : IAgentProvider
+    internal sealed class SignedInAgent : IAgentProvider
     {
         public string Id => "fake-agent";
 

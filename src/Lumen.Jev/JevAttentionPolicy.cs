@@ -79,7 +79,7 @@ public sealed partial class JevAttentionPolicy(
         var decisions = new AttentionDecision[candidates.Count];
         for (var i = 0; i < candidates.Count; i++)
         {
-            decisions[i] = await rules.DecideAsync(candidates[i], cancellationToken).ConfigureAwait(false);
+            decisions[i] = await RuleBasedAttentionPolicy.DecideAsync(candidates[i], context.Settings.Sensitivity).ConfigureAwait(false);
         }
 
         var surfaced = Enumerable.Range(0, candidates.Count).Where(i => decisions[i].Action != AttentionAction.Suppress).ToList();

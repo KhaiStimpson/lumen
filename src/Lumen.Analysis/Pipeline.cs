@@ -3,7 +3,11 @@ using Lumen.Domain;
 namespace Lumen.Analysis;
 
 /// <summary>Everything a detector may look at. Head files are read from the checkout.</summary>
-public sealed record AnalysisContext(PullRequestSnapshot Snapshot, IPullRequestCheckout Checkout);
+public sealed record AnalysisContext(PullRequestSnapshot Snapshot, IPullRequestCheckout Checkout)
+{
+    /// <summary>The repository's review settings, resolved when this analysis started.</summary>
+    public ReviewSettings Settings { get; init; } = ReviewSettings.Default;
+}
 
 /// <summary>
 /// Compact, structured signals describing a candidate — the input an attention policy decides on. This is the

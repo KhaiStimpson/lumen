@@ -59,13 +59,8 @@ public sealed class PeerPatternDetector : IChangeDetector
 {
     public const string DetectorId = "peer-pattern/v1";
 
-    private const double CandidateSupport = 0.6;
-    private const int MinimumPeers = 3;
-    private const int MaxPointsPerType = 2;
-    private const int MaxExamples = 4;
-
-    // Traits that say little about design; comparing them produces noise.
-    private static readonly HashSet<string> IgnoredSubjects = new(StringComparer.Ordinal)
+    /// <summary>Names that say little about design; comparing them produces noise. Settings can add more.</summary>
+    public static readonly IReadOnlySet<string> BuiltInIgnoredNames = new HashSet<string>(StringComparer.Ordinal)
     {
         "CancellationToken", "string", "int", "bool", "Guid", "TimeProvider", "Task", "ValueTask", "Math", "Console",
         "string.IsNullOrWhiteSpace", "string.IsNullOrEmpty", "string.Join", "string.Format", "Task.WhenAll",
@@ -91,17 +86,28 @@ public sealed class PeerPatternDetector : IChangeDetector
     public async Task<DetectionResult> DetectAsync(AnalysisContext context, CancellationToken cancellationToken)
     {
         var index = await _indexFactory(context.Checkout.RootPath, cancellationToken).ConfigureAwait(false);
-        return await DetectAsync(index, context.Snapshot, context.Checkout.ReadBaseFileAsync, cancellationToken).ConfigureAwait(false);
+        return await DetectAsync(index, context.Snapshot, context.Checkout.ReadBaseFileAsync, context.Settings, cancellationToken).ConfigureAwait(false);
     }
+
+    public static Task<DetectionResult> DetectAsync(
+        RepositoryTypeIndex index,
+        PullRequestSnapshot snapshot,
+        Func<string, CancellationToken, Task<string?>> readBaseFile,
+        CancellationToken cancellationToken) =>
+        DetectAsync(index, snapshot, readBaseFile, ReviewSettings.Default, cancellationToken);
 
     public static async Task<DetectionResult> DetectAsync(
         RepositoryTypeIndex index,
         PullRequestSnapshot snapshot,
         Func<string, CancellationToken, Task<string?>> readBaseFile,
+        ReviewSettings settings,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+        var sensitivity = settings.Sensitivity;
+        var ignored = IgnoredNames(settings);
         var baseFacts = await ReadBaseFactsAsync(snapshot, readBaseFile, cancellationToken).ConfigureAwait(false);
-        var changed = FindChangedTypes(index, snapshot, baseFacts);
+        var changed = FindChangedTypes(index, snapshot, baseFacts, settings);
         if (changed.Count == 0)
         {
             return DetectionResult.Empty;
@@ -135,10 +141,10 @@ public sealed class PeerPatternDetector : IChangeDetector
         foreach (var change in changed)
         {
             var type = change.Head;
-            foreach (var role in RolesOf(type, repoTypes))
+            foreach (var role in RolesOf(type, repoTypes, ignored))
             {
                 var peers = pool.Where(p => p.FullName != type.FullName && role.Matches(p)).ToList();
-                if (peers.Count < MinimumPeers)
+                if (peers.Count < sensitivity.MinimumPeers)
                 {
                     continue;
                 }
@@ -147,22 +153,22 @@ public sealed class PeerPatternDetector : IChangeDetector
                     .SelectMany(p => p.AllTraits)
                     .GroupBy(t => t)
                     .Select(g => (Trait: g.Key, Count: g.Count()))
-                    .Where(x => x.Count >= MinimumPeers && x.Trait.Key != role.DefiningTraitKey && IsMeaningful(x.Trait, type, repoTypes))
+                    .Where(x => x.Count >= sensitivity.MinimumPeers && x.Trait.Key != role.DefiningTraitKey && IsMeaningful(x.Trait, type, repoTypes, ignored))
                     .Where(x => x.Trait.Kind != TraitKind.BaseType || role.Kind == "suffix");
 
                 foreach (var (trait, count) in traitCounts)
                 {
                     var support = (double)count / peers.Count;
-                    if (support < CandidateSupport)
+                    if (support < sensitivity.CandidateSupport)
                     {
                         continue;
                     }
 
                     var lift = Lift(trait.Key, support);
                     var category = CategoryOf(trait, repoTypes);
-                    AddConvention(conventions, role, trait, peers, count, lift);
+                    AddConvention(conventions, role, trait, peers, count, lift, sensitivity);
 
-                    if (type.Has(trait) || IsImpliedByMissingDependency(trait, type, peers))
+                    if (type.Has(trait) || IsImpliedByMissingDependency(trait, type, peers, sensitivity.CandidateSupport))
                     {
                         continue;
                     }
@@ -173,7 +179,7 @@ public sealed class PeerPatternDetector : IChangeDetector
             }
         }
 
-        var candidates = SelectCandidates(deviations, index, snapshot);
+        var candidates = SelectCandidates(deviations, index, snapshot, sensitivity);
         return new DetectionResult(
             candidates,
             [.. conventions.Values.OrderByDescending(c => (double)c.Supporting / c.PeerCount).ThenBy(c => c.Statement, StringComparer.Ordinal)]);
@@ -183,9 +189,10 @@ public sealed class PeerPatternDetector : IChangeDetector
     /// Filters traits down to ones that say something about design: calls and dependencies on concepts declared in
     /// this repository (not framework plumbing), error handling and attributes. Never the type itself.
     /// </summary>
-    private static bool IsMeaningful(Trait trait, TypeFacts type, IReadOnlySet<string> repoTypes)
+    private static bool IsMeaningful(Trait trait, TypeFacts type, IReadOnlySet<string> repoTypes, IReadOnlySet<string> ignored)
     {
-        if (IgnoredSubjects.Contains(trait.Subject))
+        if (ignored.Contains(trait.Subject) || ignored.Contains(StripGeneric(trait.Subject)) ||
+            (trait.Kind == TraitKind.Calls && ignored.Contains(StripGeneric(ReceiverOf(trait)))))
         {
             return false;
         }
@@ -200,6 +207,11 @@ public sealed class PeerPatternDetector : IChangeDetector
     }
 
     /// <summary>Repository concepts matter more than framework plumbing such as IConfiguration.</summary>
+    private static IReadOnlySet<string> IgnoredNames(ReviewSettings settings) =>
+        settings.IgnoredNames.Count == 0
+            ? BuiltInIgnoredNames
+            : BuiltInIgnoredNames.Concat(settings.IgnoredNames.Select(n => n.Trim()).Where(n => n.Length > 0)).ToHashSet(StringComparer.Ordinal);
+
     private static string CategoryOf(Trait trait, IReadOnlySet<string> repoTypes) =>
         trait.Kind == TraitKind.Dependency && !repoTypes.Contains(StripGeneric(trait.Subject))
             ? "framework-dependency"
@@ -216,7 +228,7 @@ public sealed class PeerPatternDetector : IChangeDetector
     /// <summary>
     /// "Calls QueueClaimService.Claim" is implied by "takes QueueClaimService"; report the dependency, not the call.
     /// </summary>
-    private static bool IsImpliedByMissingDependency(Trait trait, TypeFacts type, List<TypeFacts> peers)
+    private static bool IsImpliedByMissingDependency(Trait trait, TypeFacts type, List<TypeFacts> peers, double candidateSupport)
     {
         if (trait.Kind != TraitKind.Calls)
         {
@@ -224,14 +236,14 @@ public sealed class PeerPatternDetector : IChangeDetector
         }
 
         var dependency = new Trait(TraitKind.Dependency, ReceiverOf(trait));
-        return !type.Has(dependency) && peers.Count(p => p.Has(dependency)) >= peers.Count * CandidateSupport;
+        return !type.Has(dependency) && peers.Count(p => p.Has(dependency)) >= peers.Count * candidateSupport;
     }
 
-    private static IEnumerable<PeerRole> RolesOf(TypeFacts type, IReadOnlySet<string> repoTypes)
+    private static IEnumerable<PeerRole> RolesOf(TypeFacts type, IReadOnlySet<string> repoTypes, IReadOnlySet<string> ignored)
     {
         foreach (var trait in type.AllTraits)
         {
-            if (trait.Kind is TraitKind.BaseType or TraitKind.Dependency && IsMeaningful(trait, type, repoTypes))
+            if (trait.Kind is TraitKind.BaseType or TraitKind.Dependency && IsMeaningful(trait, type, repoTypes, ignored))
             {
                 yield return PeerRole.Of(trait);
             }
@@ -249,9 +261,10 @@ public sealed class PeerPatternDetector : IChangeDetector
         Trait trait,
         List<TypeFacts> peers,
         int count,
-        double lift)
+        double lift,
+        ReviewSensitivity sensitivity)
     {
-        if ((double)count / peers.Count < 0.75 || lift < 1.5)
+        if ((double)count / peers.Count < sensitivity.MinimumSupport || lift < sensitivity.MinimumLift)
         {
             return;
         }
@@ -268,10 +281,10 @@ public sealed class PeerPatternDetector : IChangeDetector
             Phrases.RolePlural(role),
             count,
             peers.Count,
-            [.. peers.Where(p => p.Has(trait)).Take(MaxExamples).Select(p => new CodeLocation(p.Path, p.Traits[trait.Key].Line, p.Traits[trait.Key].Line, p.Name))]);
+            [.. peers.Where(p => p.Has(trait)).Take(sensitivity.MaxExamples).Select(p => new CodeLocation(p.Path, p.Traits[trait.Key].Line, p.Traits[trait.Key].Line, p.Name))]);
     }
 
-    private static List<Candidate> SelectCandidates(List<Deviation> deviations, RepositoryTypeIndex index, PullRequestSnapshot snapshot)
+    private static List<Candidate> SelectCandidates(List<Deviation> deviations, RepositoryTypeIndex index, PullRequestSnapshot snapshot, ReviewSensitivity sensitivity)
     {
         // The same missing trait is often visible through several roles; each type is reported for a trait
         // only once, under the most convincing role.
@@ -303,9 +316,9 @@ public sealed class PeerPatternDetector : IChangeDetector
             var d = group.First;
 
             // Only surface-worthy candidates consume a type's budget; weaker ones still flow to the policy for diagnostics.
-            var budgeted = d.Introduced && d.Support >= 0.7 && d.Lift >= 1.5;
+            var budgeted = d.Introduced && d.Support >= sensitivity.MinimumSupport - 0.05 && d.Lift >= sensitivity.MinimumLift;
             var changes = budgeted
-                ? group.Changes.Where(c => perType.GetValueOrDefault(c.Head.FullName) < MaxPointsPerType).ToList()
+                ? group.Changes.Where(c => perType.GetValueOrDefault(c.Head.FullName) < sensitivity.MaxPointsPerType).ToList()
                 : group.Changes;
             if (changes.Count == 0)
             {
@@ -331,7 +344,7 @@ public sealed class PeerPatternDetector : IChangeDetector
                 }
             }
 
-            candidates.Add(BuildCandidate(d, affected, changes, index));
+            candidates.Add(BuildCandidate(d, affected, changes, index, sensitivity.MaxExamples));
         }
 
         return candidates;
@@ -368,7 +381,7 @@ public sealed class PeerPatternDetector : IChangeDetector
             : new AffectedType(type, new CodeLocation(type.Path, line.Value, line.Value, type.Name), instead);
     }
 
-    private static Candidate BuildCandidate(Deviation d, List<AffectedType> affected, List<ChangedType> changes, RepositoryTypeIndex index)
+    private static Candidate BuildCandidate(Deviation d, List<AffectedType> affected, List<ChangedType> changes, RepositoryTypeIndex index, int maxExamples)
     {
         var following = d.Peers.Where(p => p.Has(d.Trait)).OrderBy(p => p.Path, StringComparer.Ordinal).ToList();
         var notFollowing = d.Peers.Where(p => !p.Has(d.Trait)).OrderBy(p => p.Path, StringComparer.Ordinal).ToList();
@@ -376,7 +389,7 @@ public sealed class PeerPatternDetector : IChangeDetector
         var key = StableId("pp", d.Role.Key, d.Trait.Key);
         var convention = $"{Phrases.RolePlural(d.Role)} {Phrases.Has(d.Trait)}";
 
-        var examples = following.Take(MaxExamples).Select(p => Example(index, p, p.Traits[d.Trait.Key].Line)).ToList();
+        var examples = following.Take(maxExamples).Select(p => Example(index, p, p.Traits[d.Trait.Key].Line)).ToList();
         var primary = affected[0];
         var currentLine = (primary.Instead.Count > 0 ? primary.Instead[0].Line : (int?)null) ?? primary.Anchor.StartLine;
 
@@ -489,11 +502,12 @@ public sealed class PeerPatternDetector : IChangeDetector
     private static List<ChangedType> FindChangedTypes(
         RepositoryTypeIndex index,
         PullRequestSnapshot snapshot,
-        Dictionary<string, IReadOnlyList<TypeFacts>> baseFacts)
+        Dictionary<string, IReadOnlyList<TypeFacts>> baseFacts,
+        ReviewSettings settings)
     {
         var result = new List<ChangedType>();
 
-        foreach (var file in snapshot.Files.Where(f => IsAnalysable(f) && f.Kind != FileChangeKind.Deleted))
+        foreach (var file in snapshot.Files.Where(f => IsAnalysable(f) && f.Kind != FileChangeKind.Deleted && !settings.IsSkipped(f.Path)))
         {
             var added = file.AddedLines().ToHashSet();
             var headTypes = index.TypesIn(file.Path).Where(t => !t.IsTest && added.Any(l => l >= t.StartLine && l <= t.EndLine));

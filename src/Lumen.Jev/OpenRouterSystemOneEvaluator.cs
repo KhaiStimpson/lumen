@@ -36,13 +36,21 @@ public interface IOpenRouterKeyCheck
 /// JEV over OpenRouter's Decisions API (TDD §38): one request carries every question for a batch, and each answer
 /// comes back with its probabilities. The key is read from the platform credential store on each call.
 /// </summary>
-public sealed class OpenRouterSystemOneEvaluator(HttpClient http, ISecretStore secrets, OpenRouterOptions options) : ISystemOneEvaluator, IOpenRouterKeyCheck
+public sealed class OpenRouterSystemOneEvaluator(HttpClient http, ISecretStore secrets, Func<OpenRouterOptions> currentOptions) : ISystemOneEvaluator, IOpenRouterKeyCheck
 {
     public const string ProviderName = "openrouter";
 
+    public OpenRouterSystemOneEvaluator(HttpClient http, ISecretStore secrets, OpenRouterOptions options)
+        : this(http, secrets, () => options)
+    {
+    }
+
+    /// <summary>Read at each call, so a model or retention change in Settings applies to the next request.</summary>
+    private OpenRouterOptions Options => currentOptions();
+
     public bool IsConfigured => !string.IsNullOrWhiteSpace(ReadKey());
 
-    public string Model => options.Model;
+    public string Model => Options.Model;
 
     public async Task<SystemOneResult> EvaluateAsync(
         SystemOneState state,
@@ -53,7 +61,7 @@ public sealed class OpenRouterSystemOneEvaluator(HttpClient http, ISecretStore s
         ArgumentNullException.ThrowIfNull(questions);
 
         var key = ReadKey() ?? throw new SystemOneUnavailableException(SystemOneFailure.NotConfigured, "No OpenRouter API key is stored.");
-        using var request = new HttpRequestMessage(HttpMethod.Post, options.DecisionsEndpoint)
+        using var request = new HttpRequestMessage(HttpMethod.Post, Options.DecisionsEndpoint)
         {
             Content = JsonContent.Create(BuildRequest(state, questions)),
         };
@@ -61,7 +69,7 @@ public sealed class OpenRouterSystemOneEvaluator(HttpClient http, ISecretStore s
         request.Headers.Add("X-Title", "Lumen");
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(options.RequestTimeout);
+        timeout.CancelAfter(Options.RequestTimeout);
         var stopwatch = Stopwatch.StartNew();
         HttpResponseMessage response;
         try
@@ -70,7 +78,7 @@ public sealed class OpenRouterSystemOneEvaluator(HttpClient http, ISecretStore s
         }
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new SystemOneUnavailableException(SystemOneFailure.Timeout, $"JEV did not answer within {options.RequestTimeout.TotalSeconds:0}s", ex);
+            throw new SystemOneUnavailableException(SystemOneFailure.Timeout, $"JEV did not answer within {Options.RequestTimeout.TotalSeconds:0}s", ex);
         }
         catch (HttpRequestException ex)
         {
@@ -85,7 +93,7 @@ public sealed class OpenRouterSystemOneEvaluator(HttpClient http, ISecretStore s
                 throw Failure(response.StatusCode, body);
             }
 
-            return ParseResponse(body, questions, options.Model, stopwatch.Elapsed);
+            return ParseResponse(body, questions, Options.Model, stopwatch.Elapsed);
         }
     }
 
@@ -98,7 +106,7 @@ public sealed class OpenRouterSystemOneEvaluator(HttpClient http, ISecretStore s
             return new OpenRouterKeyStatus(false, "No key stored");
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, options.KeyEndpoint);
+        using var request = new HttpRequestMessage(HttpMethod.Get, Options.KeyEndpoint);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
         try
         {
@@ -143,7 +151,7 @@ public sealed class OpenRouterSystemOneEvaluator(HttpClient http, ISecretStore s
         }
 
         var provider = new JsonObject { ["data_collection"] = "deny" };
-        if (options.RequireZeroDataRetention)
+        if (Options.RequireZeroDataRetention)
         {
             provider["zdr"] = true;
             provider["allow_fallbacks"] = false;
@@ -151,7 +159,7 @@ public sealed class OpenRouterSystemOneEvaluator(HttpClient http, ISecretStore s
 
         return new JsonObject
         {
-            ["model"] = options.Model,
+            ["model"] = Options.Model,
             ["state"] = state.Json.DeepClone(),
             ["questions"] = questionMap,
             ["provider"] = provider,

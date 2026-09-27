@@ -33,14 +33,29 @@ public sealed class ConnectionsProbe(
                 JevEnabled = settings.Jev.Enabled,
                 AllowCodeSnippetsToJev = settings.Privacy.AllowCodeSnippetsToJev,
                 InvestigationsEnabled = settings.Agents.Enabled && settings.Privacy.AllowCodeToAgents,
+                JevModel = settings.Jev.Model,
+                JevTimeoutSeconds = settings.Jev.TimeoutSeconds,
+                JevRequireZeroDataRetention = settings.Jev.RequireZeroDataRetention,
+                MaxInvestigationsPerPullRequest = settings.Agents.MaxInvestigationsPerPullRequest,
+                MaxConcurrentInvestigations = settings.Agents.MaxConcurrent,
+                AllowMeteredUsage = settings.Agents.AllowMeteredUsage,
             },
         };
     }
 
-    /// <summary>Only the panel's switches change; model, limits and everything else in settings.json are kept.</summary>
+    /// <summary>
+    /// The switches always change; each Cloud AI limit changes only when it is set, and is kept in a sane range.
+    /// Everything else in settings.json is kept.
+    /// </summary>
+    /// <exception cref="ArgumentException">The JEV model name is blank.</exception>
     public void UpdateSettings(ConnectionSettings changes)
     {
         ArgumentNullException.ThrowIfNull(changes);
+        if (changes.HasJevModel && string.IsNullOrWhiteSpace(changes.JevModel))
+        {
+            throw new ArgumentException("Enter a JEV model, e.g. typesafe/jev-1.13.", nameof(changes));
+        }
+
         store.Update(current => current with
         {
             Privacy = current.Privacy with
@@ -49,8 +64,22 @@ public sealed class ConnectionsProbe(
                 AllowCodeSnippetsToJev = changes.AllowCodeSnippetsToJev,
                 AllowCodeToAgents = changes.InvestigationsEnabled,
             },
-            Jev = current.Jev with { Enabled = changes.JevEnabled },
-            Agents = current.Agents with { Enabled = changes.InvestigationsEnabled },
+            Jev = current.Jev with
+            {
+                Enabled = changes.JevEnabled,
+                Model = changes.HasJevModel ? changes.JevModel.Trim() : current.Jev.Model,
+                TimeoutSeconds = changes.HasJevTimeoutSeconds ? Math.Clamp(changes.JevTimeoutSeconds, 2, 60) : current.Jev.TimeoutSeconds,
+                RequireZeroDataRetention = changes.HasJevRequireZeroDataRetention ? changes.JevRequireZeroDataRetention : current.Jev.RequireZeroDataRetention,
+            },
+            Agents = current.Agents with
+            {
+                Enabled = changes.InvestigationsEnabled,
+                MaxInvestigationsPerPullRequest = changes.HasMaxInvestigationsPerPullRequest
+                    ? Math.Clamp(changes.MaxInvestigationsPerPullRequest, 0, 20)
+                    : current.Agents.MaxInvestigationsPerPullRequest,
+                MaxConcurrent = changes.HasMaxConcurrentInvestigations ? Math.Clamp(changes.MaxConcurrentInvestigations, 1, 4) : current.Agents.MaxConcurrent,
+                AllowMeteredUsage = changes.HasAllowMeteredUsage ? changes.AllowMeteredUsage : current.Agents.AllowMeteredUsage,
+            },
         });
     }
 

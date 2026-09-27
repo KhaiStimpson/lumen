@@ -324,4 +324,49 @@ public sealed class PeerPatternDetectorTests
 
         Assert.Empty(result.Candidates);
     }
+
+    private static Task<DetectionResult> DetectWith(ReviewSettings settings, Dictionary<string, string> head, string diff) =>
+        PeerPatternDetector.DetectAsync(RepositoryTypeIndex.FromSources(head), Snapshot(diff), BaseReader(NoBase), settings, CancellationToken.None);
+
+    [Fact]
+    public async Task QuietNeedsMorePeersThanTheRepositoryHas()
+    {
+        var (head, diff) = NewDbWorkerScenario();
+
+        var result = await DetectWith(new ReviewSettings { Sensitivity = ReviewSensitivity.Quiet }, head, diff);
+
+        Assert.Empty(result.Candidates);
+    }
+
+    [Fact]
+    public async Task AnIgnoredTypeIsNeverAConventionNorAreCallsOnIt()
+    {
+        var (head, diff) = NewDbWorkerScenario();
+
+        var result = await DetectWith(new ReviewSettings { IgnoredNames = ["QueueClaimService"] }, head, diff);
+
+        Assert.DoesNotContain(result.Candidates, c => FactsOf(c).Missing.Subject.StartsWith("QueueClaimService", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Conventions, c => c.Statement.Contains("QueueClaimService", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ChangesUnderASkippedPathAreNotFlagged()
+    {
+        var (head, diff) = NewDbWorkerScenario();
+
+        var result = await DetectWith(new ReviewSettings { SkippedPaths = ["src/Acme/Workers/InvoiceRetry*.cs"] }, head, diff);
+
+        Assert.Empty(result.Candidates);
+    }
+
+    [Fact]
+    public async Task ExamplesFollowTheSensitivity()
+    {
+        var (head, diff) = NewDbWorkerScenario();
+
+        var result = await DetectWith(new ReviewSettings { Sensitivity = ReviewSensitivity.Balanced with { MaxExamples = 1 } }, head, diff);
+
+        var candidate = Assert.Single(result.Candidates);
+        Assert.Single(Precedent(candidate).Examples);
+    }
 }

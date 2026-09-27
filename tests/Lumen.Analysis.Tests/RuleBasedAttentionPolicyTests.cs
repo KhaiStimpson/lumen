@@ -162,4 +162,14 @@ public sealed class RuleBasedAttentionPolicyTests
 
         Assert.Equal((ReviewSeverity.Low, 0d), (decision.Severity, decision.Priority));
     }
+
+    [Fact]
+    public async Task TheRepositorysSensitivitySetsTheThresholds()
+    {
+        var candidate = Make(4, 5, lift: 1.8);
+
+        Assert.Equal(AttentionAction.Surface, (await RuleBasedAttentionPolicy.DecideAsync(candidate, ReviewSensitivity.Balanced)).Action);
+        Assert.Equal(AttentionAction.Suppress, (await RuleBasedAttentionPolicy.DecideAsync(candidate, ReviewSensitivity.Quiet)).Action);
+        Assert.Equal(AttentionAction.Surface, (await RuleBasedAttentionPolicy.DecideAsync(Make(2, 3, lift: 1.3), ReviewSensitivity.Thorough)).Action);
+    }
 }

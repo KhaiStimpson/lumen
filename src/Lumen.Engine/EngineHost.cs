@@ -85,6 +85,7 @@ public static class EngineHost
 
         services.AddSingleton(_ => EngineSettings.Load(options.DataDirectory));
         services.AddSingleton(sp => new EngineSettingsStore(sp.GetRequiredService<EngineSettings>(), options.DataDirectory));
+        services.AddSingleton(sp => new ReviewSettingsStore(sp.GetRequiredService<EngineSettingsStore>(), options.DataDirectory));
         services.AddSingleton<ISecretStore>(_ => OperatingSystem.IsWindows() ? new WindowsCredentialStore() : new UnavailableSecretStore());
 
         services.AddSingleton<IChangeDetector, PeerPatternDetector>();
@@ -119,13 +120,18 @@ public static class EngineHost
     /// <summary>JEV on top of the rules (TDD §38). Without a key or permission it is a pass-through to the rules.</summary>
     internal static void AddJev(IServiceCollection services)
     {
-        services.AddSingleton(sp =>
+        // Read at each request, so a model or retention change in Settings applies without a restart.
+        static OpenRouterSystemOneEvaluator Create(HttpClient http, IServiceProvider sp)
         {
-            var jev = sp.GetRequiredService<EngineSettings>().Jev;
-            return new OpenRouterOptions { Model = jev.Model, RequireZeroDataRetention = jev.RequireZeroDataRetention };
-        });
-        services.AddHttpClient<ISystemOneEvaluator, OpenRouterSystemOneEvaluator>();
-        services.AddHttpClient<IOpenRouterKeyCheck, OpenRouterSystemOneEvaluator>();
+            var settings = sp.GetRequiredService<EngineSettingsStore>();
+            return new OpenRouterSystemOneEvaluator(
+                http,
+                sp.GetRequiredService<ISecretStore>(),
+                () => new OpenRouterOptions { Model = settings.Current.Jev.Model, RequireZeroDataRetention = settings.Current.Jev.RequireZeroDataRetention });
+        }
+
+        services.AddHttpClient<ISystemOneEvaluator, OpenRouterSystemOneEvaluator>(Create);
+        services.AddHttpClient<IOpenRouterKeyCheck, OpenRouterSystemOneEvaluator>(Create);
         services.AddSingleton(sp =>
         {
             var settings = sp.GetRequiredService<EngineSettingsStore>();
@@ -160,17 +166,17 @@ public static class EngineHost
         services.AddSingleton<IInvestigator, RepositoryPatternInvestigator>();
         services.AddSingleton(sp =>
         {
-            var agents = sp.GetRequiredService<EngineSettings>().Agents;
+            var settings = sp.GetRequiredService<EngineSettingsStore>();
             return new InvestigationScheduler(
                 sp.GetServices<IInvestigator>(),
                 sp.GetRequiredService<IAgentProvider>(),
                 sp.GetRequiredService<IInvestigationStore>(),
                 sp.GetRequiredService<IAgentWorktreeFactory>(),
-                new InvestigationSchedulerOptions
+                () => new InvestigationSchedulerOptions
                 {
-                    MaxConcurrent = agents.MaxConcurrent,
-                    MaxPerPullRequest = agents.MaxInvestigationsPerPullRequest,
-                    AllowMeteredUsage = agents.AllowMeteredUsage,
+                    MaxConcurrent = settings.Current.Agents.MaxConcurrent,
+                    MaxPerPullRequest = settings.Current.Agents.MaxInvestigationsPerPullRequest,
+                    AllowMeteredUsage = settings.Current.Agents.AllowMeteredUsage,
                 },
                 sp.GetRequiredService<ILogger<InvestigationScheduler>>());
         });

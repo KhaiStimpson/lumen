@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Lumen.Analysis;
 using Lumen.Domain;
 
 namespace Lumen.Engine;
@@ -49,6 +50,9 @@ public sealed record EngineSettings
     public JevSettings Jev { get; init; } = new();
 
     public AgentSettings Agents { get; init; } = new();
+
+    /// <summary>The global review defaults; repositories override them in their own files (see ReviewSettingsStore).</summary>
+    public ReviewSettings Review { get; init; } = new();
 
     public bool AgentsAllowed => Agents.Enabled && Privacy.AllowsAgents;
 

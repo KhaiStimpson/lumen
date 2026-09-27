@@ -2,17 +2,41 @@ using Lumen.Domain;
 
 namespace Lumen.Analysis;
 
-/// <summary>Deterministic thresholds in the spirit of TDD §10.3. Replaced by a JEV-backed policy in Phase 3.</summary>
+/// <summary>
+/// Deterministic thresholds in the spirit of TDD §10.3, and the floor under JEV. During an analysis the thresholds
+/// come from the repository's <see cref="ReviewSensitivity"/>; the properties are the defaults outside one.
+/// </summary>
 public sealed class RuleBasedAttentionPolicy : IAttentionPolicy
 {
-    public int MinimumPeers { get; init; } = 3;
+    public int MinimumPeers { get; init; } = ReviewSensitivity.Balanced.MinimumPeers;
 
-    public double MinimumSupport { get; init; } = 0.75;
+    public double MinimumSupport { get; init; } = ReviewSensitivity.Balanced.MinimumSupport;
 
-    public double MinimumLift { get; init; } = 1.5;
+    public double MinimumLift { get; init; } = ReviewSensitivity.Balanced.MinimumLift;
 
-    public ValueTask<AttentionDecision> DecideAsync(Candidate candidate, CancellationToken cancellationToken)
+    public ValueTask<AttentionDecision> DecideAsync(Candidate candidate, CancellationToken cancellationToken) =>
+        DecideAsync(candidate, new ReviewSensitivity { MinimumPeers = MinimumPeers, MinimumSupport = MinimumSupport, MinimumLift = MinimumLift });
+
+    public async ValueTask<IReadOnlyList<AttentionDecision>> DecideAllAsync(
+        IReadOnlyList<Candidate> candidates,
+        AnalysisContext context,
+        CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(candidates);
+        ArgumentNullException.ThrowIfNull(context);
+        var decisions = new List<AttentionDecision>(candidates.Count);
+        foreach (var candidate in candidates)
+        {
+            decisions.Add(await DecideAsync(candidate, context.Settings.Sensitivity).ConfigureAwait(false));
+        }
+
+        return decisions;
+    }
+
+    public static ValueTask<AttentionDecision> DecideAsync(Candidate candidate, ReviewSensitivity sensitivity)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        ArgumentNullException.ThrowIfNull(sensitivity);
         var s = candidate.Signals;
 
         if (!s.IntroducedByChange)
@@ -22,20 +46,20 @@ public sealed class RuleBasedAttentionPolicy : IAttentionPolicy
 
         if (candidate.Type == ReviewPointType.PatternDeviation)
         {
-            if (s.PeerCount < MinimumPeers)
+            if (s.PeerCount < sensitivity.MinimumPeers)
             {
                 return Decide(AttentionAction.Suppress, ReviewSeverity.Low, 0, $"Only {s.PeerCount} peers; precedent too thin");
             }
 
             // A slightly weaker majority is still convincing when many peers agree.
-            var required = s.Supporting >= 5 ? MinimumSupport - 0.05 : MinimumSupport;
+            var required = s.Supporting >= 5 ? sensitivity.MinimumSupport - 0.05 : sensitivity.MinimumSupport;
             if (s.Support < required)
             {
-                return Decide(AttentionAction.Suppress, ReviewSeverity.Low, 0, $"Support {s.Support:P0} below {MinimumSupport:P0}");
+                return Decide(AttentionAction.Suppress, ReviewSeverity.Low, 0, $"Support {s.Support:P0} below {sensitivity.MinimumSupport:P0}");
             }
 
             // Depending on a ubiquitous type (e.g. the DbContext) is weak evidence of a role-specific convention.
-            var requiredLift = s.Category == "dependency" ? MinimumLift + 1 : MinimumLift;
+            var requiredLift = s.Category == "dependency" ? sensitivity.MinimumLift + 1 : sensitivity.MinimumLift;
             if (s.Lift < requiredLift)
             {
                 return Decide(AttentionAction.Suppress, ReviewSeverity.Low, 0, $"Lift {s.Lift:0.0} — convention is not specific to this role");

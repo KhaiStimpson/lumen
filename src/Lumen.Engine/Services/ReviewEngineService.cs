@@ -12,6 +12,7 @@ public sealed class ReviewEngineService(
     IGitHubClient gitHub,
     IReviewStore store,
     ConnectionsProbe connections,
+    ReviewSettingsStore reviewSettings,
     TimeProvider time) : ReviewEngine.ReviewEngineBase
 {
     private static readonly string Version =
@@ -124,6 +125,10 @@ public sealed class ReviewEngineService(
         {
             connections.UpdateSettings(request);
         }
+        catch (ArgumentException ex)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new RpcException(new Status(StatusCode.Unavailable, $"Could not save settings: {ex.Message}"));
@@ -131,6 +136,127 @@ public sealed class ReviewEngineService(
 
         return await connections.GetAsync(context.CancellationToken).ConfigureAwait(false);
     }
+
+    public override Task<ReviewSettingsReply> GetReviewSettings(ReviewSettingsRequest request, ServerCallContext context)
+    {
+        try
+        {
+            return Task.FromResult(ReviewSettingsReply(RepositoryOf(request.Owner, request.Name)));
+        }
+        catch (ArgumentException ex)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
+        }
+    }
+
+    public override Task<ReviewSettingsReply> UpdateReviewSettings(UpdateReviewSettingsRequest request, ServerCallContext context)
+    {
+        var repository = RepositoryOf(request.Owner, request.Name);
+        var rules = request.Rules ?? new ReviewRules();
+        try
+        {
+            if (repository is null)
+            {
+                reviewSettings.UpdateGlobal(new Analysis.ReviewSettings
+                {
+                    Sensitivity = FromProto(rules.Sensitivity) ?? Analysis.ReviewSensitivity.Balanced,
+                    IgnoredNames = [.. rules.IgnoredNames],
+                    MechanicalPaths = [.. rules.MechanicalPaths],
+                    SkippedPaths = [.. rules.SkippedPaths],
+                });
+            }
+            else
+            {
+                reviewSettings.Update(repository, new RepositoryReviewSettings
+                {
+                    Sensitivity = FromProto(rules.Sensitivity),
+                    IgnoredNames = [.. rules.IgnoredNames],
+                    MechanicalPaths = [.. rules.MechanicalPaths],
+                    SkippedPaths = [.. rules.SkippedPaths],
+                });
+            }
+        }
+        catch (ArgumentException ex)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new RpcException(new Status(StatusCode.Unavailable, $"Could not save settings: {ex.Message}"));
+        }
+
+        return Task.FromResult(ReviewSettingsReply(repository));
+    }
+
+    private ReviewSettingsReply ReviewSettingsReply(RepositoryRef? repository)
+    {
+        var global = reviewSettings.Global;
+        var reply = new ReviewSettingsReply
+        {
+            Global = ToProto(global.Sensitivity, global.IgnoredNames, global.MechanicalPaths, global.SkippedPaths),
+            SettingsPath = reviewSettings.SettingsPath,
+            Quiet = ToProto(Analysis.ReviewSensitivity.Quiet),
+            Balanced = ToProto(Analysis.ReviewSensitivity.Balanced),
+            Thorough = ToProto(Analysis.ReviewSensitivity.Thorough),
+        };
+        reply.BuiltInIgnoredNames.AddRange(Roslyn.PeerPatternDetector.BuiltInIgnoredNames.Order(StringComparer.OrdinalIgnoreCase));
+        reply.BuiltInMechanicalPaths.AddRange(Analysis.MechanicalClassifier.BuiltInDescriptions);
+
+        if (repository is not null)
+        {
+            var own = reviewSettings.Get(repository);
+            reply.Repository = ToProto(own.Sensitivity, own.IgnoredNames, own.MechanicalPaths, own.SkippedPaths);
+            reply.RepositorySettingsPath = reviewSettings.PathFor(repository);
+        }
+
+        return reply;
+    }
+
+    private static RepositoryRef? RepositoryOf(string owner, string name)
+    {
+        if (owner.Length == 0 && name.Length == 0)
+        {
+            return null;
+        }
+
+        if (owner.Length == 0 || name.Length == 0)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Give both the repository owner and name, or neither."));
+        }
+
+        return new RepositoryRef(owner, name);
+    }
+
+    private static ReviewRules ToProto(
+        Analysis.ReviewSensitivity? sensitivity,
+        IEnumerable<string> ignoredNames,
+        IEnumerable<string> mechanicalPaths,
+        IEnumerable<string> skippedPaths)
+    {
+        var rules = new ReviewRules { Sensitivity = sensitivity is null ? null : ToProto(sensitivity) };
+        rules.IgnoredNames.AddRange(ignoredNames);
+        rules.MechanicalPaths.AddRange(mechanicalPaths);
+        rules.SkippedPaths.AddRange(skippedPaths);
+        return rules;
+    }
+
+    private static Contracts.ReviewSensitivity ToProto(Analysis.ReviewSensitivity sensitivity) => new()
+    {
+        MinimumPeers = sensitivity.MinimumPeers,
+        MinimumSupport = sensitivity.MinimumSupport,
+        MinimumLift = sensitivity.MinimumLift,
+        MaxPointsPerType = sensitivity.MaxPointsPerType,
+        MaxExamples = sensitivity.MaxExamples,
+    };
+
+    private static Analysis.ReviewSensitivity? FromProto(Contracts.ReviewSensitivity? sensitivity) => sensitivity is null ? null : new()
+    {
+        MinimumPeers = sensitivity.MinimumPeers,
+        MinimumSupport = sensitivity.MinimumSupport,
+        MinimumLift = sensitivity.MinimumLift,
+        MaxPointsPerType = sensitivity.MaxPointsPerType,
+        MaxExamples = sensitivity.MaxExamples,
+    };
 
     private async Task RecordAsync(
         PullRequestSession session,

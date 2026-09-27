@@ -16,6 +16,7 @@ public sealed partial class PullRequestSessionManager(
     IReviewStore store,
     ReviewPointPipeline pipeline,
     InvestigationCoordinator investigations,
+    ReviewSettingsStore reviewSettings,
     ILogger<PullRequestSessionManager> logger) : IDisposable
 {
     private readonly ConcurrentDictionary<PullRequestKey, PullRequestSession> _sessions = new();
@@ -58,8 +59,11 @@ public sealed partial class PullRequestSessionManager(
                 new InlineProgress(message => Progress(session, "repository", message)),
                 ct).ConfigureAwait(false);
 
+            // Resolved once, so this run never sees a settings change half-applied; Re-analyse picks up the next one.
+            var settings = reviewSettings.Resolve(key.Repository);
+
             Progress(session, "diff", "Reading changes…");
-            var files = ChangedFiles.FromUnifiedDiff(await checkout.GetDiffAsync(ct).ConfigureAwait(false));
+            var files = ChangedFiles.FromUnifiedDiff(await checkout.GetDiffAsync(ct).ConfigureAwait(false), settings.MechanicalPaths);
             var snapshot = new Domain.PullRequestSnapshot(key, info.BaseSha, info.HeadSha, checkout.MergeBaseSha, info.Metadata, files, threads);
             session.SetSnapshot(snapshot, checkout);
             session.Publish(new PullRequestEvent { Snapshot = ProtoMapper.ToProto(snapshot, viewer) });
@@ -69,7 +73,7 @@ public sealed partial class PullRequestSessionManager(
             var states = await store.GetLatestActionsAsync(key, ct).ConfigureAwait(false);
 
             var result = await pipeline.RunAsync(
-                new AnalysisContext(snapshot, checkout),
+                new AnalysisContext(snapshot, checkout) { Settings = settings },
                 point =>
                 {
                     var withState = states.TryGetValue(point.Id, out var action) ? point with { State = StateFor(action, point.State) } : point;
