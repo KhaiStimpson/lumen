@@ -198,6 +198,122 @@
     <Setter Property="Background" Value="{DynamicResource Accent}" />
   </Style>
 
+  <!-- Settings navigation: Button.row, with the current section in the selected colour -->
+  <Style Selector="Button.row.nav">
+    <Setter Property="Padding" Value="10,7" />
+    <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+    <Setter Property="FontSize" Value="12.5" />
+  </Style>
+  <Style Selector="Button.row.nav.current">
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <!-- Content strings become TextBlocks, which the app-wide TextBlock style colours; restate the colour for them. -->
+  <Style Selector="Button.row.nav TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+  </Style>
+  <Style Selector="Button.row.nav.current TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+  </Style>
+
+  <!-- Segmented control: picks one of two or three values (scope, theme, motion). Tabs are for navigation. -->
+  <Style Selector="Border.segmented">
+    <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Control}" />
+    <Setter Property="Padding" Value="2" />
+  </Style>
+  <Style Selector="RadioButton.segment">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="Root" Background="Transparent" CornerRadius="5" Padding="10,4">
+          <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" TextElement.FontSize="12" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="RadioButton.segment:pointerover /template/ Border#Root">
+    <Setter Property="Background" Value="{DynamicResource Surface.Hover}" />
+  </Style>
+  <Style Selector="RadioButton.segment:checked /template/ Border#Root">
+    <Setter Property="Background" Value="{DynamicResource Surface.Raised}" />
+    <Setter Property="BoxShadow" Value="0 1 2 0 #1A000000" />
+  </Style>
+  <Style Selector="RadioButton.segment:checked">
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <Style Selector="RadioButton.segment TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+  </Style>
+  <Style Selector="RadioButton.segment:checked TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+
+  <!-- Preset card: a choice that needs a sentence to explain it -->
+  <Style Selector="RadioButton.preset">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="Root" Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Border.Strong}"
+                BorderThickness="1" CornerRadius="{StaticResource Radius.Card}" Padding="12,10">
+          <ContentPresenter Content="{TemplateBinding Content}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="VerticalAlignment" Value="Stretch" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="RadioButton.preset:pointerover /template/ Border#Root">
+    <Setter Property="Background" Value="{DynamicResource Surface.Hover}" />
+  </Style>
+  <Style Selector="RadioButton.preset:checked /template/ Border#Root">
+    <Setter Property="Background" Value="{DynamicResource Accent.Soft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="Padding" Value="11,9" />
+  </Style>
+
+  <!-- Stepper: numbers in settings, tabular and monospace so columns of values line up -->
+  <Style Selector="NumericUpDown.stepper">
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Control}" />
+    <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}" />
+    <Setter Property="FontFamily" Value="{StaticResource CodeFont}" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Width" Value="112" />
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="ClipValueToMinMax" Value="True" />
+    <Setter Property="AllowSpin" Value="True" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- At a limit the button only dims; the Fluent grey fill reads as pressed. -->
+  <Style Selector="NumericUpDown.stepper /template/ ButtonSpinner /template/ RepeatButton:disabled /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Opacity" Value="0.4" />
+  </Style>
+  <Style Selector="Border.entry">
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}" />
+    <Setter Property="Background" Value="{DynamicResource Surface.Raised}" />
+    <Setter Property="Padding" Value="8,2,2,2" />
+  </Style>
+  <Style Selector="Border.entry.fixed">
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+    <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
+    <Setter Property="Padding" Value="8,3" />
+  </Style>
+  <Style Selector="Border.entry > StackPanel > TextBlock, Border.entry > TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource CodeFont}" />
+    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.entry.fixed > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+  </Style>
+
   <!-- Icons -->
   <Style Selector="PathIcon">
     <Setter Property="Width" Value="14" />

@@ -218,6 +218,19 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
     public void Start() => _watch ??= WatchAsync(refresh: false);
 
+    /// <summary>A review setting changed since this pull request was analysed; offer Re-analyse, never run it unasked.</summary>
+    [ObservableProperty]
+    public partial bool NeedsReanalysis { get; set; }
+
+    public string ReanalyseLabel => $"Re-analyse {NumberLabel}";
+
+    [RelayCommand]
+    private Task ReanalyseAsync()
+    {
+        NeedsReanalysis = false;
+        return RefreshAsync();
+    }
+
     [RelayCommand]
     private async Task RefreshAsync()
     {

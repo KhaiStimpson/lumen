@@ -27,4 +27,10 @@ public interface IReviewSource : IAsyncDisposable
 
     /// <summary>Saves the panel's switches to the engine's settings.json; they apply without a restart.</summary>
     Task<Connections> UpdateConnectionSettingsAsync(ConnectionSettings settings, CancellationToken cancellationToken);
+
+    /// <summary>The global review settings, and the repository's own when the request names one.</summary>
+    Task<ReviewSettingsReply> GetReviewSettingsAsync(ReviewSettingsRequest request, CancellationToken cancellationToken);
+
+    /// <summary>Replaces one layer: the global settings, or the named repository's overrides.</summary>
+    Task<ReviewSettingsReply> UpdateReviewSettingsAsync(UpdateReviewSettingsRequest request, CancellationToken cancellationToken);
 }

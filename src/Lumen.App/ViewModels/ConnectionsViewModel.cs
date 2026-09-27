@@ -50,6 +50,27 @@ public sealed partial class ConnectionsViewModel(IReviewSource source) : Observa
     [ObservableProperty]
     public partial bool InvestigationsEnabled { get; set; }
 
+    // Cloud AI limits (the Settings overlay's Cloud AI limits section).
+
+    /// <summary>Saved on Enter or when the box loses focus, never per keystroke.</summary>
+    [ObservableProperty]
+    public partial string JevModelInput { get; set; } = "";
+
+    [ObservableProperty]
+    public partial decimal JevTimeoutSeconds { get; set; } = 12;
+
+    [ObservableProperty]
+    public partial bool JevRequireZeroDataRetention { get; set; } = true;
+
+    [ObservableProperty]
+    public partial decimal MaxInvestigationsPerPullRequest { get; set; } = 3;
+
+    [ObservableProperty]
+    public partial decimal MaxConcurrentInvestigations { get; set; } = 1;
+
+    [ObservableProperty]
+    public partial bool AllowMeteredUsage { get; set; }
+
     public bool IsLoaded => Status is not null;
 
     public ConnectionState JevState => Status?.Jev.State ?? ConnectionState.Off;
@@ -110,6 +131,32 @@ public sealed partial class ConnectionsViewModel(IReviewSource source) : Observa
 
     partial void OnInvestigationsEnabledChanged(bool value) => SaveSettings();
 
+    partial void OnJevModelInputChanged(string value)
+    {
+        // The box commits on leaving it, so a blank here is a finished edit: put the saved model back.
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            if (Status?.Settings is { } saved)
+            {
+                JevModelInput = saved.JevModel;
+            }
+        }
+        else if (value.Trim() != Status?.Settings?.JevModel)
+        {
+            SaveSettings();
+        }
+    }
+
+    partial void OnJevTimeoutSecondsChanged(decimal value) => SaveSettings();
+
+    partial void OnJevRequireZeroDataRetentionChanged(bool value) => SaveSettings();
+
+    partial void OnMaxInvestigationsPerPullRequestChanged(decimal value) => SaveSettings();
+
+    partial void OnMaxConcurrentInvestigationsChanged(decimal value) => SaveSettings();
+
+    partial void OnAllowMeteredUsageChanged(bool value) => SaveSettings();
+
     partial void OnStatusChanged(Connections? value)
     {
         if (value?.Settings is not { } settings)
@@ -124,6 +171,12 @@ public sealed partial class ConnectionsViewModel(IReviewSource source) : Observa
             JevEnabled = settings.JevEnabled;
             AllowCodeSnippetsToJev = settings.AllowCodeSnippetsToJev;
             InvestigationsEnabled = settings.InvestigationsEnabled;
+            JevModelInput = settings.JevModel;
+            JevTimeoutSeconds = (decimal)settings.JevTimeoutSeconds;
+            JevRequireZeroDataRetention = settings.JevRequireZeroDataRetention;
+            MaxInvestigationsPerPullRequest = settings.MaxInvestigationsPerPullRequest;
+            MaxConcurrentInvestigations = settings.MaxConcurrentInvestigations;
+            AllowMeteredUsage = settings.AllowMeteredUsage;
         }
         finally
         {
@@ -144,7 +197,19 @@ public sealed partial class ConnectionsViewModel(IReviewSource source) : Observa
             JevEnabled = JevEnabled,
             AllowCodeSnippetsToJev = AllowCodeSnippetsToJev,
             InvestigationsEnabled = InvestigationsEnabled,
+            JevTimeoutSeconds = (double)JevTimeoutSeconds,
+            JevRequireZeroDataRetention = JevRequireZeroDataRetention,
+            MaxInvestigationsPerPullRequest = (int)MaxInvestigationsPerPullRequest,
+            MaxConcurrentInvestigations = (int)MaxConcurrentInvestigations,
+            AllowMeteredUsage = AllowMeteredUsage,
         };
+
+        // A blank model would be refused; leave the saved one alone until a real name is entered.
+        if (!string.IsNullOrWhiteSpace(JevModelInput))
+        {
+            settings.JevModel = JevModelInput.Trim();
+        }
+
         await RunAsync(ct => source.UpdateConnectionSettingsAsync(settings, ct)).ConfigureAwait(true);
     }
 

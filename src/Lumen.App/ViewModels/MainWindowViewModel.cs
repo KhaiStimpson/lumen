@@ -9,6 +9,15 @@ using Lumen.Domain;
 
 namespace Lumen.App.ViewModels;
 
+public enum SettingsSection
+{
+    Connections,
+    Review,
+    Files,
+    CloudLimits,
+    Appearance,
+}
+
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly IReviewSource _source;
@@ -22,6 +31,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _settingsPath = settingsPath;
         Home = new OpenPullRequestViewModel(settings.RecentPullRequests, OpenAsync);
         Connections = new ConnectionsViewModel(source);
+        Review = new ReviewSettingsViewModel(source);
+        Appearance = new AppearanceViewModel(settings, settingsPath);
+        Review.Saved += (_, _) =>
+        {
+            if (PullRequest is { } pr)
+            {
+                pr.NeedsReanalysis = true;
+            }
+        };
         Current = Home;
     }
 
@@ -29,8 +47,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public ConnectionsViewModel Connections { get; }
 
+    public ReviewSettingsViewModel Review { get; }
+
+    public AppearanceViewModel Appearance { get; }
+
+    /// <summary>The Settings overlay (docs/design/settings-overlay.md): modal, closed by Escape or a click outside.</summary>
     [ObservableProperty]
-    public partial bool IsConnectionsOpen { get; set; }
+    public partial bool IsSettingsOpen { get; set; }
+
+    [ObservableProperty]
+    public partial SettingsSection Section { get; set; }
 
     public string SourceDescription => _source.Description;
 
@@ -86,17 +112,35 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private Task OpenConnectionsAsync()
+    private Task OpenConnectionsAsync() => OpenSettingsAsync(SettingsSection.Connections);
+
+    [RelayCommand]
+    private Task OpenReviewSettingsAsync() => OpenSettingsAsync(SettingsSection.Review);
+
+    /// <summary>Opens on <paramref name="section"/>; review settings load for the open pull request's repository.</summary>
+    public Task OpenSettingsAsync(SettingsSection section)
     {
-        IsConnectionsOpen = true;
-        return Connections.LoadAsync();
+        Section = section;
+        IsSettingsOpen = true;
+        return Task.WhenAll(Connections.LoadAsync(), Review.LoadAsync(PullRequest?.Ref));
     }
 
     [RelayCommand]
-    private void CloseConnections()
+    private void ShowSection(SettingsSection section) => Section = section;
+
+    [RelayCommand]
+    private void CloseSettings()
     {
-        IsConnectionsOpen = false;
+        IsSettingsOpen = false;
         Connections.KeyInput = "";
+    }
+
+    /// <summary>Closes Settings so the fresh analysis is what the reviewer sees next.</summary>
+    [RelayCommand]
+    private Task ReanalyseAsync()
+    {
+        IsSettingsOpen = false;
+        return PullRequest?.ReanalyseCommand.ExecuteAsync(null) ?? Task.CompletedTask;
     }
 
     [RelayCommand]
@@ -107,10 +151,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        var dark = app.ActualThemeVariant == ThemeVariant.Dark;
-        app.RequestedThemeVariant = dark ? ThemeVariant.Light : ThemeVariant.Dark;
-        _settings.Theme = dark ? "Light" : "Dark";
-        _settings.Save(_settingsPath);
+        // Through Appearance, so the Settings overlay and app.json stay in step with the title bar button.
+        Appearance.Theme = app.ActualThemeVariant == ThemeVariant.Dark ? ThemeChoice.Light : ThemeChoice.Dark;
     }
 
     partial void OnGoToFileQueryChanged(string value)

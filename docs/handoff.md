@@ -6,8 +6,16 @@ no git remote; fast-forwarded into main). Status, design and deviations: [plan.m
 ## State
 
 P3.1–P4.4 are done and committed, plus an in-app **Connections** panel (plug button in the title bar; TDD §39) that
-stores the OpenRouter key through the engine, shows JEV/Claude status, and edits the Cloud AI, JEV and investigation switches live. `dotnet build Lumen.slnx` has 0 errors (the
-warnings are the pre-existing Avalonia `Watermark` ones) and `dotnet test Lumen.slnx` passes (303 tests). Only **P4.5, the live checks**, remains, and it needs you.
+stores the OpenRouter key through the engine, shows JEV/Claude status, and edits the Cloud AI, JEV and investigation switches live.
+
+That panel is now one section of a **Settings** overlay ([design/settings-overlay.md](design/settings-overlay.md)):
+Review sensitivity presets with Advanced numbers, Ignored & files lists, Cloud AI limits and Appearance. Review
+settings are global (`settings.json` → `review`) with per-repository overrides (`review/{owner}/{repo}.json`), resolved
+once per analysis and passed to the detector and rules through `AnalysisContext.Settings`. A change marks the open PR
+for **Re-analyse** rather than re-running it. The JEV model/retention and investigation limits are now read live.
+
+`dotnet build Lumen.slnx` has 0 errors (the warnings are the pre-existing Avalonia `Watermark` ones) and
+`dotnet test Lumen.slnx` passes (343 tests). Only **P4.5, the live checks**, remains, and it needs you.
 
 ## Needs the user (nothing here has been done without asking)
 

@@ -37,14 +37,12 @@ public sealed partial class MainWindow : Window
             }
         };
 
-        // A click outside the card closes it (but not a click on the scroll bar).
-        ConnectionsScroller.PointerPressed += (_, e) =>
+        // A click outside the card closes it.
+        SettingsHost.PointerPressed += (_, e) =>
         {
-            if (e.Source is Visual target
-                && !ConnectionsCard.IsVisualAncestorOf(target)
-                && target.FindAncestorOfType<Avalonia.Controls.Primitives.ScrollBar>(includeSelf: true) is null)
+            if (e.Source is Visual target && !SettingsCard.IsVisualAncestorOf(target) && target != SettingsCard)
             {
-                ViewModel?.CloseConnectionsCommand.Execute(null);
+                ViewModel?.CloseSettingsCommand.Execute(null);
             }
         };
     }
@@ -54,12 +52,12 @@ public sealed partial class MainWindow : Window
     /// <summary>Keyboard-first review (TDD §29).</summary>
     private async void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
-        // The Connections card is modal: Escape closes it, and review shortcuts stay with the view underneath.
-        if (ViewModel is { IsConnectionsOpen: true } main)
+        // The Settings card is modal: Escape closes it, and review shortcuts stay with the view underneath.
+        if (ViewModel is { IsSettingsOpen: true } main)
         {
             if (e.Key == Key.Escape)
             {
-                main.CloseConnectionsCommand.Execute(null);
+                main.CloseSettingsCommand.Execute(null);
                 Focus();
                 e.Handled = true;
             }

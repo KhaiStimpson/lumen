@@ -52,8 +52,25 @@ public static class Converters
     public static readonly IValueConverter StrengthToWidth =
         new FuncValueConverter<double, double>(strength => Math.Round(strength * 56));
 
+    /// <summary>
+    /// An enum property against the enum member named in the parameter. Two-way, so a radio button can set it;
+    /// unchecking does nothing, since checking another option already moved the value.
+    /// </summary>
+    public static readonly IValueConverter EnumEquals = new EnumEqualsConverter();
+
     public static readonly IValueConverter DimIf =
         new FuncValueConverter<bool, double>(dim => dim ? 0.45 : 1);
+
+    private sealed class EnumEqualsConverter : IValueConverter
+    {
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+            value is not null && parameter is not null && string.Equals(value.ToString(), parameter.ToString(), StringComparison.Ordinal);
+
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+            value is true && parameter?.ToString() is { } name && targetType.IsEnum
+                ? Enum.Parse(targetType, name)
+                : Avalonia.Data.BindingOperations.DoNothing;
+    }
 
     private sealed class ResourceConverter(Func<string, string> key) : IValueConverter
     {

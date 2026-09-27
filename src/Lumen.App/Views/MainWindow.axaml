@@ -15,7 +15,7 @@
 
   <Grid RowDefinitions="44,*">
     <!-- Title bar: identity, where you are, and a quiet go-to box. Drag area is the empty space. -->
-    <Grid Name="TitleBar" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,150" Background="{DynamicResource Surface.Window}">
+    <Grid Name="TitleBar" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto,150" Background="{DynamicResource Surface.Window}">
       <StackPanel Orientation="Horizontal" Spacing="9" Margin="16,0,18,0" VerticalAlignment="Center">
         <Border Width="22" Height="22" CornerRadius="6" Background="{DynamicResource Accent}">
           <Path Data="{StaticResource Icon.Spark}" Fill="{DynamicResource Accent.OnAccent}" Width="12" Height="12" Stretch="Uniform" />
@@ -46,12 +46,17 @@
         </Border>
       </Panel>
 
-      <Button Name="ConnectionsButton" Grid.Column="4" Classes="ghost" Padding="7" Margin="0,0,2,0"
+      <Button Name="SettingsButton" Grid.Column="4" Classes="ghost" Padding="7" Margin="0,0,2,0"
+              Command="{Binding OpenReviewSettingsCommand}" ToolTip.Tip="Review settings">
+        <Path Data="{StaticResource Icon.Sliders}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="14" Height="14" />
+      </Button>
+
+      <Button Name="ConnectionsButton" Grid.Column="5" Classes="ghost" Padding="7" Margin="0,0,2,0"
               Command="{Binding OpenConnectionsCommand}" ToolTip.Tip="Connections">
         <Path Data="{StaticResource Icon.Plug}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="14" Height="14" />
       </Button>
 
-      <Button Grid.Column="5" Classes="ghost" Padding="7" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="Toggle light / dark">
+      <Button Grid.Column="6" Classes="ghost" Padding="7" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="Toggle light / dark">
         <Panel>
           <Path Data="{StaticResource Icon.Moon}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="14" Height="14" />
         </Panel>
@@ -69,28 +74,15 @@
       </ContentControl.DataTemplates>
     </ContentControl>
 
-    <!-- Connections: a modal card over the current view; click outside or Escape to close. -->
-    <Panel Name="ConnectionsOverlay" Grid.Row="1" IsVisible="{Binding IsConnectionsOpen}">
-      <Border Name="ConnectionsScrim" Background="{DynamicResource Surface.Window}" Opacity="0.72" />
-      <ScrollViewer Name="ConnectionsScroller" VerticalScrollBarVisibility="Auto">
-      <Border Name="ConnectionsCard" Classes="card" Width="520" Margin="0,48,0,24" Padding="28,24" VerticalAlignment="Top" HorizontalAlignment="Center"
-              BoxShadow="0 12 40 0 #24000000">
-        <StackPanel Spacing="20">
-          <Grid ColumnDefinitions="*,Auto">
-            <StackPanel Spacing="4">
-              <TextBlock Classes="h2" Text="Connections" />
-              <TextBlock Classes="caption secondary" TextWrapping="Wrap"
-                         Text="Optional. Reviews never wait on these: without them the deterministic review is unchanged." />
-            </StackPanel>
-            <Button Grid.Column="1" Classes="ghost" Padding="7" VerticalAlignment="Top"
-                    Command="{Binding CloseConnectionsCommand}" ToolTip.Tip="Close (Esc)">
-              <Path Data="{StaticResource Icon.Close}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="11" Height="11" />
-            </Button>
-          </Grid>
-          <views:ConnectionsView DataContext="{Binding Connections}" />
-        </StackPanel>
-      </Border>
-      </ScrollViewer>
+    <!-- Settings: a modal card over the current view; click outside or Escape to close (docs/design/settings-overlay.md). -->
+    <Panel Name="SettingsOverlay" Grid.Row="1" IsVisible="{Binding IsSettingsOpen}">
+      <Border Name="SettingsScrim" Background="{DynamicResource Surface.Window}" Opacity="0.72" />
+      <Panel Name="SettingsHost" Background="Transparent">
+        <Border Name="SettingsCard" Classes="card" Width="760" MaxHeight="680" Margin="24,32,24,28" HorizontalAlignment="Center"
+                BoxShadow="0 12 40 0 #24000000">
+          <views:SettingsView />
+        </Border>
+      </Panel>
     </Panel>
   </Grid>
 </Window>

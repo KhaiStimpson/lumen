@@ -17,6 +17,9 @@ public sealed class App : Application
 
     public static IMotionService Motion { get; private set; } = new MotionService(() => false);
 
+    /// <summary>The Appearance setting: null follows the OS. Read at each animation, so a change applies at once.</summary>
+    public static bool? ReducedMotionPreference { get; set; }
+
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override void OnFrameworkInitializationCompleted()
@@ -29,8 +32,9 @@ public sealed class App : Application
             _ => ThemeVariant.Default,
         };
 
-        var reducedMotion = Options.ReducedMotion ?? settings.ReducedMotion ?? SystemMotionPreference.PrefersReducedMotion();
-        Motion = new MotionService(() => reducedMotion);
+        ReducedMotionPreference = settings.ReducedMotion;
+        var system = SystemMotionPreference.PrefersReducedMotion();
+        Motion = new MotionService(() => Options.ReducedMotion ?? ReducedMotionPreference ?? system);
 
         IReviewSource source = Options.FixtureDirectory is { } fixture
             ? new FixtureReviewSource(fixture)

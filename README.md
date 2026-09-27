@@ -53,9 +53,23 @@ deterministic review is unchanged.
   Connections (which sets `privacy.allowCodeToAgents` and `agents.enabled` together).
 
 Connections also holds the **Cloud AI** master switch and the JEV switches. They save to
-`%LOCALAPPDATA%\Lumen\settings.json` and apply without a restart. The rest stays in that file: the JEV model and
-timeout, investigation limits, and `"agents": { "allowMeteredUsage": true }` (Lumen never switches to metered API
-billing without it).
+`%LOCALAPPDATA%\Lumen\settings.json` and apply without a restart.
+
+### Settings
+
+Connections is one section of the **Settings** overlay (plug button for Connections, sliders button for Review):
+
+- **Review**: how picky convention detection is. Quiet, Balanced (the default) or Thorough, with the numbers behind
+  them under Advanced. Edit it for all repositories, or override it for the open pull request's repository.
+- **Ignored & files**: names never treated as a convention, paths treated as mechanical, and paths never flagged. A
+  repository's lists add to the ones for all repositories.
+- **Cloud AI limits**: the JEV model, timeout and zero-data-retention routing; investigations per pull request and at
+  once; and metered usage (Lumen never switches to metered API billing without it).
+- **Appearance**: theme and motion.
+
+Global settings live in `settings.json`, a repository's overrides in `%LOCALAPPDATA%\Lumen\review\{owner}\{repo}.json`.
+Review changes apply to the next analysis: a **Re-analyse** button appears instead of the open pull request re-running
+on its own.
 
 Check what's connected (costs nothing):
 

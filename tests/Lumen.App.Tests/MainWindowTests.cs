@@ -233,7 +233,7 @@ public sealed class MainWindowTests
         window.FindControl<Button>("ConnectionsButton")!.Command!.Execute(null);
         await Fixture.WaitUntilAsync(() => connections.IsLoaded);
         await Fixture.PumpAsync();
-        Assert.True(window.FindControl<Panel>("ConnectionsOverlay")!.IsEffectivelyVisible);
+        Assert.True(window.FindControl<Panel>("SettingsOverlay")!.IsEffectivelyVisible);
         Assert.Equal("No OpenRouter key", connections.JevStatus);
         Assert.False(connections.SaveKeyCommand.CanExecute(null));
 
@@ -288,7 +288,7 @@ public sealed class MainWindowTests
     }
 
     [AvaloniaFact]
-    public async Task ConnectionsPanelIsModalAndEscapeClosesIt()
+    public async Task SettingsAreModalAndEscapeClosesThem()
     {
         await using var session = await Session.OpenAsync();
         var (vm, pr) = (session.ViewModel, session.PullRequest);
@@ -299,33 +299,209 @@ public sealed class MainWindowTests
         Assert.Same(first, pr.CurrentPoint);
 
         await session.PressAsync(PhysicalKey.Escape);
-        Assert.False(vm.IsConnectionsOpen);
-        Assert.False(session.Window.FindControl<Panel>("ConnectionsOverlay")!.IsEffectivelyVisible);
+        Assert.False(vm.IsSettingsOpen);
+        Assert.False(session.Window.FindControl<Panel>("SettingsOverlay")!.IsEffectivelyVisible);
 
         await session.PressAsync(PhysicalKey.J);
         Assert.NotSame(first, pr.CurrentPoint);
     }
 
     [AvaloniaFact]
-    public async Task ClickingOutsideTheConnectionsCardClosesIt()
+    public async Task ClickingOutsideTheSettingsCardClosesIt()
     {
         await using var session = await Session.OpenAsync();
         var (window, vm) = (session.Window, session.ViewModel);
         await vm.OpenConnectionsCommand.ExecuteAsync(null);
         await Fixture.PumpAsync();
 
-        var card = window.FindControl<Border>("ConnectionsCard")!;
+        var card = window.FindControl<Border>("SettingsCard")!;
         var inside = card.TranslatePoint(new Point(40, 40), window)!.Value;
         window.MouseDown(inside, MouseButton.Left);
         window.MouseUp(inside, MouseButton.Left);
         await Fixture.PumpAsync();
-        Assert.True(vm.IsConnectionsOpen);
+        Assert.True(vm.IsSettingsOpen);
 
         window.MouseDown(new Point(60, 500), MouseButton.Left);
         window.MouseUp(new Point(60, 500), MouseButton.Left);
         await Fixture.PumpAsync();
-        Assert.False(vm.IsConnectionsOpen);
+        Assert.False(vm.IsSettingsOpen);
     }
+
+    [AvaloniaFact]
+    public async Task PickingAPresetOverridesTheRepositoryAndOffersReanalysis()
+    {
+        await using var session = await Session.OpenAsync();
+        var (window, vm, review, pr) = (session.Window, session.ViewModel, session.ViewModel.Review, session.PullRequest);
+
+        window.FindControl<Button>("SettingsButton")!.Command!.Execute(null);
+        await Fixture.WaitUntilAsync(() => review.IsLoaded);
+        await Fixture.PumpAsync();
+        Assert.Equal(SettingsSection.Review, vm.Section);
+        Assert.Equal(SettingsScope.Repository, review.Scope);
+        Assert.Equal(ReviewPreset.Balanced, review.Preset);
+        Assert.False(Find<StackPanel>(window, "OverrideNote").IsVisible);
+        Assert.False(Find<Border>(window, "ReanalyseBar").IsVisible);
+
+        Find<RadioButton>(window, "PresetQuiet").IsChecked = true;
+        await Fixture.WaitUntilAsync(() => review.IsOverriding);
+
+        var own = session.Source.RepositoryReviewRules["KhaiStimpson/andrew-crm"];
+        Assert.Equal(5, own.Sensitivity.MinimumPeers);
+        Assert.Equal(3, session.Source.GlobalReviewRules.Sensitivity.MinimumPeers);
+        Assert.Equal("Overrides All repositories (Balanced)", review.OverrideNote);
+        Assert.True(pr.NeedsReanalysis);
+        await Fixture.PumpAsync(20);
+        Assert.True(Find<Border>(window, "ReanalyseBar").IsEffectivelyVisible);
+        Capture(window, "07-settings-review.png");
+
+        // Any number that no preset uses makes it Custom, and Advanced says so.
+        Find<Button>(window, "AdvancedToggle").Command!.Execute(null);
+        await Fixture.PumpAsync();
+        Find<NumericUpDown>(window, "MinimumPeers").Value = 6;
+        await Fixture.WaitUntilAsync(() => session.Source.RepositoryReviewRules["KhaiStimpson/andrew-crm"].Sensitivity.MinimumPeers == 6);
+        Assert.Equal(ReviewPreset.Custom, review.Preset);
+        await Fixture.PumpAsync(20);
+        Capture(window, "08-settings-advanced.png");
+
+        Find<Button>(window, "ResetToGlobal").Command!.Execute(null);
+        await Fixture.WaitUntilAsync(() => !review.IsOverriding);
+        Assert.Null(session.Source.RepositoryReviewRules["KhaiStimpson/andrew-crm"].Sensitivity);
+        Assert.Equal(ReviewPreset.Balanced, review.Preset);
+
+        // Re-analyse closes Settings and re-runs; nothing ran before it was asked for.
+        Find<Button>(window, "ReanalyseButton").Command!.Execute(null);
+        await Fixture.WaitUntilAsync(() => !vm.IsSettingsOpen && !pr.IsAnalysing);
+        Assert.False(pr.NeedsReanalysis);
+        await Fixture.PumpAsync();
+        Assert.False(Find<Border>(window, "ReanalyseBanner").IsVisible);
+    }
+
+    [AvaloniaFact]
+    public async Task TheAllRepositoriesScopeEditsTheGlobalDefaults()
+    {
+        await using var session = await Session.OpenAsync();
+        var (window, vm, review) = (session.Window, session.ViewModel, session.ViewModel.Review);
+        await vm.OpenReviewSettingsCommand.ExecuteAsync(null);
+        await Fixture.PumpAsync();
+
+        Find<RadioButton>(window, "ReviewScopeGlobal").IsChecked = true;
+        await Fixture.PumpAsync();
+        Assert.Equal(SettingsScope.AllRepositories, review.Scope);
+        Assert.Equal("Every repository, unless one overrides it.", review.ScopeCaption);
+
+        Find<RadioButton>(window, "PresetThorough").IsChecked = true;
+        await Fixture.WaitUntilAsync(() => session.Source.GlobalReviewRules.Sensitivity.MinimumPeers == 3
+            && Math.Abs(session.Source.GlobalReviewRules.Sensitivity.MinimumSupport - 0.65) < 0.001);
+        Assert.Empty(session.Source.RepositoryReviewRules);
+        Assert.False(review.IsOverriding);
+
+        // Back on the repository, which still inherits: it shows the new global preset.
+        Find<RadioButton>(window, "ReviewScopeRepository").IsChecked = true;
+        await Fixture.PumpAsync();
+        Assert.Equal(ReviewPreset.Thorough, review.Preset);
+        Assert.False(review.IsOverriding);
+    }
+
+    [AvaloniaFact]
+    public async Task IgnoredNamesAreAddedPerRepositoryOnTopOfTheGlobalOnes()
+    {
+        await using var session = await Session.OpenAsync();
+        var (window, vm, review) = (session.Window, session.ViewModel, session.ViewModel.Review);
+        await vm.OpenReviewSettingsCommand.ExecuteAsync(null);
+        vm.ShowSectionCommand.Execute(SettingsSection.Files);
+        await Fixture.PumpAsync();
+
+        // A global entry first...
+        Find<RadioButton>(window, "FilesScopeGlobal").IsChecked = true;
+        review.NewIgnoredName = "IClock";
+        await review.AddIgnoredNameCommand.ExecuteAsync(null);
+        Assert.Equal(["IClock"], session.Source.GlobalReviewRules.IgnoredNames);
+
+        // ...then one for this repository, typed and entered.
+        Find<RadioButton>(window, "FilesScopeRepository").IsChecked = true;
+        await Fixture.PumpAsync();
+        Assert.Equal(["IClock"], review.InheritedIgnoredNames);
+        var box = Find<TextBox>(window, "NewIgnoredName");
+        box.Focus();
+        window.KeyTextInput("  AppDbContext ");
+        await session.PressAsync(PhysicalKey.Enter);
+        await Fixture.WaitUntilAsync(() => session.Source.RepositoryReviewRules.ContainsKey("KhaiStimpson/andrew-crm"));
+
+        Assert.Equal(["AppDbContext"], session.Source.RepositoryReviewRules["KhaiStimpson/andrew-crm"].IgnoredNames);
+        Assert.Equal("", box.Text);
+        Assert.True(session.PullRequest.NeedsReanalysis);
+        Find<TextBox>(window, "NewMechanicalPath").Text = "src/Generated/**";
+        await review.AddMechanicalPathCommand.ExecuteAsync(null);
+        await Fixture.PumpAsync(20);
+        Capture(window, "09-settings-files.png");
+
+        await review.RemoveIgnoredNameCommand.ExecuteAsync("AppDbContext");
+        Assert.Empty(session.Source.RepositoryReviewRules["KhaiStimpson/andrew-crm"].IgnoredNames);
+        Assert.Equal(["src/Generated/**"], session.Source.RepositoryReviewRules["KhaiStimpson/andrew-crm"].MechanicalPaths);
+    }
+
+    [AvaloniaFact]
+    public async Task CloudAiLimitsSaveThroughTheEngine()
+    {
+        await using var session = await Session.OpenAsync();
+        var (window, vm, connections) = (session.Window, session.ViewModel, session.ViewModel.Connections);
+        await vm.OpenConnectionsCommand.ExecuteAsync(null);
+        vm.ShowSectionCommand.Execute(SettingsSection.CloudLimits);
+        await Fixture.PumpAsync();
+        Assert.Equal(3, Find<NumericUpDown>(window, "MaxInvestigationsPerPullRequest").Value);
+
+        Find<NumericUpDown>(window, "MaxInvestigationsPerPullRequest").Value = 5;
+        await Fixture.WaitUntilAsync(() => session.Source.ConnectionSettings.MaxInvestigationsPerPullRequest == 5);
+        Find<ToggleSwitch>(window, "AllowMeteredUsage").IsChecked = true;
+        await Fixture.WaitUntilAsync(() => session.Source.ConnectionSettings.AllowMeteredUsage);
+        connections.JevModelInput = "~typesafe/jev-latest";
+        await Fixture.WaitUntilAsync(() => session.Source.ConnectionSettings.JevModel == "~typesafe/jev-latest");
+
+        // A blank model is never sent; the box goes back to the saved one.
+        connections.JevModelInput = " ";
+        await Fixture.PumpAsync();
+        Assert.Equal("~typesafe/jev-latest", session.Source.ConnectionSettings.JevModel);
+        Assert.Equal("~typesafe/jev-latest", connections.JevModelInput);
+        Assert.False(session.PullRequest.NeedsReanalysis);
+        await Fixture.PumpAsync(20);
+        Capture(window, "10-settings-cloud-limits.png");
+    }
+
+    [AvaloniaFact]
+    public async Task AppearanceChangesThemeAndMotionAtOnce()
+    {
+        var app = Application.Current!;
+        try
+        {
+            await using var session = await Session.OpenAsync();
+            var (window, vm) = (session.Window, session.ViewModel);
+            await vm.OpenConnectionsCommand.ExecuteAsync(null);
+            vm.ShowSectionCommand.Execute(SettingsSection.Appearance);
+            await Fixture.PumpAsync();
+
+            Find<RadioButton>(window, "ThemeDark").IsChecked = true;
+            Find<RadioButton>(window, "MotionReduced").IsChecked = true;
+            await Fixture.PumpAsync(20);
+
+            Assert.Equal(ThemeVariant.Dark, app.ActualThemeVariant);
+            Assert.True(App.ReducedMotionPreference);
+            Capture(window, "11-settings-appearance-dark.png");
+
+            // The title bar button and the setting stay in step.
+            vm.ToggleThemeCommand.Execute(null);
+            Assert.Equal(ThemeChoice.Light, vm.Appearance.Theme);
+            Assert.True(Find<RadioButton>(window, "ThemeLight").IsChecked);
+        }
+        finally
+        {
+            app.RequestedThemeVariant = ThemeVariant.Light;
+            App.ReducedMotionPreference = null;
+        }
+    }
+
+    private static T Find<T>(Window window, string name)
+        where T : Control =>
+        window.GetVisualDescendants().OfType<T>().Single(c => c.Name == name);
 
     private static void Capture(Window window, string name)
     {

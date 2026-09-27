@@ -106,6 +106,16 @@ public sealed class EngineReviewSource : IReviewSource
             .UpdateConnectionSettingsAsync(settings, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
+    public async Task<ReviewSettingsReply> GetReviewSettingsAsync(ReviewSettingsRequest request, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .GetReviewSettingsAsync(request, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<ReviewSettingsReply> UpdateReviewSettingsAsync(UpdateReviewSettingsRequest request, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .UpdateReviewSettingsAsync(request, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
     private async Task<ReviewEngine.ReviewEngineClient> ClientAsync(CancellationToken cancellationToken)
     {
         await _connectGate.WaitAsync(cancellationToken).ConfigureAwait(false);

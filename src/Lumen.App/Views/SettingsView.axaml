@@ -1,0 +1,77 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             x:Class="Lumen.App.Views.SettingsView"
+             x:DataType="vm:MainWindowViewModel">
+  <!-- The Settings card (docs/design/settings-overlay.md): sections down the left, the chosen one on the right, and
+       Re-analyse docked at the bottom while the open PR is out of date with its review settings. -->
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1" Padding="20,14,12,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="h2" Text="Settings" VerticalAlignment="Center" />
+        <Button Name="CloseSettings" Grid.Column="1" Classes="ghost" Padding="7" Command="{Binding CloseSettingsCommand}" ToolTip.Tip="Close (Esc)">
+          <Path Data="{StaticResource Icon.Close}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="11" Height="11" />
+        </Button>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="184,*">
+      <Border Background="{DynamicResource Surface.Sunken}" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,1,0"
+              Padding="10,12" CornerRadius="0,0,0,10">
+        <StackPanel Spacing="2">
+          <Button Name="NavConnections" Classes="row nav" Content="Connections"
+                  Classes.current="{Binding Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Connections}"
+                  Command="{Binding ShowSectionCommand}" CommandParameter="{x:Static vm:SettingsSection.Connections}" />
+          <Button Name="NavReview" Classes="row nav" Content="Review"
+                  Classes.current="{Binding Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Review}"
+                  Command="{Binding ShowSectionCommand}" CommandParameter="{x:Static vm:SettingsSection.Review}" />
+          <Button Name="NavFiles" Classes="row nav" Content="Ignored &amp; files"
+                  Classes.current="{Binding Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Files}"
+                  Command="{Binding ShowSectionCommand}" CommandParameter="{x:Static vm:SettingsSection.Files}" />
+          <Button Name="NavCloudLimits" Classes="row nav" Content="Cloud AI limits"
+                  Classes.current="{Binding Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=CloudLimits}"
+                  Command="{Binding ShowSectionCommand}" CommandParameter="{x:Static vm:SettingsSection.CloudLimits}" />
+          <TextBlock Classes="section" Text="APP" Margin="10,16,0,4" />
+          <Button Name="NavAppearance" Classes="row nav" Content="Appearance"
+                  Classes.current="{Binding Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Appearance}"
+                  Command="{Binding ShowSectionCommand}" CommandParameter="{x:Static vm:SettingsSection.Appearance}" />
+        </StackPanel>
+      </Border>
+
+      <ScrollViewer Name="SettingsContent" Grid.Column="1" VerticalScrollBarVisibility="Auto">
+        <Panel Margin="24,20,24,24">
+          <StackPanel Spacing="20"
+                      IsVisible="{Binding Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Connections}">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="h3" Text="Connections" />
+              <TextBlock Classes="caption secondary" TextWrapping="Wrap"
+                         Text="Optional. Reviews never wait on these: without them the deterministic review is unchanged." />
+            </StackPanel>
+            <views:ConnectionsView DataContext="{Binding Connections}" />
+          </StackPanel>
+          <views:ReviewSettingsView DataContext="{Binding Review}"
+                                    IsVisible="{Binding $parent[views:SettingsView].((vm:MainWindowViewModel)DataContext).Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Review, FallbackValue=False}" />
+          <views:FilesSettingsView DataContext="{Binding Review}"
+                                   IsVisible="{Binding $parent[views:SettingsView].((vm:MainWindowViewModel)DataContext).Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Files, FallbackValue=False}" />
+          <views:CloudLimitsView DataContext="{Binding Connections}"
+                                 IsVisible="{Binding $parent[views:SettingsView].((vm:MainWindowViewModel)DataContext).Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=CloudLimits, FallbackValue=False}" />
+          <views:AppearanceView DataContext="{Binding Appearance}"
+                                IsVisible="{Binding $parent[views:SettingsView].((vm:MainWindowViewModel)DataContext).Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Appearance, FallbackValue=False}" />
+        </Panel>
+      </ScrollViewer>
+    </Grid>
+
+    <Border Name="ReanalyseBar" Grid.Row="2" Background="{DynamicResource Accent.Soft}" BorderBrush="{DynamicResource Border.Subtle}"
+            BorderThickness="0,1,0,0" CornerRadius="0,0,10,10" Padding="20,10,14,10"
+            IsVisible="{Binding PullRequest.NeedsReanalysis, FallbackValue=False}">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <TextBlock FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center">
+          <Run Text="Review settings changed. " /><Run Text="{Binding PullRequest.NumberLabel, FallbackValue=''}" Foreground="{DynamicResource Text.Secondary}" /><Run Text=" still shows the earlier results." Foreground="{DynamicResource Text.Secondary}" />
+        </TextBlock>
+        <Button Name="ReanalyseButton" Grid.Column="1" Classes="primary" Content="{Binding PullRequest.ReanalyseLabel, FallbackValue='Re-analyse'}"
+                Command="{Binding ReanalyseCommand}" />
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

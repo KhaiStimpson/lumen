@@ -1,0 +1,197 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             x:Class="Lumen.App.Views.FilesSettingsView"
+             x:DataType="vm:ReviewSettingsViewModel">
+  <!-- Three lists. Entries for this layer can be removed; the global and built-in ones are shown for context only. -->
+  <UserControl.Styles>
+    <Style Selector="ItemsControl.entries">
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <WrapPanel ItemSpacing="6" LineSpacing="6" />
+        </ItemsPanelTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.remove">
+      <Setter Property="Padding" Value="5" />
+      <Setter Property="Margin" Value="4,0,0,0" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+  </UserControl.Styles>
+
+  <StackPanel Spacing="22">
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+      <StackPanel Spacing="2">
+        <TextBlock Classes="h3" Text="Ignored &amp; files" />
+        <TextBlock Classes="caption secondary" TextWrapping="Wrap" Text="What Lumen leaves out of convention checks." />
+      </StackPanel>
+      <Border Grid.Column="1" Classes="segmented" VerticalAlignment="Top" IsVisible="{Binding HasRepository}">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <RadioButton Name="FilesScopeGlobal" Classes="segment" GroupName="FilesScope" Content="All repositories"
+                       IsChecked="{Binding Scope, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=AllRepositories}" />
+          <RadioButton Name="FilesScopeRepository" Classes="segment" GroupName="FilesScope" Content="{Binding RepositoryName}"
+                       IsChecked="{Binding Scope, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Repository}" />
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <!-- Names -->
+    <StackPanel Spacing="8">
+      <StackPanel Spacing="2">
+        <TextBlock Classes="body" FontWeight="SemiBold" Text="Never treat as a convention" />
+        <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                   Text="Type or member names, e.g. IClock or IClock.Now. A type name also covers calls on it." />
+      </StackPanel>
+      <ItemsControl Name="IgnoredNames" Classes="entries" ItemsSource="{Binding IgnoredNames}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <Border Classes="entry">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding}" />
+                <Button Classes="ghost remove" ToolTip.Tip="Remove"
+                        Command="{Binding $parent[ItemsControl].((vm:ReviewSettingsViewModel)DataContext).RemoveIgnoredNameCommand, FallbackValue={x:Null}}"
+                        CommandParameter="{Binding}">
+                  <Path Data="{StaticResource Icon.Close}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="8" Height="8" />
+                </Button>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <TextBox Name="NewIgnoredName" Text="{Binding NewIgnoredName}" PlaceholderText="Add a name…" MinHeight="32" VerticalContentAlignment="Center">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddIgnoredNameCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button Grid.Column="1" Classes="subtle" Content="Add" Command="{Binding AddIgnoredNameCommand}" MinHeight="32" />
+      </Grid>
+      <StackPanel Spacing="6" IsVisible="{Binding InheritedIgnoredNames.Count, Converter={x:Static views:Converters.IsPositive}}">
+        <TextBlock Classes="caption tertiary" Text="From all repositories" />
+        <ItemsControl Classes="entries" ItemsSource="{Binding InheritedIgnoredNames}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Border Classes="entry fixed"><TextBlock Text="{Binding}" /></Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+      <StackPanel Spacing="6">
+        <TextBlock Classes="caption tertiary" Text="Built in" />
+        <ItemsControl Classes="entries" ItemsSource="{Binding BuiltInIgnoredNames}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Border Classes="entry fixed"><TextBlock Text="{Binding}" /></Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </StackPanel>
+
+    <Border Classes="divider" />
+
+    <!-- Mechanical paths -->
+    <StackPanel Spacing="8">
+      <StackPanel Spacing="2">
+        <TextBlock Classes="body" FontWeight="SemiBold" Text="Treat as mechanical" />
+        <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                   Text="Collapsed in the file list and never analysed. Patterns like src/Generated/** or *.g.cs." />
+      </StackPanel>
+      <ItemsControl Name="MechanicalPaths" Classes="entries" ItemsSource="{Binding MechanicalPaths}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <Border Classes="entry">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding}" />
+                <Button Classes="ghost remove" ToolTip.Tip="Remove"
+                        Command="{Binding $parent[ItemsControl].((vm:ReviewSettingsViewModel)DataContext).RemoveMechanicalPathCommand, FallbackValue={x:Null}}"
+                        CommandParameter="{Binding}">
+                  <Path Data="{StaticResource Icon.Close}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="8" Height="8" />
+                </Button>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <TextBox Name="NewMechanicalPath" Text="{Binding NewMechanicalPath}" PlaceholderText="Add a path pattern…" MinHeight="32" VerticalContentAlignment="Center">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddMechanicalPathCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button Grid.Column="1" Classes="subtle" Content="Add" Command="{Binding AddMechanicalPathCommand}" MinHeight="32" />
+      </Grid>
+      <StackPanel Spacing="6" IsVisible="{Binding InheritedMechanicalPaths.Count, Converter={x:Static views:Converters.IsPositive}}">
+        <TextBlock Classes="caption tertiary" Text="From all repositories" />
+        <ItemsControl Classes="entries" ItemsSource="{Binding InheritedMechanicalPaths}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Border Classes="entry fixed"><TextBlock Text="{Binding}" /></Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+      <StackPanel Spacing="6">
+        <TextBlock Classes="caption tertiary" Text="Built in" />
+        <ItemsControl Classes="entries" ItemsSource="{Binding BuiltInMechanicalPaths}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Border Classes="entry fixed"><TextBlock Text="{Binding}" /></Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </StackPanel>
+
+    <Border Classes="divider" />
+
+    <!-- Skipped paths -->
+    <StackPanel Spacing="8">
+      <StackPanel Spacing="2">
+        <TextBlock Classes="body" FontWeight="SemiBold" Text="Never flag changes in" />
+        <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                   Text="Changes here aren't flagged. The code still counts as precedent for everything else." />
+      </StackPanel>
+      <ItemsControl Name="SkippedPaths" Classes="entries" ItemsSource="{Binding SkippedPaths}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <Border Classes="entry">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding}" />
+                <Button Classes="ghost remove" ToolTip.Tip="Remove"
+                        Command="{Binding $parent[ItemsControl].((vm:ReviewSettingsViewModel)DataContext).RemoveSkippedPathCommand, FallbackValue={x:Null}}"
+                        CommandParameter="{Binding}">
+                  <Path Data="{StaticResource Icon.Close}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="8" Height="8" />
+                </Button>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <TextBox Name="NewSkippedPath" Text="{Binding NewSkippedPath}" PlaceholderText="Add a path pattern, e.g. src/Legacy/" MinHeight="32" VerticalContentAlignment="Center">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddSkippedPathCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button Grid.Column="1" Classes="subtle" Content="Add" Command="{Binding AddSkippedPathCommand}" MinHeight="32" />
+      </Grid>
+      <StackPanel Spacing="6" IsVisible="{Binding InheritedSkippedPaths.Count, Converter={x:Static views:Converters.IsPositive}}">
+        <TextBlock Classes="caption tertiary" Text="From all repositories" />
+        <ItemsControl Classes="entries" ItemsSource="{Binding InheritedSkippedPaths}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Border Classes="entry fixed"><TextBlock Text="{Binding}" /></Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </StackPanel>
+
+    <TextBlock Classes="caption tertiary" TextWrapping="Wrap" FontFamily="{StaticResource CodeFont}" Text="{Binding SettingsFilePath}"
+               IsVisible="{Binding IsLoaded}" />
+    <TextBlock Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+               Foreground="{DynamicResource Severity.High}" FontSize="12" TextWrapping="Wrap" />
+  </StackPanel>
+</UserControl>

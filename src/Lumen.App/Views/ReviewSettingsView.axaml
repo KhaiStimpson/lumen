@@ -1,0 +1,122 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             x:Class="Lumen.App.Views.ReviewSettingsView"
+             x:DataType="vm:ReviewSettingsViewModel">
+  <!-- Sensitivity: three presets, and the numbers behind them under Advanced. One layer at a time (scope switch). -->
+  <StackPanel Spacing="18">
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+      <StackPanel Spacing="2">
+        <TextBlock Classes="h3" Text="Review" />
+        <TextBlock Classes="caption secondary" TextWrapping="Wrap" Text="How picky Lumen is about convention deviations." />
+      </StackPanel>
+      <Border Grid.Column="1" Classes="segmented" VerticalAlignment="Top" IsVisible="{Binding HasRepository}">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <RadioButton Name="ReviewScopeGlobal" Classes="segment" GroupName="ReviewScope" Content="All repositories"
+                       IsChecked="{Binding Scope, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=AllRepositories}" />
+          <RadioButton Name="ReviewScopeRepository" Classes="segment" GroupName="ReviewScope" Content="{Binding RepositoryName}"
+                       IsChecked="{Binding Scope, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Repository}" />
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <StackPanel Spacing="8">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <TextBlock Classes="section" Text="SENSITIVITY" VerticalAlignment="Center" />
+        <StackPanel Name="OverrideNote" Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsOverriding}">
+          <Ellipse Width="6" Height="6" Fill="{DynamicResource Accent}" VerticalAlignment="Center" />
+          <TextBlock Classes="caption" Text="{Binding OverrideNote}" VerticalAlignment="Center" />
+          <Button Name="ResetToGlobal" Classes="link" Content="Reset" Command="{Binding ResetToGlobalCommand}" VerticalAlignment="Center" />
+        </StackPanel>
+      </Grid>
+      <UniformGrid Columns="3" ColumnSpacing="8">
+        <RadioButton Name="PresetQuiet" Classes="preset" GroupName="ReviewPreset"
+                     IsChecked="{Binding Preset, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Quiet}">
+          <StackPanel Spacing="3">
+            <TextBlock Text="Quiet" FontWeight="SemiBold" FontSize="12.5" />
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="Only strong, well-supported patterns. Fewest points." />
+          </StackPanel>
+        </RadioButton>
+        <RadioButton Name="PresetBalanced" Classes="preset" GroupName="ReviewPreset"
+                     IsChecked="{Binding Preset, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Balanced}">
+          <StackPanel Spacing="3">
+            <TextBlock Text="Balanced" FontWeight="SemiBold" FontSize="12.5" />
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="The default. Most peers must agree." />
+          </StackPanel>
+        </RadioButton>
+        <RadioButton Name="PresetThorough" Classes="preset" GroupName="ReviewPreset"
+                     IsChecked="{Binding Preset, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Thorough}">
+          <StackPanel Spacing="3">
+            <TextBlock Text="Thorough" FontWeight="SemiBold" FontSize="12.5" />
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="Weaker patterns too. More points, more noise." />
+          </StackPanel>
+        </RadioButton>
+      </UniformGrid>
+      <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="{Binding ScopeCaption}" />
+    </StackPanel>
+
+    <StackPanel Spacing="10">
+      <Button Name="AdvancedToggle" Classes="ghost" Padding="4,3" HorizontalAlignment="Left" Command="{Binding ToggleAdvancedCommand}">
+        <StackPanel Orientation="Horizontal" Spacing="7">
+          <Panel Width="10" Height="10" VerticalAlignment="Center">
+            <Path Data="{StaticResource Icon.ChevronRight}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" IsVisible="{Binding !IsAdvancedOpen}" />
+            <Path Data="{StaticResource Icon.ChevronDown}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" IsVisible="{Binding IsAdvancedOpen}" />
+          </Panel>
+          <TextBlock Text="Advanced" FontSize="12.5" FontWeight="Medium" Foreground="{DynamicResource Text.Secondary}" VerticalAlignment="Center" />
+          <Border Classes="pill" IsVisible="{Binding IsCustom}" VerticalAlignment="Center">
+            <TextBlock Text="Custom" />
+          </Border>
+        </StackPanel>
+      </Button>
+
+      <Border Name="AdvancedPanel" Background="{DynamicResource Surface.Sunken}" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="1"
+              CornerRadius="{StaticResource Radius.Card}" Padding="14,12" IsVisible="{Binding IsAdvancedOpen}">
+        <StackPanel Spacing="12">
+          <Grid ColumnDefinitions="*,Auto,28" ColumnSpacing="12">
+            <StackPanel Spacing="1">
+              <TextBlock Classes="body" Text="Minimum peers" />
+              <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="Classes sharing a role before a pattern among them counts" />
+            </StackPanel>
+            <NumericUpDown Name="MinimumPeers" Grid.Column="1" Classes="stepper" Value="{Binding MinimumPeers}" Minimum="2" Maximum="20" Increment="1" FormatString="0" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto,28" ColumnSpacing="12">
+            <StackPanel Spacing="1">
+              <TextBlock Classes="body" Text="Peers that must agree" />
+              <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="Share of peers that follow the pattern" />
+            </StackPanel>
+            <NumericUpDown Name="SupportPercent" Grid.Column="1" Classes="stepper" Value="{Binding SupportPercent}" Minimum="50" Maximum="100" Increment="5" FormatString="0" />
+            <TextBlock Grid.Column="2" Classes="caption tertiary" Text="%" VerticalAlignment="Center" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto,28" ColumnSpacing="12">
+            <StackPanel Spacing="1">
+              <TextBlock Classes="body" Text="Distinctiveness" />
+              <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="How much likelier the trait is in this role than elsewhere" />
+            </StackPanel>
+            <NumericUpDown Name="MinimumLift" Grid.Column="1" Classes="stepper" Value="{Binding MinimumLift}" Minimum="1" Maximum="5" Increment="0.1" FormatString="0.0" />
+            <TextBlock Grid.Column="2" Classes="caption tertiary" Text="×" VerticalAlignment="Center" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto,28" ColumnSpacing="12">
+            <StackPanel Spacing="1">
+              <TextBlock Classes="body" Text="Points per class" />
+              <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="Most deviations shown for one changed class" />
+            </StackPanel>
+            <NumericUpDown Name="PointsPerType" Grid.Column="1" Classes="stepper" Value="{Binding PointsPerType}" Minimum="1" Maximum="10" Increment="1" FormatString="0" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto,28" ColumnSpacing="12">
+            <StackPanel Spacing="1">
+              <TextBlock Classes="body" Text="Examples shown" />
+              <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="Peer classes listed as precedent on a card" />
+            </StackPanel>
+            <NumericUpDown Name="Examples" Grid.Column="1" Classes="stepper" Value="{Binding Examples}" Minimum="1" Maximum="10" Increment="1" FormatString="0" />
+          </Grid>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+
+    <TextBlock Classes="caption tertiary" TextWrapping="Wrap" FontFamily="{StaticResource CodeFont}" Text="{Binding SettingsFilePath}"
+               IsVisible="{Binding IsLoaded}" />
+    <TextBlock Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+               Foreground="{DynamicResource Severity.High}" FontSize="12" TextWrapping="Wrap" />
+  </StackPanel>
+</UserControl>

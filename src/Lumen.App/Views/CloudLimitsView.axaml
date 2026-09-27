@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             x:Class="Lumen.App.Views.CloudLimitsView"
+             x:DataType="vm:ConnectionsViewModel">
+  <!-- What JEV and investigations may use. Saved to settings.json; each applies to the next call, no restart. -->
+  <StackPanel Spacing="20">
+    <StackPanel Spacing="2">
+      <TextBlock Classes="h3" Text="Cloud AI limits" />
+      <TextBlock Classes="caption secondary" TextWrapping="Wrap"
+                 Text="What JEV and investigations may use. Each change applies to the next call." />
+    </StackPanel>
+
+    <StackPanel Spacing="12" IsEnabled="{Binding IsLoaded}">
+      <TextBlock Classes="section" Text="JEV" />
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="Model" />
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="Pinned for reproducible answers. Saved when you leave the box." />
+        </StackPanel>
+        <TextBox Name="JevModelInput" Grid.Column="1" Width="220" MinHeight="32" VerticalAlignment="Center" VerticalContentAlignment="Center" FontFamily="{StaticResource CodeFont}" FontSize="12"
+                 Text="{Binding JevModelInput, UpdateSourceTrigger=LostFocus}" />
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto,28" ColumnSpacing="12">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="Time allowed per analysis" />
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="Anything JEV hasn't answered by then keeps the rule-based decision." />
+        </StackPanel>
+        <NumericUpDown Name="JevTimeoutSeconds" Grid.Column="1" Classes="stepper" Value="{Binding JevTimeoutSeconds}" Minimum="2" Maximum="60" Increment="1" FormatString="0" />
+        <TextBlock Grid.Column="2" Classes="caption tertiary" Text="s" VerticalAlignment="Center" />
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="Zero data retention only" />
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="Route only to endpoints that keep nothing and never train on requests." />
+        </StackPanel>
+        <ToggleSwitch Name="JevRequireZeroDataRetention" Grid.Column="1" Classes="setting" IsChecked="{Binding JevRequireZeroDataRetention}" />
+      </Grid>
+    </StackPanel>
+
+    <Border Classes="divider" />
+
+    <StackPanel Spacing="12" IsEnabled="{Binding IsLoaded}">
+      <TextBlock Classes="section" Text="INVESTIGATIONS" />
+      <Grid ColumnDefinitions="*,Auto,28" ColumnSpacing="12">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="Per pull request" />
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="New investigations for each push. Earlier results are always reused." />
+        </StackPanel>
+        <NumericUpDown Name="MaxInvestigationsPerPullRequest" Grid.Column="1" Classes="stepper" Value="{Binding MaxInvestigationsPerPullRequest}" Minimum="0" Maximum="20" Increment="1" FormatString="0" />
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto,28" ColumnSpacing="12">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="At the same time" />
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="Agent sessions running at once, across all pull requests." />
+        </StackPanel>
+        <NumericUpDown Name="MaxConcurrentInvestigations" Grid.Column="1" Classes="stepper" Value="{Binding MaxConcurrentInvestigations}" Minimum="1" Maximum="4" Increment="1" FormatString="0" />
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="Allow metered usage" />
+          <TextBlock Classes="caption" TextWrapping="Wrap" Foreground="{DynamicResource Severity.Medium}"
+                     Text="When your subscription can't be used, investigations may bill your API account per token." />
+        </StackPanel>
+        <ToggleSwitch Name="AllowMeteredUsage" Grid.Column="1" Classes="setting" IsChecked="{Binding AllowMeteredUsage}" />
+      </Grid>
+    </StackPanel>
+
+    <TextBlock Classes="caption tertiary" TextWrapping="Wrap" FontFamily="{StaticResource CodeFont}" Text="{Binding SettingsPath}"
+               IsVisible="{Binding IsLoaded}" />
+    <TextBlock Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+               Foreground="{DynamicResource Severity.High}" FontSize="12" TextWrapping="Wrap" />
+  </StackPanel>
+</UserControl>

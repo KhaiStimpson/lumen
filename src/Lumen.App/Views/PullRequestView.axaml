@@ -91,7 +91,7 @@
       </Border>
 
       <!-- ===================== Center: code ===================== -->
-      <Grid Grid.Column="1" Name="Center" RowDefinitions="Auto,*" IsVisible="{Binding !IsExamining}">
+      <Grid Grid.Column="1" Name="Center" RowDefinitions="Auto,Auto,*" IsVisible="{Binding !IsExamining}">
         <!-- Guided review header -->
         <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="22,14,22,10">
           <Grid ColumnDefinitions="Auto,Auto,Auto" ClipToBounds="True">
@@ -126,7 +126,17 @@
           </StackPanel>
         </Grid>
 
-        <Border Grid.Row="1" Classes="card" Margin="16,0,16,16" ClipToBounds="True">
+        <!-- Review settings changed since this analysis: offer to re-run it, never run it unasked. -->
+        <Border Name="ReanalyseBanner" Grid.Row="1" Background="{DynamicResource Accent.Soft}" CornerRadius="{StaticResource Radius.Card}"
+                Margin="16,0,16,10" Padding="14,8,8,8" IsVisible="{Binding NeedsReanalysis}">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"
+                       Text="Review settings changed since this pull request was analysed." />
+            <Button Grid.Column="1" Classes="primary" Content="{Binding ReanalyseLabel}" Command="{Binding ReanalyseCommand}" />
+          </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Classes="card" Margin="16,0,16,16" ClipToBounds="True">
           <Panel>
             <diff:DiffEditor Name="Editor" Diff="{Binding CurrentDiff}" Markers="{Binding Markers}" FocusRange="{Binding FocusRange}" />
             <!-- Mechanical file without a diff in the fixture, or still loading -->
