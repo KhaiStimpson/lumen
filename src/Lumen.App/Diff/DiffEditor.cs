@@ -44,7 +44,7 @@ public sealed class DiffEditor : UserControl
 
     public DiffEditor()
     {
-        _editor = new TextEditor
+        _editor = new HostingTextEditor
         {
             IsReadOnly = true,
             ShowLineNumbers = false,
@@ -576,7 +576,7 @@ internal sealed class ReviewCardGenerator(DiffEditor owner) : VisualLineElementG
 
     public override int GetFirstInterestedOffset(int startOffset)
     {
-        if (!owner.ShowCards || CurrentContext is null)
+        if (CurrentContext is null)
         {
             return -1;
         }
@@ -602,6 +602,11 @@ internal sealed class ReviewCardGenerator(DiffEditor owner) : VisualLineElementG
             return null;
         }
 
+        if (!owner.ShowCards)
+        {
+            return new InlineObjectElement(1, new Border { Width = 0, Height = 0 });
+        }
+
         if (!_cards.TryGetValue(id, out var card))
         {
             card = owner.CardFactory?.Invoke(id);
@@ -623,5 +628,25 @@ internal sealed class ReviewCardGenerator(DiffEditor owner) : VisualLineElementG
         }
 
         return new InlineObjectElement(1, card);
+    }
+}
+
+/// <summary>
+/// TextEditor redirects focus to its TextArea whenever anything inside it gets focus, which would make text boxes in
+/// inline review cards impossible to type into. Let hosted inputs keep focus.
+/// </summary>
+internal sealed class HostingTextEditor : TextEditor
+{
+    protected override Type StyleKeyOverride => typeof(TextEditor);
+
+    protected override void OnGotFocus(FocusChangedEventArgs e)
+    {
+        // Inputs inside hosted cards (the comment box, buttons) keep their own focus.
+        if (e.Source is TextBox or Button)
+        {
+            return;
+        }
+
+        base.OnGotFocus(e);
     }
 }

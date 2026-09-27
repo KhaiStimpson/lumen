@@ -12,6 +12,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Lumen.Analysis.Tests/Lumen.Analysis.Tests.csproj" />
+    <Project Path="tests/Lumen.App.Tests/Lumen.App.Tests.csproj" />
     <Project Path="tests/Lumen.Engine.Tests/Lumen.Engine.Tests.csproj" />
     <Project Path="tests/Lumen.GitHub.Tests/Lumen.GitHub.Tests.csproj" />
     <Project Path="tests/Lumen.Repository.Tests/Lumen.Repository.Tests.csproj" />

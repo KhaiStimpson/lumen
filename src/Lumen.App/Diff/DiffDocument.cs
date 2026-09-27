@@ -127,6 +127,6 @@ public sealed class DiffDocument
     private static string HunkLabel(string header)
     {
         var end = header.IndexOf("@@", 2, StringComparison.Ordinal);
-        return end < 0 ? header : header[..(end + 2)] + "  " + header[(end + 2)..].Trim();
+        return end < 0 ? header : (header[..(end + 2)] + "  " + header[(end + 2)..].Trim()).TrimEnd();
     }
 }

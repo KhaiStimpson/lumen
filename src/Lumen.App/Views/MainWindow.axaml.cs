@@ -12,6 +12,9 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
 
+        // Escape hands focus back to the window so review shortcuts work again (windows aren't focusable by default).
+        Focusable = true;
+
         // Tunnel so review shortcuts win over the read-only editor, but never over text input.
         AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
 

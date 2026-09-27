@@ -1,0 +1,103 @@
+using Lumen.App.Diff;
+using Lumen.Contracts;
+
+namespace Lumen.App.Tests;
+
+public sealed class DiffDocumentTests
+{
+    private static FileDiff Sample()
+    {
+        var first = new DiffHunk { Header = "@@ -1,3 +1,4 @@ class Foo" };
+        first.Lines.Add(new DiffLine { Kind = DiffLineKind.Context, OldNumber = 1, NewNumber = 1, Text = "a" });
+        first.Lines.Add(new DiffLine { Kind = DiffLineKind.Removed, OldNumber = 2, NewNumber = 0, Text = "b" });
+        first.Lines.Add(new DiffLine { Kind = DiffLineKind.Added, OldNumber = 0, NewNumber = 2, Text = "\tB" });
+        first.Lines.Add(new DiffLine { Kind = DiffLineKind.Added, OldNumber = 0, NewNumber = 3, Text = "C" });
+        first.Lines.Add(new DiffLine { Kind = DiffLineKind.Context, OldNumber = 3, NewNumber = 4, Text = "d" });
+
+        var second = new DiffHunk { Header = "@@ -10,2 +11,2 @@" };
+        second.Lines.Add(new DiffLine { Kind = DiffLineKind.Context, OldNumber = 10, NewNumber = 11, Text = "x" });
+        second.Lines.Add(new DiffLine { Kind = DiffLineKind.Context, OldNumber = 11, NewNumber = 12, Text = "y" });
+
+        var diff = new FileDiff { Path = "src/Foo.cs" };
+        diff.Hunks.Add(first);
+        diff.Hunks.Add(second);
+        return diff;
+    }
+
+    [Fact]
+    public void FlattensHunksIntoRowsAndMapsLines()
+    {
+        var doc = DiffDocument.Build(Sample(), [("p1", 3), ("p2", 12)]);
+
+        Assert.Equal("src/Foo.cs", doc.Path);
+        Assert.Equal(
+            [
+                DiffRowKind.HunkHeader, DiffRowKind.Context, DiffRowKind.Removed, DiffRowKind.Added, DiffRowKind.Added,
+                DiffRowKind.Card, DiffRowKind.Context, DiffRowKind.HunkHeader, DiffRowKind.Context, DiffRowKind.Context,
+                DiffRowKind.Card,
+            ],
+            doc.Rows.Select(r => r.Kind));
+
+        var lines = doc.Text.Split('\n');
+        Assert.Equal(doc.Rows.Count, lines.Length);
+        Assert.Equal("@@ -1,3 +1,4 @@  class Foo", lines[0]);
+        Assert.Equal("@@ -10,2 +11,2 @@", lines[7].TrimEnd());
+        Assert.Equal(" B", lines[3]);
+        Assert.Equal(DiffDocument.CardPlaceholder.ToString(), lines[5]);
+
+        Assert.Equal(new DiffRow(DiffRowKind.HunkHeader, 0, 0), doc.RowAt(1));
+        Assert.Equal(new DiffRow(DiffRowKind.Removed, 2, 0), doc.RowAt(3));
+        Assert.Equal(new DiffRow(DiffRowKind.Added, 0, 3), doc.RowAt(5));
+        Assert.Equal(new DiffRow(DiffRowKind.Context, 3, 4), doc.RowAt(7));
+        Assert.Null(doc.RowAt(0));
+        Assert.Null(doc.RowAt(12));
+
+        Assert.Equal(2, doc.Additions);
+        Assert.Equal(1, doc.Deletions);
+        Assert.False(doc.IsEmpty);
+    }
+
+    [Fact]
+    public void PlacesCardsDirectlyUnderTheirLine()
+    {
+        var doc = DiffDocument.Build(Sample(), [("p1", 3), ("p2", 12), ("missing", 7)]);
+
+        Assert.Equal(6, doc.CardLine("p1"));
+        Assert.Equal(doc.DocumentLineForNewLine(3) + 1, doc.CardLine("p1"));
+        Assert.Equal(new DiffRow(DiffRowKind.Card, 0, 0, "p1"), doc.RowAt(6));
+
+        Assert.Equal(11, doc.CardLine("p2"));
+        Assert.Equal(doc.DocumentLineForNewLine(12) + 1, doc.CardLine("p2"));
+
+        // A card for a line the diff doesn't show has nowhere to go.
+        Assert.Null(doc.CardLine("missing"));
+        Assert.DoesNotContain(doc.Rows, r => r.CardId == "missing");
+    }
+
+    [Fact]
+    public void DocumentLineForNewLineFallsForwardToNextShownLine()
+    {
+        var doc = DiffDocument.Build(Sample(), []);
+
+        Assert.Equal(2, doc.DocumentLineForNewLine(1));
+        Assert.Equal(4, doc.DocumentLineForNewLine(2));
+        Assert.Equal(6, doc.DocumentLineForNewLine(4));
+
+        // Lines 5-10 fall between the hunks: the next shown line is 11 (document line 8, after the second header).
+        Assert.Equal(8, doc.DocumentLineForNewLine(5));
+        Assert.Equal(8, doc.DocumentLineForNewLine(11));
+        Assert.Equal(9, doc.DocumentLineForNewLine(12));
+        Assert.Null(doc.DocumentLineForNewLine(13));
+    }
+
+    [Fact]
+    public void EmptyDiffHasNoRows()
+    {
+        var doc = DiffDocument.Build(new FileDiff { Path = "a.txt" }, [("p", 1)]);
+
+        Assert.True(doc.IsEmpty);
+        Assert.Equal("", doc.Text);
+        Assert.Null(doc.CardLine("p"));
+        Assert.Null(doc.DocumentLineForNewLine(1));
+    }
+}
