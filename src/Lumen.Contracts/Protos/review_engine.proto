@@ -21,6 +21,14 @@ service ReviewEngine {
   rpc SetReviewPointState (SetReviewPointStateRequest) returns (SetReviewPointStateReply);
 
   rpc PostReviewComment (PostReviewCommentRequest) returns (PostReviewCommentReply);
+
+  // Connections (TDD §39). Checking status spends no usage. Keys go to the platform credential store and are never
+  // returned or logged.
+  rpc GetConnections (GetConnectionsRequest) returns (Connections);
+
+  rpc SetOpenRouterKey (SetOpenRouterKeyRequest) returns (Connections);
+
+  rpc RemoveOpenRouterKey (RemoveOpenRouterKeyRequest) returns (Connections);
 }
 
 message PingRequest {}
@@ -285,4 +293,55 @@ message PostReviewCommentRequest {
 message PostReviewCommentReply {
   int64 comment_id = 1;
   string url = 2;
+}
+
+message GetConnectionsRequest {}
+
+message SetOpenRouterKeyRequest {
+  string key = 1;
+}
+
+message RemoveOpenRouterKeyRequest {}
+
+enum ConnectionState {
+  // Turned off in settings; nothing is sent.
+  CONNECTION_STATE_OFF = 0;
+  // Allowed, but no credential or sign-in yet.
+  CONNECTION_STATE_NOT_CONNECTED = 1;
+  CONNECTION_STATE_CONNECTED = 2;
+  // A credential is present but the service rejected it or could not be reached.
+  CONNECTION_STATE_ERROR = 3;
+}
+
+enum ConnectionBilling {
+  CONNECTION_BILLING_UNKNOWN = 0;
+  CONNECTION_BILLING_SUBSCRIPTION = 1;
+  CONNECTION_BILLING_METERED = 2;
+}
+
+message JevConnection {
+  ConnectionState state = 1;
+  string detail = 2;
+  string model = 3;
+  bool key_stored = 4;
+  // False where there is no secure credential store yet (non-Windows).
+  bool can_store_key = 5;
+  // What JEV receives, e.g. "Counts and categories only".
+  string sends = 6;
+}
+
+message AgentConnection {
+  ConnectionState state = 1;
+  string detail = 2;
+  string version = 3;
+  ConnectionBilling billing = 4;
+  bool investigations_enabled = 5;
+  string investigations_detail = 6;
+}
+
+message Connections {
+  JevConnection jev = 1;
+  AgentConnection claude = 2;
+  // Where the non-secret preferences live (jev.enabled, privacy.*, agents.*).
+  string settings_path = 3;
 }

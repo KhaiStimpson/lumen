@@ -40,6 +40,15 @@ public static class Converters
         _ => "Severity.Low",
     });
 
+    /// <summary>Connection state → status dot. The status text always carries the meaning too.</summary>
+    public static readonly IValueConverter ConnectionToBrush = new ResourceConverter(state => state switch
+    {
+        "Connected" => "Marker.Verified",
+        "Error" => "Severity.High",
+        "NotConnected" => "Text.Tertiary",
+        _ => "Border.Strong",
+    });
+
     public static readonly IValueConverter StrengthToWidth =
         new FuncValueConverter<double, double>(strength => Math.Round(strength * 56));
 
@@ -50,7 +59,7 @@ public static class Converters
     {
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            var resourceKey = key(value as string ?? "");
+            var resourceKey = key(value?.ToString() ?? "");
             return Avalonia.Application.Current is { } app && app.TryGetResource(resourceKey, app.ActualThemeVariant, out var resource)
                 ? resource
                 : targetType == typeof(IBrush) ? Brushes.Gray : null;

@@ -21,10 +21,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _settings = settings;
         _settingsPath = settingsPath;
         Home = new OpenPullRequestViewModel(settings.RecentPullRequests, OpenAsync);
+        Connections = new ConnectionsViewModel(source);
         Current = Home;
     }
 
     public OpenPullRequestViewModel Home { get; }
+
+    public ConnectionsViewModel Connections { get; }
+
+    [ObservableProperty]
+    public partial bool IsConnectionsOpen { get; set; }
 
     public string SourceDescription => _source.Description;
 
@@ -77,6 +83,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         Current = Home;
+    }
+
+    [RelayCommand]
+    private Task OpenConnectionsAsync()
+    {
+        IsConnectionsOpen = true;
+        return Connections.LoadAsync();
+    }
+
+    [RelayCommand]
+    private void CloseConnections()
+    {
+        IsConnectionsOpen = false;
+        Connections.KeyInput = "";
     }
 
     [RelayCommand]

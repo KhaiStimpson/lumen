@@ -17,4 +17,11 @@ public interface IReviewSource : IAsyncDisposable
     Task SetReviewPointStateAsync(PullRequestRef pullRequest, string reviewPointId, ReviewPointState state, CancellationToken cancellationToken);
 
     Task<PostReviewCommentReply> PostCommentAsync(PostReviewCommentRequest request, CancellationToken cancellationToken);
+
+    Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken);
+
+    /// <summary>Hands the key to the engine, which puts it in the platform credential store; returns fresh status.</summary>
+    Task<Connections> SetOpenRouterKeyAsync(string key, CancellationToken cancellationToken);
+
+    Task<Connections> RemoveOpenRouterKeyAsync(CancellationToken cancellationToken);
 }

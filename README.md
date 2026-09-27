@@ -40,8 +40,9 @@ Both are off until you connect them, and a review never waits on either: if they
 deterministic review is unchanged.
 
 - **JEV** (attention routing via OpenRouter's Decisions API, `typesafe/jev-1.13`) receives counts and categories only —
-  no code, paths or names. It's metered by OpenRouter. Store a key in Windows Credential Manager (read from the
-  console, never from the command line):
+  no code, paths or names. It's metered by OpenRouter. Add your key from **Connections** (the plug button in the
+  title bar), which stores it in Windows Credential Manager and checks it for free. Or from a console (the key is read
+  from input, never from the command line):
 
   ```bash
   src/Lumen.Engine/bin/Debug/net10.0/Lumen.Engine.exe connections set-openrouter-key

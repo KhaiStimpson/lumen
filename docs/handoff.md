@@ -1,16 +1,17 @@
 # Handoff — Phase 3 (JEV) / Phase 4 (agents)
 
 Branch `phase3-4-jev-agents`, worktree `C:\Dev\repos\lumen\.claude\worktrees\phase3-4` (branched from main @ 5b8ebfb;
-no git remote, not merged). Status, design and deviations: [plan.md](plan.md) → "Phase 3 (JEV) and Phase 4".
+no git remote; fast-forwarded into main). Status, design and deviations: [plan.md](plan.md) → "Phase 3 (JEV) and Phase 4".
 
 ## State
 
-P3.1–P4.4 are done and committed; `dotnet build Lumen.slnx` has 0 errors (the 2 warnings are the pre-existing Avalonia
-`Watermark` ones) and `dotnet test Lumen.slnx` passes (289 tests). Only **P4.5, the live checks**, remains, and it needs you.
+P3.1–P4.4 are done and committed, plus an in-app **Connections** panel (plug button in the title bar; TDD §39) that
+stores the OpenRouter key through the engine and shows JEV/Claude status. `dotnet build Lumen.slnx` has 0 errors (the
+warnings are the pre-existing Avalonia `Watermark` ones) and `dotnet test Lumen.slnx` passes (298 tests). Only **P4.5, the live checks**, remains, and it needs you.
 
 ## Needs the user (nothing here has been done without asking)
 
-1. **JEV live check**: store an OpenRouter key (`Lumen.Engine.exe connections set-openrouter-key`), then run
+1. **JEV live check**: store an OpenRouter key (Connections panel, or `Lumen.Engine.exe connections set-openrouter-key`), then run
    `LUMEN_LIVE_JEV=1 dotnet test tests/Lumen.Jev.Tests --filter LiveJevTests`. Metered; roughly $0.00002 per call.
    If it returns 503, the TypeSafe endpoint may not be ZDR-eligible — set `"jev": { "requireZeroDataRetention": false }`
    (the state is source-free either way) and say so in plan.md.

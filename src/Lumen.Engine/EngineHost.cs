@@ -93,6 +93,12 @@ public static class EngineHost
         services.AddSingleton<ReviewPointPipeline>();
         AddAgents(services, options);
         services.AddSingleton<PullRequestSessionManager>();
+        services.AddTransient(sp => new ConnectionsProbe(
+            sp.GetRequiredService<EngineSettings>(),
+            options.DataDirectory,
+            sp.GetRequiredService<ISecretStore>(),
+            sp.GetRequiredService<IOpenRouterKeyCheck>(),
+            sp.GetRequiredService<IAgentProvider>()));
 
         if (options.ParentProcessId is { } parent)
         {
@@ -118,6 +124,7 @@ public static class EngineHost
             return new OpenRouterOptions { Model = jev.Model, RequireZeroDataRetention = jev.RequireZeroDataRetention };
         });
         services.AddHttpClient<ISystemOneEvaluator, OpenRouterSystemOneEvaluator>();
+        services.AddHttpClient<IOpenRouterKeyCheck, OpenRouterSystemOneEvaluator>();
         services.AddSingleton(sp =>
         {
             var settings = sp.GetRequiredService<EngineSettings>();

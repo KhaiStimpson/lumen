@@ -224,6 +224,56 @@ public sealed class MainWindowTests
         }
     }
 
+    [AvaloniaFact]
+    public async Task ConnectionsPanelStoresAndRemovesTheOpenRouterKey()
+    {
+        await using var session = await Session.OpenAsync();
+        var (window, connections) = (session.Window, session.ViewModel.Connections);
+
+        window.FindControl<Button>("ConnectionsButton")!.Command!.Execute(null);
+        await Fixture.WaitUntilAsync(() => connections.IsLoaded);
+        await Fixture.PumpAsync();
+        Assert.True(window.FindControl<Panel>("ConnectionsOverlay")!.IsEffectivelyVisible);
+        Assert.Equal("No OpenRouter key", connections.JevStatus);
+        Assert.False(connections.SaveKeyCommand.CanExecute(null));
+
+        var box = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "OpenRouterKey");
+        box.Focus();
+        window.KeyTextInput("sk-or-v1-fixture");
+        await session.PressAsync(PhysicalKey.Enter);
+        await Fixture.WaitUntilAsync(() => connections.IsKeyStored);
+
+        Assert.True(session.Source.OpenRouterKeyStored);
+        Assert.Equal("", connections.KeyInput);
+        Assert.Equal("", box.Text);
+        Assert.StartsWith("OpenRouter API · Key valid", connections.JevStatus, StringComparison.Ordinal);
+        await Fixture.PumpAsync(20);
+        Capture(window, "05-connections.png");
+
+        await connections.RemoveKeyCommand.ExecuteAsync(null);
+        Assert.False(session.Source.OpenRouterKeyStored);
+        Assert.False(connections.IsKeyStored);
+    }
+
+    [AvaloniaFact]
+    public async Task ConnectionsPanelIsModalAndEscapeClosesIt()
+    {
+        await using var session = await Session.OpenAsync();
+        var (vm, pr) = (session.ViewModel, session.PullRequest);
+        var first = pr.CurrentPoint;
+
+        await vm.OpenConnectionsCommand.ExecuteAsync(null);
+        await session.PressAsync(PhysicalKey.J);
+        Assert.Same(first, pr.CurrentPoint);
+
+        await session.PressAsync(PhysicalKey.Escape);
+        Assert.False(vm.IsConnectionsOpen);
+        Assert.False(session.Window.FindControl<Panel>("ConnectionsOverlay")!.IsEffectivelyVisible);
+
+        await session.PressAsync(PhysicalKey.J);
+        Assert.NotSame(first, pr.CurrentPoint);
+    }
+
     private static void Capture(Window window, string name)
     {
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
@@ -238,13 +288,16 @@ public sealed class MainWindowTests
     {
         private readonly string _settingsPath;
 
-        private Session(MainWindow window, MainWindowViewModel viewModel, PullRequestViewModel pullRequest, string settingsPath)
+        private Session(MainWindow window, MainWindowViewModel viewModel, PullRequestViewModel pullRequest, FixtureReviewSource source, string settingsPath)
         {
+            Source = source;
             Window = window;
             ViewModel = viewModel;
             PullRequest = pullRequest;
             _settingsPath = settingsPath;
         }
+
+        public FixtureReviewSource Source { get; }
 
         public MainWindow Window { get; }
 
@@ -255,7 +308,8 @@ public sealed class MainWindowTests
         public static async Task<Session> OpenAsync()
         {
             var settingsPath = Path.Combine(Path.GetTempPath(), "lumen-app-tests", $"{Guid.NewGuid():N}.json");
-            var viewModel = new MainWindowViewModel(Fixture.CreateSource(), new AppSettings(), settingsPath);
+            var source = Fixture.CreateSource();
+            var viewModel = new MainWindowViewModel(source, new AppSettings(), settingsPath);
             var window = new MainWindow { DataContext = viewModel };
             window.Show();
 
@@ -265,7 +319,7 @@ public sealed class MainWindowTests
             await Fixture.WaitUntilAsync(() => !pr.IsAnalysing);
             Assert.Null(pr.Error);
             await Fixture.PumpAsync(10);
-            return new Session(window, viewModel, pr, settingsPath);
+            return new Session(window, viewModel, pr, source, settingsPath);
         }
 
         public async Task PressAsync(PhysicalKey key)

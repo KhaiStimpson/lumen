@@ -97,6 +97,45 @@ public sealed class FixtureReviewSource : IReviewSource
         return Task.FromResult(new PostReviewCommentReply { CommentId = PostedComments.Count, Url = "https://example.invalid/fixture-comment" });
     }
 
+    /// <summary>Whether a key has been "stored"; the fixture keeps only this flag, never the key.</summary>
+    public bool OpenRouterKeyStored { get; set; }
+
+    public Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken) => Task.FromResult(FixtureConnections());
+
+    public Task<Connections> SetOpenRouterKeyAsync(string key, CancellationToken cancellationToken)
+    {
+        OpenRouterKeyStored = !string.IsNullOrWhiteSpace(key);
+        return Task.FromResult(FixtureConnections());
+    }
+
+    public Task<Connections> RemoveOpenRouterKeyAsync(CancellationToken cancellationToken)
+    {
+        OpenRouterKeyStored = false;
+        return Task.FromResult(FixtureConnections());
+    }
+
+    private Connections FixtureConnections() => new()
+    {
+        Jev = new JevConnection
+        {
+            State = OpenRouterKeyStored ? ConnectionState.Connected : ConnectionState.NotConnected,
+            Detail = OpenRouterKeyStored ? "Key valid · 4.82 credit remaining" : "No OpenRouter key",
+            Model = "typesafe/jev-1.13",
+            KeyStored = OpenRouterKeyStored,
+            CanStoreKey = true,
+            Sends = "Counts and categories only — no code, paths or names",
+        },
+        Claude = new AgentConnection
+        {
+            State = ConnectionState.Connected,
+            Detail = "Claude Pro via Claude Code",
+            Version = "2.1.0",
+            Billing = ConnectionBilling.Subscription,
+            InvestigationsDetail = "Off (settings: agents.enabled and privacy.allowCodeToAgents must both be true)",
+        },
+        SettingsPath = @"%LOCALAPPDATA%\Lumen\settings.json",
+    };
+
     private void Broadcast(PullRequestEvent evt)
     {
         lock (_live)

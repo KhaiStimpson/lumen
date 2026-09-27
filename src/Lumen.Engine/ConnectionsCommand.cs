@@ -1,6 +1,7 @@
 using System.Text;
 using Lumen.Agents.ClaudeCode;
 using Lumen.Agents.Execution;
+using Lumen.Contracts;
 using Lumen.Domain;
 using Lumen.Jev;
 using Lumen.Storage;
@@ -53,41 +54,39 @@ public static class ConnectionsCommand
     private static async Task WriteStatusAsync(EngineOptions options, ISecretStore secrets, TextWriter output)
     {
         var settings = EngineSettings.Load(options.DataDirectory);
-        output.WriteLine($"Settings: {EngineSettings.PathIn(options.DataDirectory)}");
-        output.WriteLine();
-
         using var http = new HttpClient();
-        var jev = new OpenRouterSystemOneEvaluator(http, secrets, new OpenRouterOptions { Model = settings.Jev.Model });
-        output.WriteLine("JEV");
-        if (!settings.Jev.Enabled || !settings.Privacy.AllowsJev)
-        {
-            output.WriteLine("  ○ Off (settings: jev.enabled / privacy.allowCloudReasoning)");
-        }
-        else if (!jev.IsConfigured)
-        {
-            output.WriteLine("  ○ No OpenRouter key — run: Lumen.Engine connections set-openrouter-key");
-        }
-        else
-        {
-            var key = await jev.CheckKeyAsync(CancellationToken.None).ConfigureAwait(false);
-            output.WriteLine($"  {(key.Valid ? "●" : "✕")} OpenRouter API (metered) · {settings.Jev.Model} · {key.Detail}");
-        }
-
-        output.WriteLine($"  Sends: {(settings.Privacy.AllowCodeSnippetsToJev ? "counts, categories and convention wording" : "counts and categories only — no code, paths or names")}");
-        output.WriteLine();
-
         var runner = new SandboxedProcessRunner(new CommandPolicy
         {
             AllowedExecutables = new HashSet<string>(StringComparer.Ordinal) { ClaudeCodeProvider.Executable },
             AllowedWorkingRoots = [options.DataDirectory],
         });
-        var claude = await new ClaudeCodeProvider(runner, Path.Combine(options.DataDirectory, "agent-state"))
-            .GetAuthenticationStateAsync(CancellationToken.None).ConfigureAwait(false);
+        var probe = new ConnectionsProbe(
+            settings,
+            options.DataDirectory,
+            secrets,
+            new OpenRouterSystemOneEvaluator(http, secrets, new OpenRouterOptions { Model = settings.Jev.Model }),
+            new ClaudeCodeProvider(runner, Path.Combine(options.DataDirectory, "agent-state")));
+        var status = await probe.GetAsync(CancellationToken.None).ConfigureAwait(false);
+
+        output.WriteLine($"Settings: {status.SettingsPath}");
+        output.WriteLine();
+
+        var jev = status.Jev;
+        output.WriteLine("JEV");
+        output.WriteLine(jev.State switch
+        {
+            ConnectionState.Connected => $"  ● OpenRouter API (metered) · {jev.Model} · {jev.Detail}",
+            ConnectionState.Error => $"  ✕ OpenRouter API (metered) · {jev.Model} · {jev.Detail}",
+            ConnectionState.NotConnected when jev.CanStoreKey => $"  ○ {jev.Detail} — run: Lumen.Engine connections set-openrouter-key",
+            _ => $"  ○ {jev.Detail}",
+        });
+        output.WriteLine($"  Sends: {jev.Sends}");
+        output.WriteLine();
+
+        var claude = status.Claude;
         output.WriteLine("Claude");
-        output.WriteLine($"  {(claude.IsUsable ? "●" : "○")} {claude.Detail}{(claude.Version is null ? "" : $" · {claude.Version}")}");
-        output.WriteLine(settings.AgentsAllowed
-            ? $"  Investigations: on · up to {settings.Agents.MaxInvestigationsPerPullRequest} per pull request · {(settings.Agents.AllowMeteredUsage ? "metered usage ALLOWED" : "subscription only")}"
-            : "  Investigations: off (settings: agents.enabled and privacy.allowCodeToAgents must both be true)");
+        output.WriteLine($"  {(claude.State == ConnectionState.Connected ? "●" : "○")} {claude.Detail}{(claude.Version.Length == 0 ? "" : $" · {claude.Version}")}");
+        output.WriteLine($"  Investigations: {claude.InvestigationsDetail}");
     }
 
     /// <summary>Reads without echo when attached to a console; falls back to a plain line for redirected input.</summary>

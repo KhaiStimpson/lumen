@@ -11,6 +11,7 @@ public sealed class ReviewEngineService(
     PullRequestSessionManager sessions,
     IGitHubClient gitHub,
     IReviewStore store,
+    ConnectionsProbe connections,
     TimeProvider time) : ReviewEngine.ReviewEngineBase
 {
     private static readonly string Version =
@@ -88,6 +89,33 @@ public sealed class ReviewEngineService(
         }
 
         return new PostReviewCommentReply { CommentId = posted.Id, Url = posted.Url };
+    }
+
+    public override Task<Connections> GetConnections(GetConnectionsRequest request, ServerCallContext context) =>
+        connections.GetAsync(context.CancellationToken);
+
+    public override async Task<Connections> SetOpenRouterKey(SetOpenRouterKeyRequest request, ServerCallContext context)
+    {
+        try
+        {
+            connections.SetOpenRouterKey(request.Key);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
+        }
+        catch (PlatformNotSupportedException ex)
+        {
+            throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message));
+        }
+
+        return await connections.GetAsync(context.CancellationToken).ConfigureAwait(false);
+    }
+
+    public override async Task<Connections> RemoveOpenRouterKey(RemoveOpenRouterKeyRequest request, ServerCallContext context)
+    {
+        connections.RemoveOpenRouterKey();
+        return await connections.GetAsync(context.CancellationToken).ConfigureAwait(false);
     }
 
     private async Task RecordAsync(

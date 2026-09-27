@@ -35,6 +35,8 @@ public sealed partial class MainWindow : Window
                 BeginMoveDrag(e);
             }
         };
+
+        ConnectionsScrim.PointerPressed += (_, _) => ViewModel?.CloseConnectionsCommand.Execute(null);
     }
 
     private MainWindowViewModel? ViewModel => DataContext as MainWindowViewModel;
@@ -42,6 +44,19 @@ public sealed partial class MainWindow : Window
     /// <summary>Keyboard-first review (TDD §29).</summary>
     private async void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
+        // The Connections card is modal: Escape closes it, and review shortcuts stay with the view underneath.
+        if (ViewModel is { IsConnectionsOpen: true } main)
+        {
+            if (e.Key == Key.Escape)
+            {
+                main.CloseConnectionsCommand.Execute(null);
+                Focus();
+                e.Handled = true;
+            }
+
+            return;
+        }
+
         if (ViewModel?.PullRequest is not { } pr)
         {
             return;

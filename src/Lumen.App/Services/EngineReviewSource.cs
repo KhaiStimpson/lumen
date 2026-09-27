@@ -86,6 +86,21 @@ public sealed class EngineReviewSource : IReviewSource
             .PostReviewCommentAsync(request, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
+    public async Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .GetConnectionsAsync(new GetConnectionsRequest(), cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<Connections> SetOpenRouterKeyAsync(string key, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .SetOpenRouterKeyAsync(new SetOpenRouterKeyRequest { Key = key }, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<Connections> RemoveOpenRouterKeyAsync(CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .RemoveOpenRouterKeyAsync(new RemoveOpenRouterKeyRequest(), cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
     private async Task<ReviewEngine.ReviewEngineClient> ClientAsync(CancellationToken cancellationToken)
     {
         await _connectGate.WaitAsync(cancellationToken).ConfigureAwait(false);

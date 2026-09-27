@@ -26,11 +26,17 @@ public sealed record OpenRouterOptions
 
 public sealed record OpenRouterKeyStatus(bool Valid, string Detail);
 
+/// <summary>A free check of the stored OpenRouter key, for connection status (TDD §39).</summary>
+public interface IOpenRouterKeyCheck
+{
+    Task<OpenRouterKeyStatus> CheckKeyAsync(CancellationToken cancellationToken);
+}
+
 /// <summary>
 /// JEV over OpenRouter's Decisions API (TDD §38): one request carries every question for a batch, and each answer
 /// comes back with its probabilities. The key is read from the platform credential store on each call.
 /// </summary>
-public sealed class OpenRouterSystemOneEvaluator(HttpClient http, ISecretStore secrets, OpenRouterOptions options) : ISystemOneEvaluator
+public sealed class OpenRouterSystemOneEvaluator(HttpClient http, ISecretStore secrets, OpenRouterOptions options) : ISystemOneEvaluator, IOpenRouterKeyCheck
 {
     public const string ProviderName = "openrouter";
 
