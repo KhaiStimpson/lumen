@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Lumen.Agents/Lumen.Agents.csproj" />
     <Project Path="src/Lumen.Analysis/Lumen.Analysis.csproj" />
     <Project Path="src/Lumen.App/Lumen.App.csproj" />
     <Project Path="src/Lumen.Contracts/Lumen.Contracts.csproj" />
@@ -11,6 +12,7 @@
     <Project Path="src/Lumen.Storage/Lumen.Storage.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Lumen.Agents.Tests/Lumen.Agents.Tests.csproj" />
     <Project Path="tests/Lumen.Analysis.Tests/Lumen.Analysis.Tests.csproj" />
     <Project Path="tests/Lumen.App.Tests/Lumen.App.Tests.csproj" />
     <Project Path="tests/Lumen.Engine.Tests/Lumen.Engine.Tests.csproj" />
