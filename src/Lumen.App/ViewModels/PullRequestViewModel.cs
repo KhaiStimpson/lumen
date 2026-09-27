@@ -80,6 +80,8 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
     [ObservableProperty]
     public partial string Status { get; set; }
 
+    private string _completeStatus = "";
+
     [ObservableProperty]
     public partial bool IsLoading { get; set; } = true;
 
@@ -317,12 +319,30 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
                 break;
 
+            case PullRequestEvent.EventOneofCase.ReviewPointUpdated:
+                if (ReviewPoints.FirstOrDefault(p => p.Id == evt.ReviewPointUpdated.Id) is { } existing)
+                {
+                    existing.Update(evt.ReviewPointUpdated);
+                    RefreshPointDerivedState();
+                }
+
+                break;
+
+            case PullRequestEvent.EventOneofCase.InvestigationStatus:
+                // TDD §49: one quiet line, never an agents dashboard.
+                var active = evt.InvestigationStatus.Active;
+                Status = active > 0
+                    ? string.Create(CultureInfo.InvariantCulture, $"Analysing {active} area{(active == 1 ? "" : "s")}…")
+                    : evt.InvestigationStatus.Detail.Length > 0 ? $"{_completeStatus} · {evt.InvestigationStatus.Detail}" : _completeStatus;
+                break;
+
             case PullRequestEvent.EventOneofCase.Complete:
                 IsAnalysing = false;
                 OnPropertyChanged(nameof(PositionLabel));
-                Status = OpenPoints.Any()
+                _completeStatus = OpenPoints.Any()
                     ? string.Create(CultureInfo.InvariantCulture, $"{OpenPoints.Count()} review points · analysed in {evt.Complete.DurationMs / 1000.0:0.0}s")
                     : "Nothing needs special attention";
+                Status = _completeStatus;
                 if (CurrentPoint is null && OpenPoints.FirstOrDefault() is { } first)
                 {
                     await GoToAsync(first, NavigationReason.Arrived).ConfigureAwait(true);

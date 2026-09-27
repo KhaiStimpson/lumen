@@ -287,6 +287,48 @@ public sealed class PullRequestViewModelTests
     }
 
     [AvaloniaFact]
+    public async Task InvestigationProgressAndEvidenceArriveWithoutDisturbingTheReview()
+    {
+        var pr = await Fixture.LoadAsync(Fixture.CreateSource());
+        try
+        {
+            var point = pr.CurrentPoint!;
+            var completeStatus = pr.Status;
+
+            await pr.ApplyAsync(new PullRequestEvent { InvestigationStatus = new InvestigationStatus { Active = 2 } });
+            Assert.Equal("Analysing 2 areas…", pr.Status);
+
+            var updated = point.Model.Clone();
+            updated.EvidenceState = EvidenceState.Strong;
+            updated.Evidence.Add(new Evidence
+            {
+                Id = "inv-1-0",
+                Source = "AgentInvestigation",
+                Producer = "claude-code · pattern-investigator/v1 · claude-sonnet-5",
+                Summary = "ChargeWorker claims before charging (src/ChargeWorker.cs:9)",
+                Location = new CodeLocation { Path = "src/ChargeWorker.cs", StartLine = 9, EndLine = 9 },
+            });
+            await pr.ApplyAsync(new PullRequestEvent { ReviewPointUpdated = updated });
+
+            Assert.Same(point, pr.CurrentPoint);
+            Assert.Equal(3, pr.ReviewPoints.Count);
+            Assert.Equal("Strong repository precedent", point.EvidenceLabel);
+            var agent = point.Evidence[^1];
+            Assert.Equal("Agent investigation · claude-code · pattern-investigator/v1 · claude-sonnet-5", agent.Provenance);
+
+            await pr.ApplyAsync(new PullRequestEvent { InvestigationStatus = new InvestigationStatus { Active = 0 } });
+            Assert.Equal(completeStatus, pr.Status);
+
+            await pr.ApplyAsync(new PullRequestEvent { InvestigationStatus = new InvestigationStatus { Active = 0, Detail = "Not signed in" } });
+            Assert.Equal($"{completeStatus} · Not signed in", pr.Status);
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task FileFilterNarrowsTheTree()
     {
         var pr = await Fixture.LoadAsync(Fixture.CreateSource());

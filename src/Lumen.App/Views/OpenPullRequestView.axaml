@@ -47,7 +47,7 @@
         </StackPanel>
 
         <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
-                   Text="Uses your GitHub CLI sign-in (gh auth login). Code is analysed locally; nothing is sent to AI services in this version." />
+                   Text="Uses your GitHub CLI sign-in (gh auth login). Code is analysed locally. Nothing leaves this machine for AI services unless you connect them: JEV receives counts only, and agents read code only if you allow it." />
       </StackPanel>
     </Border>
   </Grid>

@@ -8,11 +8,28 @@ public sealed partial class ReviewPointViewModel : ObservableObject
 {
     public ReviewPointViewModel(ReviewPoint model, int ordinal)
     {
-        Model = model;
         Ordinal = ordinal;
         State = model.State;
         CommentDraft = model.SuggestedComment;
+        Apply(model);
+    }
 
+    public ReviewPoint Model { get; private set; } = null!;
+
+    /// <summary>
+    /// Takes a newer version of the same point (e.g. an investigation added evidence). The reviewer's own state,
+    /// comment draft and position are kept.
+    /// </summary>
+    public void Update(ReviewPoint model)
+    {
+        Apply(model);
+        OnPropertyChanged(string.Empty);
+    }
+
+    [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(PrecedentExamples), nameof(Exceptions), nameof(Evidence), nameof(Locations))]
+    private void Apply(ReviewPoint model)
+    {
+        Model = model;
         if (model.Comparison is { } comparison)
         {
             Current = new ComparisonSideViewModel(comparison.Current, isPrecedent: false);
@@ -25,8 +42,6 @@ public sealed partial class ReviewPointViewModel : ObservableObject
         Evidence = [.. model.Evidence.Select(e => new EvidenceItemViewModel(e))];
         Locations = [new LocationViewModel(model.Anchor, isPrimary: true), .. model.OtherLocations.Select(l => new LocationViewModel(l, isPrimary: false))];
     }
-
-    public ReviewPoint Model { get; }
 
     /// <summary>Position in the ranked list (1-based); drives the "R1" tag.</summary>
     [ObservableProperty]
@@ -95,17 +110,17 @@ public sealed partial class ReviewPointViewModel : ObservableObject
 
     public string SuggestedComment => Model.SuggestedComment;
 
-    public ComparisonSideViewModel? Current { get; }
+    public ComparisonSideViewModel? Current { get; private set; }
 
-    public ComparisonSideViewModel? Precedent { get; }
+    public ComparisonSideViewModel? Precedent { get; private set; }
 
-    public IReadOnlyList<PrecedentExampleViewModel> PrecedentExamples { get; }
+    public IReadOnlyList<PrecedentExampleViewModel> PrecedentExamples { get; private set; }
 
-    public IReadOnlyList<PrecedentExampleViewModel> Exceptions { get; }
+    public IReadOnlyList<PrecedentExampleViewModel> Exceptions { get; private set; }
 
-    public IReadOnlyList<EvidenceItemViewModel> Evidence { get; }
+    public IReadOnlyList<EvidenceItemViewModel> Evidence { get; private set; }
 
-    public IReadOnlyList<LocationViewModel> Locations { get; }
+    public IReadOnlyList<LocationViewModel> Locations { get; private set; }
 
     public bool HasExceptions => Exceptions.Count > 0;
 
@@ -215,6 +230,8 @@ public sealed class EvidenceItemViewModel(Evidence evidence)
         "StaticAnalysis" => "Static analysis",
         "ReviewHistory" => "Review history",
         "GeneratedTest" => "Generated test",
+        "AgentInvestigation" => "Agent investigation",
+        "GitHistory" => "Git history",
         _ => evidence.Source,
     };
 
