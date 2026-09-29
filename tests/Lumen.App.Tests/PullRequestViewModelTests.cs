@@ -35,6 +35,26 @@ public sealed class PullRequestViewModelTests
     }
 
     [AvaloniaFact]
+    public async Task ReplayCarriesTheTriage()
+    {
+        var pr = await Fixture.LoadAsync(new GrpcLikeReviewSource(Fixture.CreateSource()));
+        try
+        {
+            var triage = pr.Triage;
+            Assert.NotNull(triage);
+            Assert.StartsWith("19,743 lines changed: 15,864 proven mechanical", triage.Summary.Text, StringComparison.Ordinal);
+            Assert.Equal(60, triage.Files.Count);
+            Assert.Contains(triage.Hunks, h => h.ChangeClass == ChangeClass.Generated && h.Tier == TriageTier.Skip);
+            Assert.Contains(triage.Hunks, h => h.ChangeClass == ChangeClass.ImportsOnly && h.Tier == TriageTier.Skip);
+            Assert.Equal(triage.Summary.TotalLines, triage.Files.Sum(f => f.TierLines.Critical + f.TierLines.WorthALook + f.TierLines.Skim + f.TierLines.Skip));
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task OpeningAFileDoesNotTickItButToggleViewedDoes()
     {
         var pr = await Fixture.LoadAsync(Fixture.CreateSource());

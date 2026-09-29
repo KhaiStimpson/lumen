@@ -52,6 +52,9 @@ internal sealed class GrpcLikeReviewSource(FixtureReviewSource inner) : IReviewS
     public Task<PostReviewCommentReply> PostCommentAsync(PostReviewCommentRequest request, CancellationToken cancellationToken) =>
         inner.PostCommentAsync(request, cancellationToken);
 
+    public Task SetTriageGroupAcknowledgedAsync(PullRequestRef pullRequest, string groupId, bool acknowledged, CancellationToken cancellationToken) =>
+        inner.SetTriageGroupAcknowledgedAsync(pullRequest, groupId, acknowledged, cancellationToken);
+
     /// <summary>When set, saving a "Viewed" tick fails the way the engine reports a GitHub refusal.</summary>
     public string? FailViewedWith { get; set; }
 

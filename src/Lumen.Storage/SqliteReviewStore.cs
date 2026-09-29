@@ -8,7 +8,7 @@ using Microsoft.Data.Sqlite;
 namespace Lumen.Storage;
 
 /// <summary>SQLite-backed stores (TDD §32–§33). Opens a pooled connection per operation. Never holds credentials.</summary>
-public sealed class SqliteReviewStore : IReviewStore, IAttentionEvaluationStore, IInvestigationStore, IAsyncDisposable
+public sealed class SqliteReviewStore : IReviewStore, IAttentionEvaluationStore, IInvestigationStore, ITriageStore, IAsyncDisposable
 {
     private const int BusyTimeoutMilliseconds = 5000;
 
@@ -332,6 +332,57 @@ public sealed class SqliteReviewStore : IReviewStore, IAttentionEvaluationStore,
                     "SELECT COUNT(*) FROM Investigations WHERE Repository = @Repository AND PullRequest = @PullRequest AND HeadSha = @HeadSha;",
                     new { Repository = key.Repository.FullName, PullRequest = key.Number, HeadSha = headSha },
                     cancellationToken: cancellationToken))
+                .ConfigureAwait(false);
+        }
+    }
+
+    public async Task<TriageResult?> FindTriageAsync(PullRequestKey key, string headSha, string version, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        const string sql = """
+            SELECT Result FROM TriageResults
+            WHERE Repository = @Repository AND PullRequest = @PullRequest AND HeadSha = @HeadSha AND Version = @Version;
+            """;
+
+        var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var json = await connection
+                .QuerySingleOrDefaultAsync<string?>(new CommandDefinition(
+                    sql,
+                    new { Repository = key.Repository.FullName, PullRequest = key.Number, HeadSha = headSha, Version = version },
+                    cancellationToken: cancellationToken))
+                .ConfigureAwait(false);
+            return json is null ? null : JsonSerializer.Deserialize<TriageResult>(json, ResultJson);
+        }
+    }
+
+    public async Task SaveTriageAsync(PullRequestKey key, string headSha, string version, TriageResult result, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(result);
+
+        const string sql = """
+            INSERT INTO TriageResults (Repository, PullRequest, HeadSha, Version, Result, At)
+            VALUES (@Repository, @PullRequest, @HeadSha, @Version, @Result, @At)
+            ON CONFLICT(Repository, PullRequest, HeadSha, Version) DO UPDATE SET Result = excluded.Result, At = excluded.At;
+            """;
+
+        var parameters = new
+        {
+            Repository = key.Repository.FullName,
+            PullRequest = key.Number,
+            HeadSha = headSha,
+            Version = version,
+            Result = JsonSerializer.Serialize(result, ResultJson),
+            At = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+        };
+
+        var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            await connection.ExecuteAsync(new CommandDefinition(sql, parameters, cancellationToken: cancellationToken))
                 .ConfigureAwait(false);
         }
     }

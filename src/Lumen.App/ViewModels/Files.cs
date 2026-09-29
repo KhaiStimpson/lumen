@@ -36,6 +36,21 @@ public sealed partial class FileEntryViewModel(ChangedFileSummary file) : Observ
 
     public bool HasReviewPoints => ReviewPointCount > 0;
 
+    /// <summary>Changed lines per triage tier; null until the triage arrives.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsMechanicalOnly), nameof(MechanicalLabel), nameof(HasCritical))]
+    public partial TierLines? TierLines { get; set; }
+
+    /// <summary>Every changed line was proven mechanical (all Skip): greyed in the tree, still one click away.</summary>
+    public bool IsMechanicalOnly => TierLines is { } t && t.Skip > 0 && t.Critical + t.WorthALook + t.Skim == 0;
+
+    public string MechanicalLabel => TierLines is { Skip: > 0 } t
+        ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{t.Skip:N0} {(t.Skip == 1 ? "line" : "lines")} mechanical")
+        : "";
+
+    /// <summary>The file holds at least one Critical hunk.</summary>
+    public bool HasCritical => TierLines is { Critical: > 0 };
+
     /// <summary>GitHub's per-file "Viewed" checkbox: ticked by the reviewer, never by merely opening the file.</summary>
     [ObservableProperty]
     public partial bool IsViewed { get; set; } = file.IsViewed;

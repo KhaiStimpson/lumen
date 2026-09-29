@@ -20,6 +20,19 @@ public sealed partial class PullRequestView : UserControl, IDisposable
     {
         InitializeComponent();
         Editor.CardFactory = CreateCard;
+        if (!App.Motion.ReducedMotion)
+        {
+            // Progress eases forward; with reduced motion it simply takes its new value.
+            ((Avalonia.Media.ScaleTransform)CoverageFill.RenderTransform!).Transitions =
+            [
+                new Avalonia.Animation.DoubleTransition
+                {
+                    Property = Avalonia.Media.ScaleTransform.ScaleXProperty,
+                    Duration = TimeSpan.FromMilliseconds(320),
+                    Easing = new Avalonia.Animation.Easings.CubicEaseOut(),
+                },
+            ];
+        }
         Editor.MarkerClicked += async (_, id) =>
         {
             if (_viewModel?.ReviewPoints.FirstOrDefault(p => p.Id == id) is { } point)
@@ -84,8 +97,13 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         }
     }
 
-    private ReviewCardView? CreateCard(string cardId)
+    private Control? CreateCard(string cardId)
     {
+        if (cardId.StartsWith(Diff.DiffFold.CardPrefix, StringComparison.Ordinal))
+        {
+            return _viewModel?.ResolveFold(cardId) is { } fold ? new FoldBadgeView { DataContext = fold } : null;
+        }
+
         if (_viewModel?.ResolveCard(cardId) is not { } resolved)
         {
             return null;

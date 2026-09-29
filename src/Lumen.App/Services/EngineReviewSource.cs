@@ -93,6 +93,13 @@ public sealed class EngineReviewSource : IReviewSource
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
+    public async Task SetTriageGroupAcknowledgedAsync(PullRequestRef pullRequest, string groupId, bool acknowledged, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .SetTriageGroupAcknowledgedAsync(
+                new SetTriageGroupAcknowledgedRequest { PullRequest = pullRequest, GroupId = groupId, Acknowledged = acknowledged },
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
     public async Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken) =>
         await (await ClientAsync(cancellationToken).ConfigureAwait(false))
             .GetConnectionsAsync(new GetConnectionsRequest(), cancellationToken: cancellationToken)

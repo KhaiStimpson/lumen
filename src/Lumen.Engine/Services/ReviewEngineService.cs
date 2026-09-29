@@ -93,6 +93,31 @@ public sealed class ReviewEngineService(
         return new PostReviewCommentReply { CommentId = posted.Id, Url = posted.Url };
     }
 
+    public override async Task<SetTriageGroupAcknowledgedReply> SetTriageGroupAcknowledged(SetTriageGroupAcknowledgedRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        if (session.Triage?.Groups.Any(g => g.Id == request.GroupId) != true)
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, $"Unknown triage group '{request.GroupId}'."));
+        }
+
+        await store.RecordInteractionAsync(
+            new ReviewInteraction(
+                session.Key,
+                session.Snapshot?.HeadSha ?? "",
+                TriageAcknowledgement.InteractionId(request.GroupId),
+                request.Acknowledged ? ReviewAction.Acknowledged : ReviewAction.Unacknowledged,
+                time.GetUtcNow(),
+                null),
+            context.CancellationToken).ConfigureAwait(false);
+
+        session.Publish(new PullRequestEvent
+        {
+            TriageGroupAcknowledged = new TriageGroupAcknowledged { GroupId = request.GroupId, Acknowledged = request.Acknowledged },
+        });
+        return new SetTriageGroupAcknowledgedReply();
+    }
+
     public override async Task<SetFileViewedReply> SetFileViewed(SetFileViewedRequest request, ServerCallContext context)
     {
         var session = RequireSession(request.PullRequest);

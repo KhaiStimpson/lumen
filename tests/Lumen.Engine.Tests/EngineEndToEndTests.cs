@@ -196,6 +196,32 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
         Assert.Equal(Environment.ProcessId, ping.ProcessId);
     }
 
+    [Fact]
+    public async Task TriagesTheSnapshotAndCachesItPerHead()
+    {
+        using var channel = EngineEndpoint.CreateChannel(_pipe);
+        await CollectUntilCompleteAsync(new ReviewEngine.ReviewEngineClient(channel));
+
+        var key = new PullRequestKey(new RepositoryRef(Pr.Owner, Pr.Name), Pr.Number);
+        var session = _engine!.Services.GetRequiredService<Sessions.PullRequestSessionManager>().Find(key);
+        var triage = session!.Triage;
+        Assert.NotNull(triage);
+        Assert.Contains(triage.Hunks, h => h.Path == WorkerScenario.NewWorkerPath && h.Class == Domain.ChangeClass.NewCode);
+
+        using var replay = EngineEndpoint.CreateChannel(_pipe);
+        var events = await CollectUntilCompleteAsync(new ReviewEngine.ReviewEngineClient(replay));
+        var kinds = events.Select(e => e.EventCase).ToList();
+        var ready = Assert.Single(events, e => e.EventCase == PullRequestEvent.EventOneofCase.TriageReady).TriageReady;
+        Assert.True(kinds.IndexOf(PullRequestEvent.EventOneofCase.Snapshot) < kinds.IndexOf(PullRequestEvent.EventOneofCase.TriageReady));
+        Assert.True(kinds.IndexOf(PullRequestEvent.EventOneofCase.TriageReady) < kinds.IndexOf(PullRequestEvent.EventOneofCase.ReviewPointAdded));
+        Assert.Equal(triage.Hunks.Count, ready.Hunks.Count);
+        Assert.True(ready.Files.Single(f => f.Path == WorkerScenario.NewWorkerPath).TierLines.Skim > 0);
+
+        var cached = await _engine.Services.GetRequiredService<ITriageStore>()
+            .FindTriageAsync(key, WorkerScenario.HeadSha, Sessions.TriageRunner.VersionFor(Analysis.ReviewSettings.Default), CancellationToken.None);
+        Assert.Equal(triage.Hunks.Count, cached!.Hunks.Count);
+    }
+
     private static Task<List<PullRequestEvent>> CollectUntilCompleteAsync(ReviewEngine.ReviewEngineClient client, bool refresh = false) =>
         CollectUntilAsync(client, e => e.Complete is not null || e.Failed is not null, refresh);
 

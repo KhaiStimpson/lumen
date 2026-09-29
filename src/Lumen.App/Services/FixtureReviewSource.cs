@@ -105,6 +105,12 @@ public sealed class FixtureReviewSource : IReviewSource
         return Task.CompletedTask;
     }
 
+    public Task SetTriageGroupAcknowledgedAsync(PullRequestRef pullRequest, string groupId, bool acknowledged, CancellationToken cancellationToken)
+    {
+        Broadcast(new PullRequestEvent { TriageGroupAcknowledged = new TriageGroupAcknowledged { GroupId = groupId, Acknowledged = acknowledged } });
+        return Task.CompletedTask;
+    }
+
     /// <summary>Whether a key has been "stored"; the fixture keeps only this flag, never the key.</summary>
     public bool OpenRouterKeyStored { get; set; }
 

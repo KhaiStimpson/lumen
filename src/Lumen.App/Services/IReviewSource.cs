@@ -21,6 +21,9 @@ public interface IReviewSource : IAsyncDisposable
     /// <summary>Ticks or clears the file's "Viewed" checkbox on GitHub.</summary>
     Task SetFileViewedAsync(PullRequestRef pullRequest, string path, bool viewed, CancellationToken cancellationToken);
 
+    /// <summary>Clears (or restores) a triage group for this pull request; the engine stores it like a dismissal.</summary>
+    Task SetTriageGroupAcknowledgedAsync(PullRequestRef pullRequest, string groupId, bool acknowledged, CancellationToken cancellationToken);
+
     Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken);
 
     /// <summary>Hands the key to the engine, which puts it in the platform credential store; returns fresh status.</summary>

@@ -17,6 +17,7 @@ public sealed partial class PullRequestSessionManager(
     ReviewPointPipeline pipeline,
     InvestigationCoordinator investigations,
     ReviewSettingsStore reviewSettings,
+    TriageRunner triage,
     ILogger<PullRequestSessionManager> logger) : IDisposable
 {
     private readonly ConcurrentDictionary<PullRequestKey, PullRequestSession> _sessions = new();
@@ -69,8 +70,18 @@ public sealed partial class PullRequestSessionManager(
             session.Publish(new PullRequestEvent { Snapshot = ProtoMapper.ToProto(snapshot, viewer, viewed) });
             LogSnapshotReady(logger, key, files.Count, stopwatch.ElapsedMilliseconds);
 
-            Progress(session, "analysis", "Comparing with repository precedent…");
+            // Triage runs before detectors (it needs only the snapshot) and never blocks the review: null means unavailable.
+            Progress(session, "triage", "Separating mechanical changes from real ones…");
+            var triageResult = await triage.RunAsync(snapshot, checkout, settings, ct).ConfigureAwait(false);
+            session.SetTriage(triageResult);
             var states = await store.GetLatestActionsAsync(key, ct).ConfigureAwait(false);
+            if (triageResult is not null)
+            {
+                var acknowledged = TriageAcknowledgement.AcknowledgedGroups(states);
+                session.Publish(new PullRequestEvent { TriageReady = ProtoMapper.ToProto(triageResult, snapshot, viewed, acknowledged) });
+            }
+
+            Progress(session, "analysis", "Comparing with repository precedent…");
 
             var result = await pipeline.RunAsync(
                 new AnalysisContext(snapshot, checkout) { Settings = settings },

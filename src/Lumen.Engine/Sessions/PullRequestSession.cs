@@ -27,6 +27,9 @@ public sealed class PullRequestSession : IDisposable
 
     public IPullRequestCheckout? Checkout { get; private set; }
 
+    /// <summary>The head commit's triage; null until computed, or when it could not be.</summary>
+    public TriageResult? Triage { get; private set; }
+
     public bool IsFinished { get; private set; }
 
     public bool HasFailed { get; private set; }
@@ -48,6 +51,8 @@ public sealed class PullRequestSession : IDisposable
         Snapshot = snapshot;
         Checkout = checkout;
     }
+
+    internal void SetTriage(TriageResult? triage) => Triage = triage;
 
     internal void AddReviewPoint(Domain.ReviewPoint point)
     {

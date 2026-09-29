@@ -54,8 +54,8 @@ public sealed class SqliteReviewStoreTests : IDisposable
         versions.CommandText = "SELECT COUNT(*), MAX(Version) FROM SchemaVersion;";
         using var reader = await versions.ExecuteReaderAsync(Ct);
         Assert.True(await reader.ReadAsync(Ct));
-        Assert.Equal(2L, reader.GetInt64(0));
-        Assert.Equal(2L, reader.GetInt64(1));
+        Assert.Equal(3L, reader.GetInt64(0));
+        Assert.Equal(3L, reader.GetInt64(1));
 
         using var journal = connection.CreateCommand();
         journal.CommandText = "PRAGMA journal_mode;";
@@ -191,7 +191,7 @@ public sealed class SqliteReviewStoreTests : IDisposable
         await connection.OpenAsync(Ct);
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT COUNT(*) FROM SchemaVersion;";
-        Assert.Equal(2L, (long?)await command.ExecuteScalarAsync(Ct));
+        Assert.Equal(3L, (long?)await command.ExecuteScalarAsync(Ct));
     }
 
     private static ReviewInteraction Interaction(
