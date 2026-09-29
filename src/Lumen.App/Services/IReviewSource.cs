@@ -18,6 +18,9 @@ public interface IReviewSource : IAsyncDisposable
 
     Task<PostReviewCommentReply> PostCommentAsync(PostReviewCommentRequest request, CancellationToken cancellationToken);
 
+    /// <summary>Ticks or clears the file's "Viewed" checkbox on GitHub.</summary>
+    Task SetFileViewedAsync(PullRequestRef pullRequest, string path, bool viewed, CancellationToken cancellationToken);
+
     Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken);
 
     /// <summary>Hands the key to the engine, which puts it in the platform credential store; returns fresh status.</summary>

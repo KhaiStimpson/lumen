@@ -22,6 +22,9 @@ service ReviewEngine {
 
   rpc PostReviewComment (PostReviewCommentRequest) returns (PostReviewCommentReply);
 
+  // Ticks or clears GitHub's per-file "Viewed" checkbox for the signed-in user.
+  rpc SetFileViewed (SetFileViewedRequest) returns (SetFileViewedReply);
+
   // Connections (TDD §39). Checking status spends no usage. Keys go to the platform credential store and are never
   // returned or logged.
   rpc GetConnections (GetConnectionsRequest) returns (Connections);
@@ -71,7 +74,14 @@ message PullRequestEvent {
     // A review point already sent, replaced in full (e.g. after an investigation added evidence).
     ReviewPoint review_point_updated = 8;
     InvestigationStatus investigation_status = 9;
+    FileViewed file_viewed = 10;
   }
+}
+
+// A file's "Viewed" checkbox changed after the snapshot was sent.
+message FileViewed {
+  string path = 1;
+  bool viewed = 2;
 }
 
 // Background investigations; may continue after AnalysisComplete (TDD §49: at most "Analysing N areas…").
@@ -102,6 +112,8 @@ message ChangedFileSummary {
   bool is_binary = 6;
   bool is_mechanical = 7;
   string mechanical_reason = 8;
+  // The viewer ticked "Viewed" on GitHub and the file has not changed since.
+  bool is_viewed = 9;
 }
 
 message PullRequestSnapshot {
@@ -303,6 +315,14 @@ message PostReviewCommentReply {
   int64 comment_id = 1;
   string url = 2;
 }
+
+message SetFileViewedRequest {
+  PullRequestRef pull_request = 1;
+  string path = 2;
+  bool viewed = 3;
+}
+
+message SetFileViewedReply {}
 
 message GetConnectionsRequest {}
 

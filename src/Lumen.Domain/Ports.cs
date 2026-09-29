@@ -31,6 +31,12 @@ public interface IGitHubClient
 
     /// <summary>Posts a single-line review comment on the head (RIGHT) side of the diff.</summary>
     Task<PostedComment> PostReviewCommentAsync(NewReviewComment comment, CancellationToken cancellationToken);
+
+    /// <summary>Paths the viewer has ticked "Viewed" on GitHub. A file changed since it was ticked is not included.</summary>
+    Task<IReadOnlySet<string>> GetViewedFilesAsync(PullRequestKey key, CancellationToken cancellationToken);
+
+    /// <summary>Ticks or clears GitHub's "Viewed" checkbox on one file for the viewer.</summary>
+    Task SetFileViewedAsync(PullRequestKey key, string path, bool viewed, CancellationToken cancellationToken);
 }
 
 /// <summary>A local checkout of a pull request at its head commit.</summary>

@@ -35,6 +35,76 @@ public sealed class PullRequestViewModelTests
     }
 
     [AvaloniaFact]
+    public async Task OpeningAFileDoesNotTickItButToggleViewedDoes()
+    {
+        var pr = await Fixture.LoadAsync(Fixture.CreateSource());
+        try
+        {
+            Assert.NotNull(pr.SelectedFile);
+            Assert.All(pr.Files, f => Assert.False(f.IsViewed));
+            Assert.Equal("0 / 60 viewed", pr.ViewedSummary);
+
+            var file = pr.SelectedFile;
+            await pr.ToggleViewedCommand.ExecuteAsync(file);
+            await Fixture.PumpAsync();
+
+            Assert.True(file.IsViewed);
+            Assert.Equal("1 / 60 viewed", pr.ViewedSummary);
+
+            await pr.ToggleViewedCommand.ExecuteAsync(file);
+            await Fixture.PumpAsync();
+
+            Assert.False(file.IsViewed);
+            Assert.Equal("0 / 60 viewed", pr.ViewedSummary);
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task ViewedTickIsPutBackWhenGitHubRefusesIt()
+    {
+        var source = new GrpcLikeReviewSource(Fixture.CreateSource()) { FailViewedWith = "GitHub didn't save it: Resource not accessible" };
+        var pr = await Fixture.LoadAsync(source);
+        try
+        {
+            var file = pr.Files[0];
+
+            await pr.ToggleViewedCommand.ExecuteAsync(file);
+
+            Assert.False(file.IsViewed);
+            Assert.Equal("0 / 60 viewed", pr.ViewedSummary);
+            Assert.Contains("Resource not accessible", pr.Toast, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task SnapshotViewedStateFromGitHubIsShown()
+    {
+        var pr = await Fixture.LoadAsync(Fixture.CreateSource());
+        try
+        {
+            var path = pr.Files[1].Path;
+
+            await pr.ApplyAsync(new PullRequestEvent { FileViewed = new FileViewed { Path = path, Viewed = true } });
+
+            Assert.True(pr.Files[1].IsViewed);
+            Assert.Equal("1 / 60 viewed", pr.ViewedSummary);
+            Assert.True(new FileEntryViewModel(new ChangedFileSummary { Path = path, IsViewed = true }).IsViewed);
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task ReanalysingCancelsTheLiveStreamWithoutFailing()
     {
         // The fixture's watch never ends on its own, so re-analysing always cancels a live stream, as with the engine.

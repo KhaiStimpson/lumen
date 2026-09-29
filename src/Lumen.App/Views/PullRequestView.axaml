@@ -40,7 +40,7 @@
 
           <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="18,14,18,8">
             <TextBlock Classes="h3" Text="Files changed" />
-            <TextBlock Grid.Column="1" Classes="caption" Text="{Binding Files.Count}" />
+            <TextBlock Grid.Column="1" Classes="caption" Text="{Binding ViewedSummary}" />
           </Grid>
 
           <TreeView Grid.Row="3" Name="FileTree" ItemsSource="{Binding Tree}" SelectedItem="{Binding SelectedNode}"
@@ -49,16 +49,24 @@
               <Style Selector="TreeViewItem" x:DataType="vm:FileTreeNode">
                 <Setter Property="IsExpanded" Value="{Binding IsExpanded}" />
               </Style>
+              <Style Selector="TextBlock.name">
+                <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+              </Style>
+              <Style Selector="TextBlock.name.viewed">
+                <Setter Property="Foreground" Value="{DynamicResource Text.Tertiary}" />
+              </Style>
             </TreeView.Styles>
             <TreeView.ItemTemplate>
               <TreeDataTemplate DataType="vm:FileTreeNode" ItemsSource="{Binding Children}">
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,3,6,3">
                   <Path Data="{StaticResource Icon.Folder}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke"
                         Width="12" Height="12" Margin="0,0,8,0" IsVisible="{Binding IsFolder}" />
-                  <Path Data="{StaticResource Icon.File}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke"
-                        Width="12" Height="12" Margin="0,0,8,0" IsVisible="{Binding !IsFolder}" />
-                  <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12.5" TextTrimming="CharacterEllipsis"
-                             Foreground="{DynamicResource Text.Primary}" />
+                  <CheckBox Classes="viewed" IsVisible="{Binding !IsFolder}"
+                            IsChecked="{Binding File.IsViewed, Mode=OneWay, FallbackValue=False}"
+                            Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).ToggleViewedCommand}"
+                            CommandParameter="{Binding File}" ToolTip.Tip="Viewed" />
+                  <TextBlock Grid.Column="1" Classes="name" Classes.viewed="{Binding File.IsViewed, FallbackValue=False}"
+                             Text="{Binding Name}" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                   <Path Grid.Column="2" Data="{StaticResource Icon.Deviation}" Fill="{DynamicResource Marker.Deviation}"
                         Width="10" Height="10" Stretch="Uniform" Margin="6,0,6,0"
                         IsVisible="{Binding File.HasReviewPoints, FallbackValue=False}" />
@@ -85,9 +93,12 @@
                   <Button Classes="row" Padding="10,4"
                           Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).SelectFileCommand}"
                           CommandParameter="{Binding}" ToolTip.Tip="{Binding Path}">
-                    <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Text="{Binding Name}" FontSize="12" Classes="secondary" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Grid.Column="1" Classes="caption tertiary" Text="{Binding MechanicalReason}" Margin="8,0,0,0" />
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                      <CheckBox Classes="viewed" IsChecked="{Binding IsViewed, Mode=OneWay}"
+                                Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).ToggleViewedCommand}"
+                                CommandParameter="{Binding}" ToolTip.Tip="Viewed" />
+                      <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" Classes="secondary" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Classes="caption tertiary" Text="{Binding MechanicalReason}" Margin="8,0,0,0" VerticalAlignment="Center" />
                     </Grid>
                   </Button>
                 </DataTemplate>

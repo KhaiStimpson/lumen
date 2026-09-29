@@ -52,6 +52,14 @@ internal sealed class GrpcLikeReviewSource(FixtureReviewSource inner) : IReviewS
     public Task<PostReviewCommentReply> PostCommentAsync(PostReviewCommentRequest request, CancellationToken cancellationToken) =>
         inner.PostCommentAsync(request, cancellationToken);
 
+    /// <summary>When set, saving a "Viewed" tick fails the way the engine reports a GitHub refusal.</summary>
+    public string? FailViewedWith { get; set; }
+
+    public Task SetFileViewedAsync(PullRequestRef pullRequest, string path, bool viewed, CancellationToken cancellationToken) =>
+        FailViewedWith is null
+            ? inner.SetFileViewedAsync(pullRequest, path, viewed, cancellationToken)
+            : Task.FromException(new RpcException(new Status(StatusCode.Unavailable, FailViewedWith)));
+
     public Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken) => inner.GetConnectionsAsync(cancellationToken);
 
     public Task<Connections> SetOpenRouterKeyAsync(string key, CancellationToken cancellationToken) => inner.SetOpenRouterKeyAsync(key, cancellationToken);

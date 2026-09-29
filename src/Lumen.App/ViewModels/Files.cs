@@ -36,8 +36,9 @@ public sealed partial class FileEntryViewModel(ChangedFileSummary file) : Observ
 
     public bool HasReviewPoints => ReviewPointCount > 0;
 
+    /// <summary>GitHub's per-file "Viewed" checkbox: ticked by the reviewer, never by merely opening the file.</summary>
     [ObservableProperty]
-    public partial bool IsViewed { get; set; }
+    public partial bool IsViewed { get; set; } = file.IsViewed;
 }
 
 /// <summary>A folder or file in the changed-files tree. Single-child folder chains are compacted ("src/Web/Services").</summary>

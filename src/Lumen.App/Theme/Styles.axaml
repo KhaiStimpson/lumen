@@ -198,6 +198,34 @@
     <Setter Property="Background" Value="{DynamicResource Accent}" />
   </Style>
 
+  <!-- GitHub's per-file "Viewed" tick: a 14px box that fits a file-tree row (Fluent's is 32px tall), accent when ticked -->
+  <Style Selector="CheckBox.viewed">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Margin" Value="0,0,8,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="Box" Width="14" Height="14" CornerRadius="3" BorderThickness="1.25"
+                BorderBrush="{DynamicResource Text.Tertiary}" Background="Transparent">
+          <Path Name="Tick" Data="{StaticResource Icon.Verified}" Stroke="White" StrokeThickness="2"
+                StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Margin="2.5" IsVisible="False" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="CheckBox.viewed:pointerover /template/ Border#Box">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="CheckBox.viewed:checked /template/ Border#Box">
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="CheckBox.viewed:checked /template/ Path#Tick">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+
   <!-- Settings navigation: Button.row, with the current section in the selected colour -->
   <Style Selector="Button.row.nav">
     <Setter Property="Padding" Value="10,7" />

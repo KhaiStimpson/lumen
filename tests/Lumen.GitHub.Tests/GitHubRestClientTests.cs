@@ -184,6 +184,61 @@ public sealed class GitHubRestClientTests : IDisposable
         Assert.Equal(new Uri("https://ghe.example/api/v3/"), http.BaseAddress);
     }
 
+    [Fact]
+    public async Task GetViewedFilesPagesThroughGraphQlAndKeepsOnlyViewed()
+    {
+        _handler
+            .Respond(HttpStatusCode.OK, FilesJson(hasNext: true, cursor: "c1", ("src/a.cs", "VIEWED"), ("src/b.cs", "UNVIEWED")))
+            .Respond(HttpStatusCode.OK, FilesJson(hasNext: false, cursor: null, ("src/c.cs", "DISMISSED"), ("src/d.cs", "VIEWED")));
+
+        var viewed = await _client.GetViewedFilesAsync(Key, CancellationToken.None);
+
+        Assert.Equal(["src/a.cs", "src/d.cs"], viewed.Order(StringComparer.Ordinal));
+        Assert.Equal("https://api.github.com/graphql", _handler.Requests[0].Uri.ToString());
+        Assert.Equal(HttpMethod.Post, _handler.Requests[0].Method);
+        Assert.Contains("\"owner\":\"octo\"", _handler.Requests[0].Body, StringComparison.Ordinal);
+        Assert.Contains("\"number\":42", _handler.Requests[0].Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"after\"", _handler.Requests[0].Body, StringComparison.Ordinal);
+        Assert.Contains("\"after\":\"c1\"", _handler.Requests[1].Body, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(true, "markFileAsViewed")]
+    [InlineData(false, "unmarkFileAsViewed")]
+    public async Task SetFileViewedLooksUpThePullRequestIdThenMutates(bool viewed, string mutation)
+    {
+        _handler
+            .Respond(HttpStatusCode.OK, """{"data":{"repository":{"pullRequest":{"id":"PR_kw42"}}}}""")
+            .Respond(HttpStatusCode.OK, "{\"data\":{\"" + mutation + "\":{\"clientMutationId\":null}}}");
+
+        await _client.SetFileViewedAsync(Key, "src/a.cs", viewed, CancellationToken.None);
+
+        Assert.Equal(2, _handler.Requests.Count);
+        Assert.DoesNotContain("$after", _handler.Requests[0].Body, StringComparison.Ordinal);
+        var body = _handler.Requests[1].Body!;
+        Assert.Contains(mutation + "(", body, StringComparison.Ordinal);
+        Assert.Contains("\"pullRequestId\":\"PR_kw42\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"path\":\"src/a.cs\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GraphQlErrorsInA200ResponseThrow()
+    {
+        _handler.Respond(HttpStatusCode.OK, """{"data":null,"errors":[{"message":"Resource not accessible by integration"}]}""");
+
+        var ex = await Assert.ThrowsAsync<GitHubApiException>(() => _client.GetViewedFilesAsync(Key, CancellationToken.None));
+
+        Assert.Equal("Resource not accessible by integration", ex.GitHubMessage);
+    }
+
+    private static string FilesJson(bool hasNext, string? cursor, params (string Path, string State)[] files)
+    {
+        var nodes = string.Join(",", files.Select(f => $"{{\"path\":\"{f.Path}\",\"viewerViewedState\":\"{f.State}\"}}"));
+        var endCursor = cursor is null ? "null" : $"\"{cursor}\"";
+        var pageInfo = $"{{\"hasNextPage\":{(hasNext ? "true" : "false")},\"endCursor\":{endCursor}}}";
+        return $"{{\"data\":{{\"repository\":{{\"pullRequest\":{{\"id\":\"PR_kw42\",\"files\":{{\"nodes\":[{nodes}],\"pageInfo\":{pageInfo}}}}}}}}}}}";
+    }
+
     private static string PullRequestJson(string state, bool merged, bool draft) => $$"""
         {
           "number": 42,

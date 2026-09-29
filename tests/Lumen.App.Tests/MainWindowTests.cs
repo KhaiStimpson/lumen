@@ -58,6 +58,39 @@ public sealed class MainWindowTests
     }
 
     [AvaloniaFact]
+    public async Task ClickingAFilesCheckboxMarksItViewedWithoutOpeningIt()
+    {
+        Directory.CreateDirectory(ScreensDirectory);
+        await using var session = await Session.OpenAsync();
+        var pr = session.PullRequest;
+        var tree = Find<TreeView>(session.Window, "FileTree");
+        var box = tree.GetVisualDescendants().OfType<CheckBox>()
+            .First(c => c.IsEffectivelyVisible && c.DataContext is FileTreeNode { File: { } f } && f != pr.SelectedFile
+                && c.TranslatePoint(default, tree) is { Y: >= 0 } p && p.Y + c.Bounds.Height <= tree.Bounds.Height);
+        var file = ((FileTreeNode)box.DataContext!).File!;
+        var selected = pr.SelectedFile;
+
+        async Task ClickAsync()
+        {
+            var centre = box.TranslatePoint(new Point(box.Bounds.Width / 2, box.Bounds.Height / 2), session.Window)!.Value;
+            session.Window.MouseDown(centre, MouseButton.Left);
+            session.Window.MouseUp(centre, MouseButton.Left);
+            await Fixture.PumpAsync();
+        }
+
+        await ClickAsync();
+        Assert.True(file.IsViewed);
+        Assert.True(box.IsChecked);
+        Assert.Same(selected, pr.SelectedFile);
+        Assert.Equal("1 / 60 viewed", pr.ViewedSummary);
+        Capture(session.Window, "12-viewed-checkbox.png");
+
+        await ClickAsync();
+        Assert.False(file.IsViewed);
+        Assert.False(box.IsChecked);
+    }
+
+    [AvaloniaFact]
     public async Task FullFileSegmentAndXToggleBetweenHunksAndTheWholeFile()
     {
         Directory.CreateDirectory(ScreensDirectory);

@@ -28,6 +28,26 @@ internal sealed class FakeGitHub : IGitHubClient
         Posted.Add(comment);
         return Task.FromResult(new PostedComment(1001, "https://github.com/acme/billing/pull/42#discussion_r1001"));
     }
+
+    public ConcurrentDictionary<string, bool> Viewed { get; } = new(StringComparer.Ordinal);
+
+    public Exception? FailViewedWith { get; set; }
+
+    public Task<IReadOnlySet<string>> GetViewedFilesAsync(PullRequestKey key, CancellationToken cancellationToken) =>
+        FailViewedWith is not null
+            ? Task.FromException<IReadOnlySet<string>>(FailViewedWith)
+            : Task.FromResult<IReadOnlySet<string>>(Viewed.Where(v => v.Value).Select(v => v.Key).ToHashSet(StringComparer.Ordinal));
+
+    public Task SetFileViewedAsync(PullRequestKey key, string path, bool viewed, CancellationToken cancellationToken)
+    {
+        if (FailViewedWith is not null)
+        {
+            return Task.FromException(FailViewedWith);
+        }
+
+        Viewed[path] = viewed;
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class FakeWorkspace(IPullRequestCheckout checkout) : IRepositoryWorkspace

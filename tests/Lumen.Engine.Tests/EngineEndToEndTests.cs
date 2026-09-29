@@ -150,6 +150,39 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
     }
 
     [Fact]
+    public async Task SnapshotCarriesGitHubViewedStateAndTicksAreSavedAndReplayed()
+    {
+        _gitHub.Viewed[WorkerScenario.NewWorkerPath] = true;
+        using var channel = EngineEndpoint.CreateChannel(_pipe);
+        var client = new ReviewEngine.ReviewEngineClient(channel);
+
+        var snapshot = (await CollectUntilCompleteAsync(client)).First(e => e.Snapshot is not null).Snapshot;
+        Assert.True(snapshot.Files.Single(f => f.Path == WorkerScenario.NewWorkerPath).IsViewed);
+
+        await client.SetFileViewedAsync(new SetFileViewedRequest { PullRequest = Pr, Path = WorkerScenario.NewWorkerPath, Viewed = false });
+
+        Assert.False(_gitHub.Viewed[WorkerScenario.NewWorkerPath]);
+        var replay = await CollectUntilAsync(client, e => e.FileViewed is not null, refresh: false);
+        Assert.Equal(new FileViewed { Path = WorkerScenario.NewWorkerPath, Viewed = false }, replay.Last().FileViewed);
+    }
+
+    [Fact]
+    public async Task ViewedStateIsBestEffortWhenLoadingButReportedWhenSaving()
+    {
+        _gitHub.FailViewedWith = new Lumen.GitHub.GitHubApiException(System.Net.HttpStatusCode.OK, "GraphQL failed", "Resource not accessible");
+        using var channel = EngineEndpoint.CreateChannel(_pipe);
+        var client = new ReviewEngine.ReviewEngineClient(channel);
+
+        var events = await CollectUntilCompleteAsync(client);
+        Assert.All(events.First(e => e.Snapshot is not null).Snapshot.Files, f => Assert.False(f.IsViewed));
+
+        var ex = await Assert.ThrowsAsync<RpcException>(async () =>
+            await client.SetFileViewedAsync(new SetFileViewedRequest { PullRequest = Pr, Path = WorkerScenario.NewWorkerPath, Viewed = true }));
+        Assert.Equal(StatusCode.Unavailable, ex.StatusCode);
+        Assert.Contains("GraphQL failed", ex.Status.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ReportsGitHubFailureWithoutCrashing()
     {
         _gitHub.FailWith = new Lumen.GitHub.GitHubAuthenticationException("Run gh auth login.");

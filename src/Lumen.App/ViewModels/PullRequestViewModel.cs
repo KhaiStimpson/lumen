@@ -138,6 +138,8 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
     [ObservableProperty]
     public partial (int Start, int End)? FocusRange { get; set; }
 
+    public string ViewedSummary => string.Create(CultureInfo.InvariantCulture, $"{Files.Count(f => f.IsViewed)} / {Files.Count} viewed");
+
     public string GeneratedSummary => GeneratedFiles.Count == 0
         ? ""
         : string.Create(CultureInfo.InvariantCulture, $"{GeneratedFiles.Count} generated files · +{GeneratedFiles.Sum(f => f.Model.Additions)}");
@@ -335,6 +337,15 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
                 break;
 
+            case PullRequestEvent.EventOneofCase.FileViewed:
+                if (Files.FirstOrDefault(f => f.Path == evt.FileViewed.Path) is { } viewedFile)
+                {
+                    viewedFile.IsViewed = evt.FileViewed.Viewed;
+                    OnPropertyChanged(nameof(ViewedSummary));
+                }
+
+                break;
+
             case PullRequestEvent.EventOneofCase.Conventions:
                 Conventions.Clear();
                 foreach (var convention in RankConventions(evt.Conventions.Conventions).Take(5))
@@ -423,6 +434,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
         RebuildTree();
         OnPropertyChanged(nameof(GeneratedSummary));
+        OnPropertyChanged(nameof(ViewedSummary));
         IsLoading = false;
 
         var firstReviewable = Tree.SelectMany(n => n.Descendants().Prepend(n)).FirstOrDefault(n => n.File is not null)?.File ?? Files.FirstOrDefault();
@@ -549,7 +561,6 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
         if (version == _diffVersion)
         {
-            file.IsViewed = true;
             RebuildCurrentDiff();
         }
     }
@@ -599,6 +610,30 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
             {
                 IsDiffLoading = false;
             }
+        }
+    }
+
+    /// <summary>Flips the file's "Viewed" tick at once and saves it to GitHub; puts it back if GitHub refuses.</summary>
+    [RelayCommand]
+    public async Task ToggleViewedAsync(FileEntryViewModel? file)
+    {
+        if (file is null)
+        {
+            return;
+        }
+
+        var viewed = !file.IsViewed;
+        file.IsViewed = viewed;
+        OnPropertyChanged(nameof(ViewedSummary));
+        try
+        {
+            await _source.SetFileViewedAsync(Ref, file.Path, viewed, _lifetime.Token).ConfigureAwait(true);
+        }
+        catch (RpcException ex) when (!(ex.StatusCode == StatusCode.Cancelled && _lifetime.IsCancellationRequested))
+        {
+            file.IsViewed = !viewed;
+            OnPropertyChanged(nameof(ViewedSummary));
+            Toast = $"Couldn't mark {file.Name} as {(viewed ? "viewed" : "not viewed")}: {ex.Status.Detail}";
         }
     }
 

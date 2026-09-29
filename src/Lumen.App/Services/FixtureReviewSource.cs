@@ -99,6 +99,12 @@ public sealed class FixtureReviewSource : IReviewSource
         return Task.FromResult(new PostReviewCommentReply { CommentId = PostedComments.Count, Url = "https://example.invalid/fixture-comment" });
     }
 
+    public Task SetFileViewedAsync(PullRequestRef pullRequest, string path, bool viewed, CancellationToken cancellationToken)
+    {
+        Broadcast(new PullRequestEvent { FileViewed = new FileViewed { Path = path, Viewed = viewed } });
+        return Task.CompletedTask;
+    }
+
     /// <summary>Whether a key has been "stored"; the fixture keeps only this flag, never the key.</summary>
     public bool OpenRouterKeyStored { get; set; }
 

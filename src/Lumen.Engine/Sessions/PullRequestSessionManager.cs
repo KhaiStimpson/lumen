@@ -50,7 +50,7 @@ public sealed partial class PullRequestSessionManager(
         try
         {
             Progress(session, "github", "Fetching pull request…");
-            var (info, viewer, threads) = await LoadFromGitHubAsync(key, ct).ConfigureAwait(false);
+            var (info, viewer, threads, viewed) = await LoadFromGitHubAsync(key, ct).ConfigureAwait(false);
 
             var checkout = await workspace.CheckoutAsync(
                 key,
@@ -66,7 +66,7 @@ public sealed partial class PullRequestSessionManager(
             var files = ChangedFiles.FromUnifiedDiff(await checkout.GetDiffAsync(ct).ConfigureAwait(false), settings.MechanicalPaths);
             var snapshot = new Domain.PullRequestSnapshot(key, info.BaseSha, info.HeadSha, checkout.MergeBaseSha, info.Metadata, files, threads);
             session.SetSnapshot(snapshot, checkout);
-            session.Publish(new PullRequestEvent { Snapshot = ProtoMapper.ToProto(snapshot, viewer) });
+            session.Publish(new PullRequestEvent { Snapshot = ProtoMapper.ToProto(snapshot, viewer, viewed) });
             LogSnapshotReady(logger, key, files.Count, stopwatch.ElapsedMilliseconds);
 
             Progress(session, "analysis", "Comparing with repository precedent…");
@@ -122,7 +122,7 @@ public sealed partial class PullRequestSessionManager(
     }
 
     /// <summary>Loads PR data, falling back to the last cached copy when GitHub is unreachable (TDD §55).</summary>
-    private async Task<(PullRequestInfo Info, string Viewer, IReadOnlyList<ReviewThread> Threads)> LoadFromGitHubAsync(
+    private async Task<(PullRequestInfo Info, string Viewer, IReadOnlyList<ReviewThread> Threads, IReadOnlySet<string> Viewed)> LoadFromGitHubAsync(
         PullRequestKey key,
         CancellationToken ct)
     {
@@ -132,11 +132,12 @@ public sealed partial class PullRequestSessionManager(
             var infoTask = gitHub.GetPullRequestAsync(key, ct);
             var viewerTask = gitHub.GetViewerLoginAsync(ct);
             var threadsTask = gitHub.GetReviewCommentsAsync(key, ct);
-            await Task.WhenAll(infoTask, viewerTask, threadsTask).ConfigureAwait(false);
+            var viewedTask = GetViewedFilesAsync(key, ct);
+            await Task.WhenAll(infoTask, viewerTask, threadsTask, viewedTask).ConfigureAwait(false);
             var (info, viewer, threads) = (await infoTask.ConfigureAwait(false), await viewerTask.ConfigureAwait(false), await threadsTask.ConfigureAwait(false));
             var cached = new CachedPullRequest(info, viewer, [.. threads]);
             await store.SetCacheAsync(cacheKey, JsonSerializer.Serialize(cached), ct).ConfigureAwait(false);
-            return (info, viewer, threads);
+            return (info, viewer, threads, await viewedTask.ConfigureAwait(false));
         }
         catch (HttpRequestException ex)
         {
@@ -147,7 +148,23 @@ public sealed partial class PullRequestSessionManager(
             }
 
             LogUsingCachedPullRequest(logger, ex, key);
-            return (cached.Info, cached.Viewer, cached.Threads);
+
+            // Viewed state isn't cached: a stale tick is worse than none.
+            return (cached.Info, cached.Viewer, cached.Threads, new HashSet<string>());
+        }
+    }
+
+    /// <summary>Best-effort: the review works without it (e.g. a token that can't use GraphQL), just with no ticks.</summary>
+    private async Task<IReadOnlySet<string>> GetViewedFilesAsync(PullRequestKey key, CancellationToken ct)
+    {
+        try
+        {
+            return await gitHub.GetViewedFilesAsync(key, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogViewedFilesUnavailable(logger, ex, key);
+            return new HashSet<string>();
         }
     }
 
@@ -184,6 +201,9 @@ public sealed partial class PullRequestSessionManager(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{PullRequest}: {Points} review points, {Suppressed} suppressed, {Elapsed} ms")]
     private static partial void LogAnalysisComplete(ILogger logger, PullRequestKey pullRequest, int points, int suppressed, long elapsed);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "{PullRequest}: couldn't read the Viewed checkboxes from GitHub")]
+    private static partial void LogViewedFilesUnavailable(ILogger logger, Exception exception, PullRequestKey pullRequest);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "{PullRequest}: analysis failed")]
     private static partial void LogAnalysisFailed(ILogger logger, Exception exception, PullRequestKey pullRequest);

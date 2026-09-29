@@ -18,7 +18,7 @@ public static class ProtoMapper
         Number = key.Number,
     };
 
-    public static Contracts.PullRequestSnapshot ToProto(D.PullRequestSnapshot snapshot, string viewer)
+    public static Contracts.PullRequestSnapshot ToProto(D.PullRequestSnapshot snapshot, string viewer, IReadOnlySet<string> viewedFiles)
     {
         var proto = new Contracts.PullRequestSnapshot
         {
@@ -49,6 +49,7 @@ public static class ProtoMapper
             IsBinary = f.IsBinary,
             IsMechanical = f.Mechanical.IsMechanical,
             MechanicalReason = f.Mechanical.Reason ?? "",
+            IsViewed = viewedFiles.Contains(f.Path),
         }));
         return proto;
     }

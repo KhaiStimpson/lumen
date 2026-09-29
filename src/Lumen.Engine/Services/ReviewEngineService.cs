@@ -4,6 +4,7 @@ using Lumen.Contracts;
 using Lumen.Domain;
 using Lumen.Engine.Mapping;
 using Lumen.Engine.Sessions;
+using Lumen.GitHub;
 
 namespace Lumen.Engine.Services;
 
@@ -90,6 +91,30 @@ public sealed class ReviewEngineService(
         }
 
         return new PostReviewCommentReply { CommentId = posted.Id, Url = posted.Url };
+    }
+
+    public override async Task<SetFileViewedReply> SetFileViewed(SetFileViewedRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        var snapshot = session.Snapshot
+            ?? throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pull request is still loading."));
+        if (snapshot.FindFile(request.Path) is null)
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, $"'{request.Path}' is not part of this pull request."));
+        }
+
+        try
+        {
+            await gitHub.SetFileViewedAsync(session.Key, request.Path, request.Viewed, context.CancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is GitHubApiException or GitHubAuthenticationException or HttpRequestException)
+        {
+            throw new RpcException(new Status(StatusCode.Unavailable, $"GitHub didn't save it: {ex.Message}"));
+        }
+
+        // Published so a client that re-attaches replays the tick rather than the snapshot's original state.
+        session.Publish(new PullRequestEvent { FileViewed = new FileViewed { Path = request.Path, Viewed = request.Viewed } });
+        return new SetFileViewedReply();
     }
 
     public override Task<Connections> GetConnections(GetConnectionsRequest request, ServerCallContext context) =>

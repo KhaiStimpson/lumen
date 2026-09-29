@@ -86,6 +86,13 @@ public sealed class EngineReviewSource : IReviewSource
             .PostReviewCommentAsync(request, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
+    public async Task SetFileViewedAsync(PullRequestRef pullRequest, string path, bool viewed, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .SetFileViewedAsync(
+                new SetFileViewedRequest { PullRequest = pullRequest, Path = path, Viewed = viewed },
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
     public async Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken) =>
         await (await ClientAsync(cancellationToken).ConfigureAwait(false))
             .GetConnectionsAsync(new GetConnectionsRequest(), cancellationToken: cancellationToken)
