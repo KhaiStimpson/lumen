@@ -121,6 +121,37 @@ public sealed class PullRequestViewModelTests
     }
 
     [AvaloniaFact]
+    public async Task FullFileToggleShowsWholeFileAndKeepsCardsUnderTheirLines()
+    {
+        var pr = await Fixture.LoadAsync(Fixture.CreateSource());
+        try
+        {
+            var point = pr.ReviewPoints[0];
+            var hunks = pr.CurrentDiff!;
+            Assert.Contains(hunks.Rows, r => r.Kind == DiffRowKind.HunkHeader);
+
+            pr.ShowFullFile = true;
+            await Fixture.WaitUntilAsync(() => pr.CurrentDiff != hunks);
+
+            var full = pr.CurrentDiff!;
+            Assert.Equal(Fixture.TopPointPath, full.Path);
+            Assert.DoesNotContain(full.Rows, r => r.Kind == DiffRowKind.HunkHeader);
+            var shown = full.Rows.Where(r => r.NewNumber > 0).Select(r => r.NewNumber).ToList();
+            Assert.Equal(Enumerable.Range(1, shown.Count), shown);
+            Assert.Equal(hunks.Additions, full.Additions);
+            Assert.Equal(hunks.Deletions, full.Deletions);
+            Assert.Equal(full.DocumentLineForNewLine(point.Line) + 1, full.CardLine(point.Id));
+
+            pr.ShowFullFile = false;
+            Assert.Equal(hunks.Text, pr.CurrentDiff!.Text);
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task OtherLocationsGetCompactReferenceCards()
     {
         var pr = await Fixture.LoadAsync(Fixture.CreateSource());

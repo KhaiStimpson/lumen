@@ -66,7 +66,9 @@ public sealed class FixtureReviewSource : IReviewSource
         // Reconstruct head-side text from the diff when available; precedent files usually aren't in the diff.
         if (_diffs.TryGetValue(path, out var diff))
         {
-            var lines = diff.Hunks.SelectMany(h => h.Lines).Where(l => l.NewNumber > 0).Select(l => l.Text);
+            // Lines outside the hunks weren't recorded: leave them blank so line numbers still match the head.
+            var known = diff.Hunks.SelectMany(h => h.Lines).Where(l => l.NewNumber > 0).DistinctBy(l => l.NewNumber).ToDictionary(l => l.NewNumber, l => l.Text);
+            var lines = Enumerable.Range(1, known.Keys.DefaultIfEmpty(0).Max()).Select(n => known.GetValueOrDefault(n, ""));
             return Task.FromResult(new SourceFile { Path = path, Text = string.Join('\n', lines), Exists = true });
         }
 

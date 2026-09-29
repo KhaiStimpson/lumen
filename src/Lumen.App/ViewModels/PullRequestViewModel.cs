@@ -33,6 +33,9 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
     private readonly IReviewSource _source;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly Dictionary<string, FileDiff> _diffCache = new(StringComparer.Ordinal);
+
+    // Head-side file text for the full-file view; null when the file has none (deleted) or couldn't be loaded.
+    private readonly Dictionary<string, string?> _headCache = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FileTreeNode> _nodes = new(StringComparer.Ordinal);
     private readonly HashSet<string> _arrived = new(StringComparer.Ordinal);
     private Task? _watch;
@@ -124,6 +127,10 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
     [ObservableProperty]
     public partial bool IsDiffLoading { get; set; }
+
+    /// <summary>Show the whole file with the changes in place, instead of only the hunks.</summary>
+    [ObservableProperty]
+    public partial bool ShowFullFile { get; set; }
 
     [ObservableProperty]
     public partial IReadOnlyList<GutterMarker> Markers { get; set; } = [];
@@ -260,6 +267,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         Conventions.Clear();
         _arrived.Clear();
         _diffCache.Clear();
+        _headCache.Clear();
         CurrentPoint = null;
         Mode = ReviewMode.Diff;
         IsAnalysing = true;
@@ -534,10 +542,63 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
             }
         }
 
+        if (ShowFullFile)
+        {
+            await LoadHeadAsync(file, version).ConfigureAwait(true);
+        }
+
         if (version == _diffVersion)
         {
             file.IsViewed = true;
             RebuildCurrentDiff();
+        }
+    }
+
+    partial void OnShowFullFileChanged(bool value) => _ = ApplyShowFullFileAsync();
+
+    private async Task ApplyShowFullFileAsync()
+    {
+        if (SelectedFile is not { } file)
+        {
+            return;
+        }
+
+        var version = _diffVersion;
+        if (ShowFullFile)
+        {
+            await LoadHeadAsync(file, version).ConfigureAwait(true);
+        }
+
+        if (version == _diffVersion)
+        {
+            RebuildCurrentDiff();
+        }
+    }
+
+    private async Task LoadHeadAsync(FileEntryViewModel file, int version)
+    {
+        if (_headCache.ContainsKey(file.Path))
+        {
+            return;
+        }
+
+        IsDiffLoading = true;
+        try
+        {
+            var source = await _source.GetSourceFileAsync(Ref, file.Path, _lifetime.Token).ConfigureAwait(true);
+            _headCache[file.Path] = source.Exists ? source.Text : null;
+        }
+        catch (RpcException ex)
+        {
+            // Not cached, so the next toggle or visit retries; meanwhile the plain diff stays up.
+            Toast = $"Couldn't load the full {file.Name}: {ex.Status.Detail}";
+        }
+        finally
+        {
+            if (version == _diffVersion)
+            {
+                IsDiffLoading = false;
+            }
         }
     }
 
@@ -551,7 +612,8 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         var path = SelectedFile.Path;
         var cards = ReviewPoints
             .SelectMany(p => p.Locations.Where(l => l.Path == path).Select(l => (Id: CardId(p, l), NewLine: l.Line)));
-        CurrentDiff = DiffDocument.Build(diff, cards);
+        var head = ShowFullFile ? _headCache.GetValueOrDefault(path) : null;
+        CurrentDiff = DiffDocument.Build(diff, cards, head);
         UpdateMarkers();
     }
 

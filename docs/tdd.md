@@ -1249,6 +1249,7 @@ C          comment
 P          show precedent
 E          evidence
 F          files
+X          full file / changes only
 Ctrl+K     command palette
 Esc        return to diff
 ```

@@ -58,6 +58,52 @@ public sealed class MainWindowTests
     }
 
     [AvaloniaFact]
+    public async Task FullFileSegmentAndXToggleBetweenHunksAndTheWholeFile()
+    {
+        Directory.CreateDirectory(ScreensDirectory);
+        await using var session = await Session.OpenAsync();
+        var pr = session.PullRequest;
+        var changes = Find<RadioButton>(session.Window, "ShowChanges");
+        var full = Find<RadioButton>(session.Window, "ShowFullFile");
+        var editor = session.Window.GetVisualDescendants().OfType<Diff.DiffEditor>().First(e => e.Name == "Editor");
+        Assert.True(changes.IsChecked);
+
+        // A modified file with several hunks, so there is unchanged code between them to bring back.
+        await pr.SelectFileAsync(pr.Files.First(f => f.Path == "src/AndrewCrm.Web/Program.cs"));
+        await Fixture.PumpAsync();
+        var hunks = editor.Diff!;
+        Assert.Contains(hunks.Rows, r => r.Kind == Diff.DiffRowKind.HunkHeader);
+
+        async Task ClickAsync(Control control)
+        {
+            var centre = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), session.Window)!.Value;
+            session.Window.MouseDown(centre, MouseButton.Left);
+            session.Window.MouseUp(centre, MouseButton.Left);
+            await Fixture.PumpAsync();
+        }
+
+        await ClickAsync(full);
+        Assert.True(pr.ShowFullFile);
+        Assert.False(changes.IsChecked);
+        Assert.DoesNotContain(editor.Diff!.Rows, r => r.Kind == Diff.DiffRowKind.HunkHeader);
+        Assert.True(editor.Diff.Rows.Count > hunks.Rows.Count);
+        Capture(session.Window, "13-full-file.png");
+
+        await ClickAsync(changes);
+        Assert.False(pr.ShowFullFile);
+        Assert.Equal(hunks.Text, editor.Diff!.Text);
+
+        // X flips it from the keyboard, and the segments follow both ways.
+        await session.PressAsync(PhysicalKey.X);
+        Assert.True(pr.ShowFullFile);
+        Assert.True(full.IsChecked);
+        await session.PressAsync(PhysicalKey.X);
+        Assert.False(pr.ShowFullFile);
+        Assert.True(changes.IsChecked);
+        Assert.False(full.IsChecked);
+    }
+
+    [AvaloniaFact]
     public async Task SavedPaneWidthsAreRestoredAtStartup()
     {
         await using var session = await Session.OpenAsync(new AppSettings { LeftPaneWidth = 410, RightPaneWidth = 275 });

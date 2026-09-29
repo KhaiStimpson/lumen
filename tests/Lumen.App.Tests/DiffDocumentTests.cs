@@ -91,6 +91,68 @@ public sealed class DiffDocumentTests
     }
 
     [Fact]
+    public void FullFileShowsUnchangedCodeBetweenHunksWithoutHeaders()
+    {
+        // Head has 14 lines; the sample's hunks cover 1-4 and 11-12.
+        var head = string.Join("\r\n", Enumerable.Range(1, 14).Select(n => n switch
+        {
+            1 => "a", 2 => "B", 3 => "C", 4 => "d", 11 => "x", 12 => "y",
+            _ => "h" + n,
+        })) + "\r\n";
+
+        var doc = DiffDocument.Build(Sample(), [("p1", 3), ("p2", 7)], head);
+
+        Assert.DoesNotContain(doc.Rows, r => r.Kind == DiffRowKind.HunkHeader);
+        var code = doc.Rows.Where(r => r.Kind != DiffRowKind.Card).ToList();
+
+        // Every head line appears once, in order, plus the one removed line.
+        Assert.Equal(Enumerable.Range(1, 14), code.Where(r => r.NewNumber > 0).Select(r => r.NewNumber));
+        Assert.Equal(new DiffRow(DiffRowKind.Removed, 2, 0), code[1]);
+
+        // Between the hunks the old side is one line behind (one removed, two added); after the last it stays so.
+        Assert.Equal(new DiffRow(DiffRowKind.Context, 4, 5), code.Single(r => r.NewNumber == 5));
+        Assert.Equal(new DiffRow(DiffRowKind.Context, 9, 10), code.Single(r => r.NewNumber == 10));
+        Assert.Equal(new DiffRow(DiffRowKind.Context, 13, 14), code.Single(r => r.NewNumber == 14));
+
+        var lines = doc.Text.Split('\n');
+        Assert.Equal(doc.Rows.Count, lines.Length);
+        Assert.Equal("h5", lines[doc.DocumentLineForNewLine(5)!.Value - 1]);
+        Assert.Equal("h14", lines[^1]);
+
+        // Cards can now sit under lines outside the hunks.
+        Assert.Equal(doc.DocumentLineForNewLine(7) + 1, doc.CardLine("p2"));
+        Assert.Equal(doc.DocumentLineForNewLine(3) + 1, doc.CardLine("p1"));
+    }
+
+    [Fact]
+    public void FullFileWithPureDeletionHunkKeepsLineBeforeIt()
+    {
+        var hunk = new DiffHunk { OldStart = 3, OldCount = 1, NewStart = 2, NewCount = 0, Header = "@@ -3 +2,0 @@" };
+        hunk.Lines.Add(new DiffLine { Kind = DiffLineKind.Removed, OldNumber = 3, NewNumber = 0, Text = "gone" });
+        var diff = new FileDiff { Path = "a.txt" };
+        diff.Hunks.Add(hunk);
+
+        var doc = DiffDocument.Build(diff, [], "one\ntwo\nthree");
+
+        Assert.Equal(
+            [
+                new DiffRow(DiffRowKind.Context, 1, 1), new DiffRow(DiffRowKind.Context, 2, 2),
+                new DiffRow(DiffRowKind.Removed, 3, 0), new DiffRow(DiffRowKind.Context, 4, 3),
+            ],
+            doc.Rows);
+        Assert.Equal("one\ntwo\ngone\nthree", doc.Text);
+    }
+
+    [Fact]
+    public void FullFileFallsBackToHunksWhenHeadTextIsTooShort()
+    {
+        var doc = DiffDocument.Build(Sample(), [], "a\nB");
+
+        Assert.Equal(DiffDocument.Build(Sample(), []).Text, doc.Text);
+        Assert.Equal(DiffRowKind.HunkHeader, doc.Rows[0].Kind);
+    }
+
+    [Fact]
     public void EmptyDiffHasNoRows()
     {
         var doc = DiffDocument.Build(new FileDiff { Path = "a.txt" }, [("p", 1)]);

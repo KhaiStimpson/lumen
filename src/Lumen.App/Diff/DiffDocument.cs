@@ -77,7 +77,12 @@ public sealed class DiffDocument
     public int? CardLine(string cardId) => _cardLines.TryGetValue(cardId, out var line) ? line : null;
 
     /// <param name="cards">Review point ids and the head-side line each card sits under.</param>
-    public static DiffDocument Build(FileDiff diff, IEnumerable<(string Id, int NewLine)> cards)
+    /// <param name="headText">
+    /// The whole file at the PR head. When given, the unchanged code between hunks is shown as context and hunk
+    /// headers are dropped, so the diff reads in place within the full file. Ignored if it can't hold the diff's
+    /// head-side lines (e.g. a stale or partial copy).
+    /// </param>
+    public static DiffDocument Build(FileDiff diff, IEnumerable<(string Id, int NewLine)> cards, string? headText = null)
     {
         var cardsByLine = cards
             .GroupBy(c => c.NewLine)
@@ -97,9 +102,46 @@ public sealed class DiffDocument
             text.Append(content);
         }
 
-        foreach (var hunk in diff.Hunks)
+        void AppendCode(DiffRowKind kind, int oldNumber, int newNumber, string content)
         {
-            Append(new DiffRow(DiffRowKind.HunkHeader, 0, 0), HunkLabel(hunk.Header));
+            Append(new DiffRow(kind, oldNumber, newNumber), content.Replace('\t', ' '));
+
+            if (newNumber > 0 && cardsByLine.Remove(newNumber, out var ids))
+            {
+                foreach (var id in ids)
+                {
+                    Append(new DiffRow(DiffRowKind.Card, 0, 0, id), CardPlaceholder.ToString());
+                }
+            }
+        }
+
+        var head = headText is null ? null : SplitLines(headText);
+        if (head is not null && diff.Hunks.SelectMany(h => h.Lines).Any(l => l.NewNumber > head.Length))
+        {
+            head = null;
+        }
+
+        // Next head-side line not yet shown, and old-minus-new for unchanged lines between hunks.
+        var nextNew = 1;
+        var delta = 0;
+        foreach (var hunk in diff.Hunks.OrderBy(h => h.NewStart))
+        {
+            var newNumbers = hunk.Lines.Where(l => l.NewNumber > 0).Select(l => l.NewNumber).ToList();
+            var oldNumbers = hunk.Lines.Where(l => l.OldNumber > 0).Select(l => l.OldNumber).ToList();
+            if (head is not null)
+            {
+                // A pure deletion ("+N,0") sits after line N.
+                var gapEnd = newNumbers.Count > 0 ? newNumbers.Min() - 1 : hunk.NewStart;
+                for (; nextNew <= gapEnd; nextNew++)
+                {
+                    AppendCode(DiffRowKind.Context, nextNew + delta, nextNew, head[nextNew - 1]);
+                }
+            }
+            else
+            {
+                Append(new DiffRow(DiffRowKind.HunkHeader, 0, 0), HunkLabel(hunk.Header));
+            }
+
             foreach (var line in hunk.Lines)
             {
                 var kind = line.Kind switch
@@ -108,19 +150,31 @@ public sealed class DiffDocument
                     DiffLineKind.Removed => DiffRowKind.Removed,
                     _ => DiffRowKind.Context,
                 };
-                Append(new DiffRow(kind, line.OldNumber, line.NewNumber), line.Text.Replace('\t', ' '));
+                AppendCode(kind, line.OldNumber, line.NewNumber, line.Text);
+            }
 
-                if (line.NewNumber > 0 && cardsByLine.Remove(line.NewNumber, out var ids))
-                {
-                    foreach (var id in ids)
-                    {
-                        Append(new DiffRow(DiffRowKind.Card, 0, 0, id), CardPlaceholder.ToString());
-                    }
-                }
+            // The last line each side consumed; the next unchanged line follows both.
+            var lastNew = newNumbers.Count > 0 ? newNumbers.Max() : hunk.NewStart;
+            var lastOld = oldNumbers.Count > 0 ? oldNumbers.Max() : hunk.OldStart;
+            nextNew = Math.Max(nextNew, lastNew + 1);
+            delta = lastOld - lastNew;
+        }
+
+        if (head is not null)
+        {
+            for (; nextNew <= head.Length; nextNew++)
+            {
+                AppendCode(DiffRowKind.Context, nextNew + delta, nextNew, head[nextNew - 1]);
             }
         }
 
         return new DiffDocument(diff.Path, text.ToString(), rows);
+    }
+
+    private static string[] SplitLines(string text)
+    {
+        var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        return text.EndsWith('\n') ? lines[..^1] : lines;
     }
 
     /// <summary>"@@ -18,15 +20,48 @@ public class Foo" → "@@ -18,15 +20,48 @@  public class Foo".</summary>

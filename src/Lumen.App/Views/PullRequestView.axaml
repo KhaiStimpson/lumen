@@ -115,6 +115,15 @@
           <TextBlock Grid.Row="1" Classes="caption tertiary" Margin="0,3,0,0" Text="{Binding SelectedFile.Directory, FallbackValue=''}" TextTrimming="CharacterEllipsis" />
 
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="16,0,0,0">
+            <!-- Only the hunks, or the whole file with the changes in place (X toggles) -->
+            <Border Classes="segmented" VerticalAlignment="Center" Margin="0,0,6,0">
+              <StackPanel Orientation="Horizontal" Spacing="2">
+                <RadioButton Name="ShowChanges" Classes="segment" GroupName="DiffScope" Content="Changes"
+                             IsChecked="{Binding !ShowFullFile, Mode=OneWay}" ToolTip.Tip="Show only the changed hunks (X)" />
+                <RadioButton Name="ShowFullFile" Classes="segment" GroupName="DiffScope" Content="Full file"
+                             IsChecked="{Binding ShowFullFile}" ToolTip.Tip="Show the whole file with the changes in place (X)" />
+              </StackPanel>
+            </Border>
             <Button Classes="subtle" Padding="8,6" Command="{Binding PreviousPointCommand}" ToolTip.Tip="Previous review point (K)">
               <Path Data="{StaticResource Icon.ChevronLeft}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="12" Height="12" />
             </Button>
@@ -275,6 +284,9 @@
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
                   <Border Classes="kbd"><TextBlock Text="P" /></Border><TextBlock Classes="caption" Text="precedent" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
+                  <Border Classes="kbd"><TextBlock Text="X" /></Border><TextBlock Classes="caption" Text="full file" />
                 </StackPanel>
               </WrapPanel>
             </StackPanel>

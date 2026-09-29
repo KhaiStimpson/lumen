@@ -142,6 +142,9 @@ public sealed partial class MainWindow : Window
             case Key.F:
                 this.FindControl<TextBox>("GoToFile")?.Focus();
                 break;
+            case Key.X:
+                pr.ShowFullFile = !pr.ShowFullFile;
+                break;
             default:
                 e.Handled = false;
                 break;

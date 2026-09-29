@@ -132,13 +132,19 @@ public sealed class DiffEditor : UserControl
         if (change.Property == DiffProperty)
         {
             var diff = Diff;
+            var anchor = change.OldValue is DiffDocument old && old.Path == diff?.Path ? TopAnchor() : null;
             _cards.Reset();
             _editor.Document = new TextDocument(diff?.Text ?? "");
             SyntaxThemes.SetLanguage(_syntax, diff?.Path);
             SetVerticalOffset(0);
-            _editor.ScrollToHorizontalOffset(0);
+            if (anchor is null)
+            {
+                _editor.ScrollToHorizontalOffset(0);
+            }
+
             _gutter.InvalidateMeasure();
             ApplyPendingReveal();
+            RestoreAnchor(anchor);
         }
         else if (change.Property == MarkersProperty || change.Property == FocusRangeProperty || change.Property == ShowCardsProperty)
         {
@@ -163,6 +169,48 @@ public sealed class DiffEditor : UserControl
 
         _pendingNewLine = null;
         return RevealDocumentLineAsync(documentLine, motion, cancellationToken);
+    }
+
+    /// <summary>The first head-side line on screen and how far below the top it sits.</summary>
+    private (int NewLine, double ScreenY)? TopAnchor()
+    {
+        if (!TextView.VisualLinesValid)
+        {
+            return null;
+        }
+
+        foreach (var line in TextView.VisualLines)
+        {
+            if (RowAt(line.FirstDocumentLine.LineNumber) is { NewNumber: > 0 } row)
+            {
+                return (row.NewNumber, line.VisualTop - TextView.VerticalOffset);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Re-rendering the same file (full-file toggle, cards arriving) keeps the code under the reader where it was,
+    /// unless a reveal is already queued.
+    /// </summary>
+    private void RestoreAnchor((int NewLine, double ScreenY)? anchor)
+    {
+        if (anchor is not { } a)
+        {
+            return;
+        }
+
+        Avalonia.Threading.Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (_pendingNewLine is null && Diff?.DocumentLineForNewLine(a.NewLine) is { } documentLine)
+                {
+                    TextView.EnsureVisualLines();
+                    SetVerticalOffset(TextView.GetVisualTopByDocumentLine(documentLine) - a.ScreenY);
+                }
+            },
+            Avalonia.Threading.DispatcherPriority.Background);
     }
 
     /// <summary>Applies a remembered reveal after the current layout pass, when positions are measurable.</summary>
