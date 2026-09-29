@@ -65,7 +65,7 @@ this section.
 
 Define what a tier is and build the yardstick first, so every later phase is measured instead of eyeballed.
 
-- [ ] Domain types in `Lumen.Domain`: `ChangeClass` (Formatting, CommentsOnly, ImportsOnly, Rename, Move, Ripple,
+- [x] Domain types in `Lumen.Domain`: `ChangeClass` (Formatting, CommentsOnly, ImportsOnly, Rename, Move, Ripple,
       Generated, NewCode, BehaviourChange), `TriageTier` (Critical, WorthALook, Skim, Skip), `HunkTriage` (file,
       head/old line span, class, tier, reasons, optional group id) and `TriageGroup` (id, class, title such as
       "Renamed `Foo`→`Bar`", members). JSON round-trip tests.
