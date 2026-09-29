@@ -17,6 +17,24 @@ public enum DiffRowKind
 public sealed record DiffRow(DiffRowKind Kind, int OldNumber, int NewNumber, string? CardId = null);
 
 /// <summary>
+/// Changed lines proven mechanical, shown as one inline badge (hosted like a review card, id <c>fold:{Id}</c>). When
+/// collapsed the lines are left out; when expanded they follow the badge. Old/new spans are 0 when a side has none.
+/// </summary>
+public sealed record DiffFold(string Id, int OldStart, int OldEnd, int NewStart, int NewEnd, bool Expanded)
+{
+    public const string CardPrefix = "fold:";
+
+    public string CardId => CardPrefix + Id;
+
+    public bool Covers(DiffLine line) => line.Kind switch
+    {
+        DiffLineKind.Added => NewStart > 0 && line.NewNumber >= NewStart && line.NewNumber <= NewEnd,
+        DiffLineKind.Removed => OldStart > 0 && line.OldNumber >= OldStart && line.OldNumber <= OldEnd,
+        _ => false,
+    };
+}
+
+/// <summary>
 /// A unified diff flattened into editor text. Each document line maps to one <see cref="DiffRow"/>; review cards
 /// get their own placeholder line directly under the code they refer to, so the editor stays virtualised.
 /// </summary>
@@ -82,8 +100,11 @@ public sealed class DiffDocument
     /// headers are dropped, so the diff reads in place within the full file. Ignored if it can't hold the diff's
     /// head-side lines (e.g. a stale or partial copy).
     /// </param>
-    public static DiffDocument Build(FileDiff diff, IEnumerable<(string Id, int NewLine)> cards, string? headText = null)
+    /// <param name="folds">Mechanical changes to show behind a badge; see <see cref="DiffFold"/>.</param>
+    public static DiffDocument Build(FileDiff diff, IEnumerable<(string Id, int NewLine)> cards, string? headText = null, IReadOnlyList<DiffFold>? folds = null)
     {
+        folds ??= [];
+        var shownFolds = new HashSet<string>(StringComparer.Ordinal);
         var cardsByLine = cards
             .GroupBy(c => c.NewLine)
             .ToDictionary(g => g.Key, g => g.Select(c => c.Id).ToList());
@@ -144,6 +165,19 @@ public sealed class DiffDocument
 
             foreach (var line in hunk.Lines)
             {
+                if (folds.FirstOrDefault(f => f.Covers(line)) is { } fold)
+                {
+                    if (shownFolds.Add(fold.Id))
+                    {
+                        Append(new DiffRow(DiffRowKind.Card, 0, 0, fold.CardId), CardPlaceholder.ToString());
+                    }
+
+                    if (!fold.Expanded)
+                    {
+                        continue;
+                    }
+                }
+
                 var kind = line.Kind switch
                 {
                     DiffLineKind.Added => DiffRowKind.Added,

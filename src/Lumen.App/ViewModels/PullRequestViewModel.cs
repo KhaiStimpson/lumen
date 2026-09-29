@@ -119,9 +119,52 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
     private void RebuildPlan() => ReviewPlan.Rebuild(Triage, ReviewPoints);
 
+    /// <summary>Mechanical hunks the reviewer opened; everything else proven mechanical stays behind its badge.</summary>
+    private readonly HashSet<string> _expandedFolds = new(StringComparer.Ordinal);
+
+    public void ToggleFold(string foldId)
+    {
+        if (!_expandedFolds.Remove(foldId))
+        {
+            _expandedFolds.Add(foldId);
+        }
+
+        RebuildCurrentDiff();
+    }
+
+    public FoldBadgeViewModel? ResolveFold(string cardId)
+    {
+        var id = cardId.StartsWith(Diff.DiffFold.CardPrefix, StringComparison.Ordinal) ? cardId[Diff.DiffFold.CardPrefix.Length..] : cardId;
+        if (Triage?.Hunks.FirstOrDefault(h => DiffFolds.IdFor(h) == id) is not { } hunk)
+        {
+            return null;
+        }
+
+        var group = hunk.GroupId.Length == 0 ? null : ReviewPlan.Groups.FirstOrDefault(g => g.Id == hunk.GroupId);
+        var index = group is null ? 0 : group.Members.ToList().FindIndex(m => DiffFolds.IdFor(m) == id);
+        return new FoldBadgeViewModel(this, id, hunk, _expandedFolds.Contains(id), group, Math.Max(0, index));
+    }
+
+    /// <summary>Opens another hunk of the same group, so a rename or move can be followed across files.</summary>
+    public Task GoToGroupMemberAsync(TriageGroupViewModel group, int index)
+    {
+        if (index < 0 || index >= group.Members.Count)
+        {
+            return Task.CompletedTask;
+        }
+
+        foreach (var other in ReviewPlan.Groups)
+        {
+            other.IsCurrent = other == group;
+        }
+
+        return FocusPlanTargetAsync(ReviewPlanBuilder.TargetOf(group.Members[index]));
+    }
+
     partial void OnTriageChanged(TriageReady? value)
     {
         RebuildPlan();
+        RebuildCurrentDiff();
         foreach (var file in Files)
         {
             file.TierLines = value?.Files.FirstOrDefault(f => f.Path == file.Path)?.TierLines;
@@ -747,7 +790,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         var cards = ReviewPoints
             .SelectMany(p => p.Locations.Where(l => l.Path == path).Select(l => (Id: CardId(p, l), NewLine: l.Line)));
         var head = ShowFullFile ? _headCache.GetValueOrDefault(path) : null;
-        CurrentDiff = DiffDocument.Build(diff, cards, head);
+        CurrentDiff = DiffDocument.Build(diff, cards, head, DiffFolds.For(Triage, path, _expandedFolds));
         UpdateMarkers();
     }
 

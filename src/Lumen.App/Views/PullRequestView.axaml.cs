@@ -84,8 +84,13 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         }
     }
 
-    private ReviewCardView? CreateCard(string cardId)
+    private Control? CreateCard(string cardId)
     {
+        if (cardId.StartsWith(Diff.DiffFold.CardPrefix, StringComparison.Ordinal))
+        {
+            return _viewModel?.ResolveFold(cardId) is { } fold ? new FoldBadgeView { DataContext = fold } : null;
+        }
+
         if (_viewModel?.ResolveCard(cardId) is not { } resolved)
         {
             return null;

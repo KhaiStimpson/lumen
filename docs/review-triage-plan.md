@@ -122,7 +122,7 @@ Replace the flat review-point list with a tiered plan the reviewer works through
       points in their tier; Consistency collapsed at the bottom. View-model tests; screenshots.
 - [x] File tree heat: mechanical-only files greyed with a "N lines mechanical" count, files with Critical hunks
       marked. Screenshots.
-- [ ] Diff: mechanical hunks collapsed behind a reason badge ("pure rename `Foo`→`Bar`", "formatting only"),
+- [x] Diff: mechanical hunks collapsed behind a reason badge ("pure rename `Foo`→`Bar`", "formatting only"),
       expandable; group members link to each other. Screenshots.
 - [ ] Keyboard: `A` acknowledges the focused group (all members), `J/K` walk the plan in tier order, acknowledged
       groups fade but stay reachable. Tests for navigation order.
