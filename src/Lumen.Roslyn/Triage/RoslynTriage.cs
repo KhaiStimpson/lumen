@@ -7,6 +7,7 @@ public static class RoslynTriage
 {
     public static IReadOnlyList<IHunkClassifier> Classifiers() =>
     [
+        new DestructiveMigrationClassifier(),
         new MechanicalFileClassifier(),
         new FormattingClassifier(),
         new CommentsOnlyClassifier(),

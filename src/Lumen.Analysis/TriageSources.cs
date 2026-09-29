@@ -17,12 +17,13 @@ public sealed class TriageSources(IReadOnlyDictionary<string, string> baseTexts,
 
     public IEnumerable<string> Paths => headTexts.Keys.Union(baseTexts.Keys, StringComparer.Ordinal);
 
-    /// <summary>Reads both sides of every changed, non-binary, non-mechanical file. A file that cannot be read is left out.</summary>
+    /// <summary>Reads both sides of every changed, non-binary, non-mechanical file (and migrations). A file that cannot be read is left out.</summary>
     public static async Task<TriageSources> LoadAsync(PullRequestSnapshot snapshot, IPullRequestCheckout checkout, CancellationToken cancellationToken)
     {
         var baseTexts = new Dictionary<string, string>(StringComparer.Ordinal);
         var headTexts = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var file in snapshot.Files.Where(f => !f.IsBinary && !f.Mechanical.IsMechanical))
+        // Migrations are mechanical files, but their dangerous operations are pulled out, so they are read too.
+        foreach (var file in snapshot.Files.Where(f => !f.IsBinary && (!f.Mechanical.IsMechanical || f.Mechanical.Reason == "Database migration")))
         {
             cancellationToken.ThrowIfCancellationRequested();
             try

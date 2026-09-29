@@ -92,7 +92,7 @@ Layer 1: take the noise out with Roslyn proofs, each classifier independent and 
       across files), grouped as "Moved `X` from A to B". An edited move is BehaviourChange on the edited lines only.
 - [x] Ripple: a signature change (added/removed/renamed parameter, renamed member) plus call-site edits that only
       apply that change, collapsed into one group; the signature change itself stays reviewable.
-- [ ] Destructive migrations: parse `Migrations/*.cs` `Up` bodies for `DropColumn`, `DropTable`, `RenameColumn`,
+- [x] Destructive migrations: parse `Migrations/*.cs` `Up` bodies for `DropColumn`, `DropTable`, `RenameColumn`,
       narrowing `AlterColumn`, `Sql(...)`; those lines become Critical ("drops column `Invoices.Total`"); the rest
       stays Skip.
 - [ ] Run the evaluation on PR #58 (fixture replay, no network); record lines-per-class and false positives in the
