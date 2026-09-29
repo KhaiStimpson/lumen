@@ -207,8 +207,20 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
     }
 
     [RelayCommand]
-    public Task SelectMoreChangesAsync(MoreChangesViewModel? more) =>
-        more?.Target is { } target ? FocusPlanTargetAsync(target) : Task.CompletedTask;
+    public Task SelectMoreChangesAsync(MoreChangesViewModel? more)
+    {
+        if (more?.Target is not { } target)
+        {
+            return Task.CompletedTask;
+        }
+
+        foreach (var group in ReviewPlan.Groups)
+        {
+            group.IsCurrent = false;
+        }
+
+        return FocusPlanTargetAsync(target);
+    }
 
     private async Task FocusPlanTargetAsync(PlanTarget target)
     {
@@ -225,6 +237,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         }
 
         UpdateMarkers();
+        OnPropertyChanged(nameof(PositionLabel));
     }
 
     // Files ----------------------------------------------------------------------------------------
@@ -337,11 +350,11 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
     {
         get
         {
-            var open = OpenPoints.ToList();
-            var index = CurrentPoint is null ? -1 : open.IndexOf(CurrentPoint);
-            return open.Count == 0 ? (IsAnalysing ? "—" : "none open") :
-                index < 0 ? string.Create(CultureInfo.InvariantCulture, $"{open.Count} review points") :
-                string.Create(CultureInfo.InvariantCulture, $"{index + 1} of {open.Count}");
+            var stops = PlanStops();
+            var index = CurrentStop is { } current ? stops.IndexOf(current) : -1;
+            return stops.Count == 0 ? (IsAnalysing ? "—" : "none open") :
+                index < 0 ? string.Create(CultureInfo.InvariantCulture, $"{stops.Count} to review") :
+                string.Create(CultureInfo.InvariantCulture, $"{index + 1} of {stops.Count}");
         }
     }
 
@@ -838,20 +851,44 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
     [RelayCommand]
     public Task PreviousPointAsync() => StepAsync(-1);
 
+    /// <summary>
+    /// What J and K walk, in the plan's order: tier by tier (Critical, Worth a look, Skim, Skip, then Consistency),
+    /// review points then groups within a tier. Dismissed points drop out; acknowledged groups stay reachable.
+    /// Folded "N more changes" rows are summaries, opened by clicking, not stops.
+    /// </summary>
+    public List<object> PlanStops() =>
+    [
+        .. ReviewPlan.Sections
+            .SelectMany(s => s.Items)
+            .Where(i => i is ReviewPointViewModel { IsDismissed: false } or TriageGroupViewModel),
+    ];
+
+    /// <summary>The review point or group the reviewer is on.</summary>
+    public object? CurrentStop => (object?)CurrentPoint ?? ReviewPlan.Groups.FirstOrDefault(g => g.IsCurrent);
+
     private Task StepAsync(int direction)
     {
-        var open = OpenPoints.ToList();
-        if (open.Count == 0)
+        var stops = PlanStops();
+        if (stops.Count == 0)
         {
             return Task.CompletedTask;
         }
 
-        var index = CurrentPoint is null ? -1 : open.IndexOf(CurrentPoint);
+        var index = CurrentStop is { } current ? stops.IndexOf(current) : -1;
         var next = index < 0
-            ? (direction > 0 ? open[0] : open[^1])
-            : open[(index + direction + open.Count) % open.Count];
-        return GoToAsync(next, direction > 0 ? NavigationReason.Next : NavigationReason.Previous);
+            ? (direction > 0 ? stops[0] : stops[^1])
+            : stops[(index + direction + stops.Count) % stops.Count];
+        return next switch
+        {
+            ReviewPointViewModel point => GoToAsync(point, direction > 0 ? NavigationReason.Next : NavigationReason.Previous),
+            TriageGroupViewModel group => SelectGroupAsync(group),
+            _ => Task.CompletedTask,
+        };
     }
+
+    /// <summary>A: clear (or restore) the group the reviewer is on, every hunk of it at once.</summary>
+    public Task AcknowledgeCurrentGroupAsync() =>
+        CurrentStop is TriageGroupViewModel group ? ToggleGroupAcknowledgedAsync(group) : Task.CompletedTask;
 
     [RelayCommand]
     public Task SelectPointAsync(ReviewPointViewModel? point) =>

@@ -129,6 +129,9 @@ public sealed partial class MainWindow : Window
             case Key.D:
                 await pr.DismissAsync(null).ConfigureAwait(true);
                 break;
+            case Key.A:
+                await pr.AcknowledgeCurrentGroupAsync().ConfigureAwait(true);
+                break;
             case Key.C:
                 pr.StartComment(null);
                 FocusComposer();

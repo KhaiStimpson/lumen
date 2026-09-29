@@ -148,15 +148,15 @@
                              IsChecked="{Binding ShowFullFile}" ToolTip.Tip="Show the whole file with the changes in place (X)" />
               </StackPanel>
             </Border>
-            <Button Classes="subtle" Padding="8,6" Command="{Binding PreviousPointCommand}" ToolTip.Tip="Previous review point (K)">
+            <Button Classes="subtle" Padding="8,6" Command="{Binding PreviousPointCommand}" ToolTip.Tip="Previous in the plan (K)">
               <Path Data="{StaticResource Icon.ChevronLeft}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="12" Height="12" />
             </Button>
             <Border Classes="card" Padding="12,5" CornerRadius="7">
               <TextBlock FontSize="12" FontWeight="Medium">
-                <Run Text="Review point " Foreground="{DynamicResource Text.Secondary}" /><Run Text="{Binding PositionLabel}" />
+                <Run Text="Plan " Foreground="{DynamicResource Text.Secondary}" /><Run Text="{Binding PositionLabel}" />
               </TextBlock>
             </Border>
-            <Button Classes="subtle" Padding="8,6" Command="{Binding NextPointCommand}" ToolTip.Tip="Next review point (J)">
+            <Button Classes="subtle" Padding="8,6" Command="{Binding NextPointCommand}" ToolTip.Tip="Next in the plan (J)">
               <Path Data="{StaticResource Icon.ChevronRight}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="12" Height="12" />
             </Button>
           </StackPanel>
