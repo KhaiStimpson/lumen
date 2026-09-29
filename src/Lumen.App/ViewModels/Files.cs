@@ -36,6 +36,10 @@ public sealed partial class FileEntryViewModel(ChangedFileSummary file) : Observ
 
     public bool HasReviewPoints => ReviewPointCount > 0;
 
+    /// <summary>Changed lines per triage tier; null until the triage arrives.</summary>
+    [ObservableProperty]
+    public partial TierLines? TierLines { get; set; }
+
     /// <summary>GitHub's per-file "Viewed" checkbox: ticked by the reviewer, never by merely opening the file.</summary>
     [ObservableProperty]
     public partial bool IsViewed { get; set; } = file.IsViewed;

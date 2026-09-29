@@ -81,6 +81,19 @@ internal static class DevCapture
             case "light" when Application.Current is { } app:
                 app.RequestedThemeVariant = ThemeVariant.Light;
                 break;
+            case var s when s.StartsWith("size:", StringComparison.Ordinal)
+                            && Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { MainWindow: { } main }:
+                var parts = s["size:".Length..].Split('x');
+                main.Width = double.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
+                main.Height = double.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
+                break;
+            case var s when s.StartsWith("expand:", StringComparison.Ordinal) && pr is not null:
+                if (pr.ReviewPlan.Sections.FirstOrDefault(x => x.Key == s["expand:".Length..]) is { } section)
+                {
+                    section.IsExpanded = true;
+                }
+
+                break;
             case var s when s.StartsWith("file:", StringComparison.Ordinal) && pr is not null:
                 var name = s["file:".Length..];
                 if (pr.Files.FirstOrDefault(f => f.Name == name) is { } file)

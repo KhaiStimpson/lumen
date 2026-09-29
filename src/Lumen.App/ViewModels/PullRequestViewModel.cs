@@ -111,9 +111,76 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
     /// <summary>A group's acknowledged flag changed (the group in <see cref="Triage"/> is already updated).</summary>
     public event EventHandler<string>? TriageGroupChanged;
 
+    /// <summary>The right pane: summary, lines per tier, and the tiers the reviewer works through.</summary>
+    public ReviewPlanViewModel ReviewPlan { get; } = new();
+
+    /// <summary>A group or a set of hunks picked from the plan; drives the diff focus while no review point is current.</summary>
+    private PlanTarget? _planFocus;
+
+    private void RebuildPlan() => ReviewPlan.Rebuild(Triage, ReviewPoints);
+
+    partial void OnTriageChanged(TriageReady? value)
+    {
+        RebuildPlan();
+        foreach (var file in Files)
+        {
+            file.TierLines = value?.Files.FirstOrDefault(f => f.Path == file.Path)?.TierLines;
+        }
+    }
+
     /// <summary>Clears or restores a triage group; the change arrives back as an event, like the Viewed tick.</summary>
-    public Task SetTriageGroupAcknowledgedAsync(string groupId, bool acknowledged) =>
-        _source.SetTriageGroupAcknowledgedAsync(Ref, groupId, acknowledged, CancellationToken.None);
+    public async Task SetTriageGroupAcknowledgedAsync(string groupId, bool acknowledged)
+    {
+        try
+        {
+            await _source.SetTriageGroupAcknowledgedAsync(Ref, groupId, acknowledged, _lifetime.Token).ConfigureAwait(true);
+        }
+        catch (RpcException ex) when (!(ex.StatusCode == StatusCode.Cancelled && _lifetime.IsCancellationRequested))
+        {
+            Toast = $"Couldn't {(acknowledged ? "clear" : "restore")} that group: {ex.Status.Detail}";
+        }
+    }
+
+    [RelayCommand]
+    public Task ToggleGroupAcknowledgedAsync(TriageGroupViewModel? group) =>
+        group is null ? Task.CompletedTask : SetTriageGroupAcknowledgedAsync(group.Id, !group.Acknowledged);
+
+    [RelayCommand]
+    public Task SelectGroupAsync(TriageGroupViewModel? group)
+    {
+        if (group?.Target is not { } target)
+        {
+            return Task.CompletedTask;
+        }
+
+        foreach (var other in ReviewPlan.Groups)
+        {
+            other.IsCurrent = other == group;
+        }
+
+        return FocusPlanTargetAsync(target);
+    }
+
+    [RelayCommand]
+    public Task SelectMoreChangesAsync(MoreChangesViewModel? more) =>
+        more?.Target is { } target ? FocusPlanTargetAsync(target) : Task.CompletedTask;
+
+    private async Task FocusPlanTargetAsync(PlanTarget target)
+    {
+        if (CurrentPoint is { } point)
+        {
+            point.IsCurrent = false;
+            CurrentPoint = null;
+        }
+
+        _planFocus = target;
+        if (Files.FirstOrDefault(f => f.Path == target.Path) is { } file && SelectedFile?.Path != target.Path)
+        {
+            await SelectFileAsync(file).ConfigureAwait(true);
+        }
+
+        UpdateMarkers();
+    }
 
     // Files ----------------------------------------------------------------------------------------
 
@@ -345,6 +412,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
                 if (Triage?.Groups.FirstOrDefault(g => g.Id == evt.TriageGroupAcknowledged.GroupId) is { } group)
                 {
                     group.Acknowledged = evt.TriageGroupAcknowledged.Acknowledged;
+                    RebuildPlan();
                     TriageGroupChanged?.Invoke(this, group.Id);
                 }
 
@@ -538,6 +606,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
     private void RefreshPointDerivedState()
     {
+        RebuildPlan();
         OnPropertyChanged(nameof(OpenPoints));
         OnPropertyChanged(nameof(PositionLabel));
         OnPropertyChanged(nameof(ReviewFocusLabel));
@@ -709,7 +778,9 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
         FocusRange = CurrentPoint?.Locations.FirstOrDefault(l => l.Path == path) is { } focus
             ? (focus.Line, focus.Line)
-            : null;
+            : CurrentPoint is null && _planFocus is { } plan && plan.Path == path
+                ? (plan.StartLine, plan.EndLine)
+                : null;
     }
 
     // Guided navigation ----------------------------------------------------------------------------
@@ -756,6 +827,12 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
         point.IsCurrent = true;
         CurrentPoint = point;
+        _planFocus = null;
+        foreach (var group in ReviewPlan.Groups)
+        {
+            group.IsCurrent = false;
+        }
+
         UpdateMarkers();
         OnPropertyChanged(nameof(PositionLabel));
         NavigationRequested?.Invoke(this, new NavigationRequest(point, reason, previous));

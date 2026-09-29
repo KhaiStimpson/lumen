@@ -10,6 +10,10 @@ public static class Converters
     public static readonly IValueConverter IsPositive =
         new FuncValueConverter<int, bool>(n => n > 0);
 
+    /// <summary>A share of changed lines → a star column width, for the plan's tier bar (0 collapses the segment).</summary>
+    public static readonly IValueConverter LinesToStar =
+        new FuncValueConverter<double, GridLength>(n => n > 0 ? new GridLength(n, GridUnitType.Star) : new GridLength(0));
+
     public static readonly IValueConverter IsZero =
         new FuncValueConverter<int, bool>(n => n == 0);
 
