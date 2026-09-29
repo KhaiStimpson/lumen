@@ -3,7 +3,37 @@ using Lumen.Domain;
 namespace Lumen.Analysis;
 
 /// <summary>What a classifier sees: the whole pull request, plus the one hunk it is asked about.</summary>
-public sealed record HunkContext(PullRequestSnapshot Snapshot, ChangedFile File, DiffHunk Hunk);
+public sealed record HunkContext(PullRequestSnapshot Snapshot, ChangedFile File, DiffHunk Hunk)
+{
+    /// <summary>The file at the merge-base, when it was loaded; proofs that need it decline without it.</summary>
+    public string? BaseText { get; init; }
+
+    /// <summary>The file at head, when it was loaded.</summary>
+    public string? HeadText { get; init; }
+
+    public TriageSources Sources { get; init; } = TriageSources.None;
+
+    /// <summary>Per-run cache shared by every classifier call (parsed trees, PR-wide analyses).</summary>
+    public TriageWorkspace Workspace { get; init; } = new();
+}
+
+/// <summary>A per-run cache so PR-wide analyses (rename maps, moved bodies) are computed once.</summary>
+public sealed class TriageWorkspace
+{
+    private readonly Dictionary<string, object?> cache = new(StringComparer.Ordinal);
+
+    public T GetOrAdd<T>(string key, Func<T> create)
+    {
+        if (cache.TryGetValue(key, out var existing))
+        {
+            return (T)existing!;
+        }
+
+        var value = create();
+        cache[key] = value;
+        return value;
+    }
+}
 
 /// <summary>Ties a hunk to others that are one idea across the pull request (a rename, a move, a ripple).</summary>
 public sealed record GroupClaim(string Key, string Title);
@@ -42,8 +72,10 @@ public sealed class TriagePipeline(IReadOnlyList<IHunkClassifier> classifiers)
 {
     public static TriagePipeline Default { get; } = new([new MechanicalFileClassifier()]);
 
-    public TriageResult Run(PullRequestSnapshot snapshot)
+    public TriageResult Run(PullRequestSnapshot snapshot, TriageSources? sources = null)
     {
+        sources ??= TriageSources.None;
+        var workspace = new TriageWorkspace();
         var hunks = new List<HunkTriage>();
         var groupKeys = new List<string>();
         var groupInfo = new Dictionary<string, (ChangeClass Class, string Title, List<HunkTriage> Members)>(StringComparer.Ordinal);
@@ -57,7 +89,13 @@ public sealed class TriagePipeline(IReadOnlyList<IHunkClassifier> classifiers)
                     continue;
                 }
 
-                var verdict = ClassifyHunk(new HunkContext(snapshot, file, hunk)) ?? Fallback(file);
+                var verdict = ClassifyHunk(new HunkContext(snapshot, file, hunk)
+                {
+                    BaseText = sources.Base(file.Path),
+                    HeadText = sources.Head(file.Path),
+                    Sources = sources,
+                    Workspace = workspace,
+                }) ?? Fallback(file);
                 var groupId = verdict.Group is { } claim ? $"g{GroupIndex(claim.Key, groupKeys)}" : null;
                 var triage = new HunkTriage
                 {

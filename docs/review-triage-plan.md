@@ -83,7 +83,7 @@ Define what a tier is and build the yardstick first, so every later phase is mea
 
 Layer 1: take the noise out with Roslyn proofs, each classifier independent and conservative.
 
-- [ ] Formatting-only: the member's token stream is identical ignoring trivia (whitespace, line breaks). Near-miss
+- [x] Formatting-only: the member's token stream is identical ignoring trivia (whitespace, line breaks). Near-miss
       tests (one changed literal, reordered tokens).
 - [ ] Comments/docs-only and imports-only (`using` directives added/removed/reordered, nothing else changed).
 - [ ] Pure rename: old and new syntax trees are equal under a single consistent identifier map; reports the map
