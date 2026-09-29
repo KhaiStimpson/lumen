@@ -116,7 +116,7 @@ Compute triage in the engine, cache it, and stream it to the app.
 
 Replace the flat review-point list with a tiered plan the reviewer works through.
 
-- [ ] `/flow:design` pass for the Review plan pane (three variants against the mockups and `Theme/Tokens.axaml`);
+- [x] `/flow:design` pass for the Review plan pane (three variants against the mockups and `Theme/Tokens.axaml`);
       record the decision in `docs/design/review-plan.md`. **Stop for the user's pick** before ticking.
 - [ ] Review plan pane: summary line, then Critical / Worth a look / Skim / Skip sections with groups and review
       points in their tier; Consistency collapsed at the bottom. View-model tests; screenshots.

@@ -1,0 +1,247 @@
+<title>Lumen Review Plan Variants</title>
+<style>
+/* Layout: three variants stacked; each shows the Lumen window at 1280×800 and 1920×1080, scaled to fit. Colours are Lumen's Theme/Tokens.axaml values. */
+:root {
+  --window: #F4F5F7; --pane: #FFFFFF; --sunken: #F7F8FA; --hover: #F0F2F5; --selected: #EAF1FE;
+  --border: #E7E9ED; --border-strong: #D5D9E0;
+  --text: #171A1F; --text-2: #59616E; --text-3: #8B929E;
+  --accent: #2F6BE8; --accent-soft: #EAF1FE;
+  --high: #D93F3F; --high-soft: #FCEBEB; --medium: #B76E00; --medium-soft: #FFF3DC; --low: #5C6F96; --low-soft: #EEF1F7;
+  --verified: #30A46C; --deviation: #F0A020; --behaviour: #3E7BFA; --correctness: #E5484D;
+  --added: #1F883D; --removed: #CF222E; --added-bg: #EAF7EE; --removed-bg: #FDEEEE;
+  --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "Cascadia Code", "Cascadia Mono", Consolas, ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --window: #0E1014; --pane: #15181D; --sunken: #111317; --hover: #1F242B; --selected: #1A2740;
+  --border: #23272F; --border-strong: #323844;
+  --text: #E8EAED; --text-2: #A0A7B2; --text-3: #6D7481;
+  --accent: #5B8DF5; --accent-soft: #1A2740;
+  --high: #F07178; --high-soft: #341A1D; --medium: #E7A93C; --medium-soft: #33280F; --low: #97A6C6; --low-soft: #1C2230;
+  --verified: #4CC47A; --deviation: #E7A93C; --behaviour: #5B8DF5; --correctness: #F0676E;
+  --added: #4CC47A; --removed: #F0676E; --added-bg: #0E1F16; --removed-bg: #2A1416; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --window: #0E1014; --pane: #15181D; --sunken: #111317; --hover: #1F242B; --selected: #1A2740;
+  --border: #23272F; --border-strong: #323844;
+  --text: #E8EAED; --text-2: #A0A7B2; --text-3: #6D7481;
+  --accent: #5B8DF5; --accent-soft: #1A2740;
+  --high: #F07178; --high-soft: #341A1D; --medium: #E7A93C; --medium-soft: #33280F; --low: #97A6C6; --low-soft: #1C2230;
+  --verified: #4CC47A; --deviation: #E7A93C; --behaviour: #5B8DF5; --correctness: #F0676E;
+  --added: #4CC47A; --removed: #F0676E; --added-bg: #0E1F16; --removed-bg: #2A1416; color-scheme: dark }
+
+body { background: var(--window); color: var(--text); font-family: var(--ui); padding: 32px 20px 64px; }
+.doc { max-width: 1240px; margin: 0 auto; display: grid; gap: 40px; }
+h1 { font-size: 26px; margin: 0 0 6px; text-wrap: balance; }
+h2 { font-size: 19px; margin: 0; text-wrap: balance; }
+p { max-width: 70ch; line-height: 1.55; color: var(--text-2); margin: 0; }
+.intro, .variant { display: grid; gap: 12px; }
+.tag { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: 600; }
+.rec { background: var(--accent-soft); border-radius: 10px; padding: 16px 18px; display: grid; gap: 6px; }
+.rec strong { color: var(--text); }
+.frames { display: grid; grid-template-columns: 1280fr 1920fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .frames { grid-template-columns: 1fr; } }
+.frame { min-width: 0; display: grid; gap: 6px; }
+.frame .label { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.viewport { position: relative; width: 100%; overflow: hidden; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--window); }
+.viewport > .win { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+
+/* ---- the mock Lumen window (drawn at real pixel size, then scaled) ---- */
+.win { font-size: 12.5px; display: grid; grid-template-rows: 40px 1fr; background: var(--window); }
+.titlebar { display: flex; align-items: center; gap: 10px; padding: 0 16px; color: var(--text-2); font-size: 12px; }
+.titlebar b { color: var(--text); }
+.cols { display: grid; min-height: 0; gap: 0; }
+.pane { background: var(--pane); border-top: 1px solid var(--border); overflow: hidden; min-width: 0; }
+.pane.left { border-right: 1px solid var(--border); border-radius: 0 10px 0 0; }
+.pane.right { border-left: 1px solid var(--border); border-radius: 10px 0 0 0; }
+.pad { padding: 18px; display: grid; gap: 14px; align-content: start; }
+.section-label { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: 600; }
+.h3 { font-size: 13.5px; font-weight: 600; }
+.caption { font-size: 11.5px; color: var(--text-2); }
+.tert { color: var(--text-3); }
+.center { padding: 14px 16px 16px; display: grid; grid-template-rows: auto 1fr; gap: 10px; min-width: 0; }
+.center .head { display: flex; justify-content: space-between; align-items: center; padding: 0 6px; }
+.card { background: var(--pane); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.code { font-family: var(--mono); font-size: 12px; line-height: 20px; padding: 8px 0; }
+.code div { padding: 0 12px; white-space: pre; color: var(--text-2); }
+.code .a { background: var(--added-bg); color: var(--text); }
+.code .r { background: var(--removed-bg); color: var(--text); }
+.code .fold { background: var(--sunken); color: var(--text-3); font-family: var(--ui); font-size: 11.5px; }
+.file { display: flex; gap: 8px; align-items: center; padding: 4px 8px; border-radius: 6px; }
+.file .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file.dim .n { color: var(--text-3); }
+.plus { color: var(--added); font-variant-numeric: tabular-nums; font-size: 11.5px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+
+/* plan building blocks */
+.summary { font-size: 12.5px; line-height: 1.45; }
+.summary b { font-weight: 600; }
+.bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--sunken); }
+.bar span { display: block; }
+.progress { display: grid; gap: 5px; }
+.meter { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.meter i { display: block; height: 100%; width: 38%; background: var(--verified); }
+.tier { display: grid; gap: 2px; }
+.tier-head { display: flex; align-items: baseline; gap: 8px; padding: 6px 0 4px; }
+.tier-head .h3 { font-size: 12.5px; }
+.tier-head .n { margin-left: auto; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.row { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: start; padding: 8px 10px; margin: 0 -10px; border-radius: 7px; }
+.row.current { background: var(--selected); }
+.row.ack { opacity: .45; }
+.row .ic { width: 22px; height: 22px; border-radius: 11px; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 700; }
+.row .t { font-weight: 600; font-size: 12.5px; line-height: 1.35; min-width: 0; }
+.row .why { font-size: 11.5px; color: var(--text-2); line-height: 1.35; }
+.pill { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 9px; white-space: nowrap; }
+.pill.crit { background: var(--high-soft); color: var(--high); }
+.pill.look { background: var(--medium-soft); color: var(--medium); }
+.pill.skim { background: var(--low-soft); color: var(--low); }
+.pill.skip { background: var(--sunken); color: var(--text-3); border: 1px solid var(--border); }
+.grp { background: var(--sunken); color: var(--text-2) !important; border: 1px solid var(--border); font-family: var(--mono); font-size: 10px !important; }
+.collapsed { display: flex; gap: 8px; align-items: center; padding: 8px 10px; margin: 0 -10px; border-radius: 7px; color: var(--text-2); font-size: 12px; }
+.collapsed::before { content: "›"; color: var(--text-3); font-size: 14px; }
+.kbd { font-family: var(--mono); font-size: 10.5px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--text-2); }
+.seg { display: inline-flex; background: var(--sunken); border: 1px solid var(--border); border-radius: 7px; padding: 2px; gap: 2px; }
+.seg span { padding: 3px 10px; border-radius: 5px; font-size: 11.5px; color: var(--text-2); }
+.seg span.on { background: var(--pane); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+/* variant C board */
+.board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.col { background: var(--sunken); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: grid; gap: 8px; }
+.col .item { background: var(--pane); border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; display: grid; gap: 3px; }
+.col .item .t { font-weight: 600; font-size: 12px; line-height: 1.35; }
+.cost { font-size: 13px; color: var(--text-2); }
+.cost b { color: var(--text); }
+</style>
+
+<div class="doc">
+  <section class="intro">
+    <span class="tag">Lumen · review-triage · design round 1</span>
+    <h1>Review plan pane</h1>
+    <p>Three ways to show the tiered plan for andrew-crm#58. Each is drawn at 1280×800 and 1920×1080 with Lumen's own colour tokens; flip your system theme to see dark. The summary, tiers and reasons are the real output of the triage engine for that pull request, with two illustrative groups added so group rows are visible.</p>
+    <div class="rec">
+      <span class="tag">Recommendation</span>
+      <p><strong>A, the plan in the right pane.</strong> It replaces the flat Review focus list in place, keeps the diff at full width, and reads top to bottom in the same order J and K walk. Cost: at 1280 the pane is 344 wide, so long group titles wrap to two lines, and precedent and patterns move below the plan instead of beside the current point.</p>
+    </div>
+  </section>
+
+  <section class="variant" id="a">
+    <span class="tag">Variant A</span>
+    <h2>Plan in the right pane</h2>
+    <p>The right pane becomes the plan: summary and progress, then Critical, Worth a look and Skim open, Skip and Consistency folded. Groups sit in their tier as rows with a hunk count and a check; review points keep their existing row. The file tree and diff are untouched.</p>
+    <div class="frames" data-variant="A"></div>
+  </section>
+
+  <section class="variant" id="b">
+    <span class="tag">Variant B</span>
+    <h2>Plan as a tab in the left pane</h2>
+    <p>The left pane gets a Plan / Files switch and opens on Plan. The right pane keeps the current point's precedent and patterns, so detail and plan are both visible. Fits the review order to the file-shaped column people already scan.</p>
+    <div class="frames" data-variant="B"></div>
+  </section>
+
+  <section class="variant" id="c">
+    <span class="tag">Variant C</span>
+    <h2>Plan board before the diff</h2>
+    <p>Opening a pull request shows the plan as four tier columns across the centre. Pressing J or picking an item drops into the diff with a slim plan strip on top. Strongest overview of the whole pull request, at the cost of a mode switch.</p>
+    <div class="frames" data-variant="C"></div>
+  </section>
+
+  <section class="intro">
+    <span class="tag">Rejected on the way</span>
+    <p class="cost"><b>A score or confidence per item</b>, because tiers carry reasons in words. <b>Hiding Skip entirely</b>, because proven-mechanical code should stay one click away. <b>Colouring every row by tier</b>, because colour stays reserved for severity and the one accent.</p>
+  </section>
+</div>
+
+<script>
+const plan = {
+  summary: '<b>19,743 lines changed:</b> 15,864 proven mechanical, 3,228 new code, 651 changing existing behaviour',
+  bar: [['var(--high)', 2], ['var(--medium)', 3.3], ['var(--low)', 16.3], ['var(--border-strong)', 80.4]],
+  tiers: [
+    { name: 'Critical', pill: 'crit', lines: '94 lines', items: [
+      { k: 'p', c: 'var(--correctness)', i: '!', t: 'Tenant filter bypassed in the scheduled refresh', why: 'IgnoreQueryFilters · no test changed', cur: true },
+      { k: 'p', c: 'var(--correctness)', i: '!', t: 'External text enters the AI prompt', why: 'untrusted content · sensitive area: AI context' } ] },
+    { name: 'Worth a look', pill: 'look', lines: '557 lines', items: [
+      { k: 'p', c: 'var(--behaviour)', i: '↻', t: 'Source links rewritten from a conditional to a switch', why: 'changes existing code · 4 callers' },
+      { k: 'g', t: 'Call sites follow the new signature of Quote', why: '6 hunks · 18 lines · added parameter discount' },
+      { k: 'p', c: 'var(--behaviour)', i: '↻', t: 'Import enqueues enrichment for every new contact', why: 'fan-out · external calls' } ] },
+    { name: 'Skim', pill: 'skim', lines: '3,228 lines', items: [
+      { k: 'g', t: 'Renamed CatchMeUpContext → AiRetrievalContext', why: '12 hunks · 40 lines', ack: true },
+      { k: 'p', c: 'var(--low)', i: '+', t: '10 new provider and service files', why: 'new code · tests added alongside' } ] },
+  ],
+  skip: 'Skip · 15,864 lines in 14 files — generated, migrations, usings',
+  consistency: 'Consistency · 3 notes'
+};
+
+function row(it) {
+  if (it.k === 'g') {
+    return `<div class="row ${it.ack ? 'ack' : ''}"><span class="ic grp">{ }</span><div><div class="t">${it.t}</div><div class="why">${it.why}</div></div><span class="kbd">${it.ack ? '✓' : 'A'}</span></div>`;
+  }
+  return `<div class="row ${it.cur ? 'current' : ''}"><span class="ic" style="background:${it.c}">${it.i}</span><div><div class="t">${it.t}</div><div class="why">${it.why}</div></div><span></span></div>`;
+}
+function planList(compact) {
+  const bar = plan.bar.map(([c, w]) => `<span style="width:${w}%;background:${c}"></span>`).join('');
+  const tiers = plan.tiers.map(t => `<div class="tier"><div class="tier-head"><span class="pill ${t.pill}">${t.name}</span><span class="n">${t.lines}</span></div>${t.items.map(row).join('')}</div>`).join('');
+  return `<div class="summary">${plan.summary}</div><div class="bar">${bar}</div>
+    <div class="progress"><div class="caption">You've covered <b>38%</b> of Critical and Worth a look</div><div class="meter"><i></i></div></div>
+    ${tiers}<div class="collapsed">${plan.skip}</div><div class="collapsed">${plan.consistency}</div>`;
+}
+const files = ['Services/Ai/AiSourceAuthorization.cs', 'Services/CatchMeUpService.cs', 'Services/Enrichment/EnrichmentScheduler.cs', 'Services/Enrichment/AbrAbnProvider.cs', 'Services/ImportService.cs', 'Pages/Settings/Index.cshtml.cs', 'Program.cs', 'Data/Entities.cs'];
+function fileTree() {
+  return `<div class="section-label">Files changed</div>` + files.map((f, i) => `<div class="file ${i > 5 ? 'dim' : ''}"><span class="dot" style="background:${i < 3 ? 'var(--high)' : 'transparent'}"></span><span class="n">${f}</span><span class="plus">+${[10, 66, 93, 208, 24, 18, 55, 164][i]}</span></div>`).join('')
+    + `<div class="collapsed">14 generated files · 15,864 lines mechanical</div>`;
+}
+function diff() {
+  return `<div class="card code">
+    <div>  44   public async Task RefreshAllAsync(CancellationToken ct = default)</div>
+    <div>  45   {</div>
+    <div class="a">+ 46       var tenantIds = await _db.Tenants.AsNoTracking().IgnoreQueryFilters()</div>
+    <div class="a">+ 47           .Where(t => t.EnrichmentEnabled)</div>
+    <div class="a">+ 48           .Select(t => t.Id).ToListAsync(ct);</div>
+    <div>  49       foreach (var tenantId in tenantIds)</div>
+    <div class="fold">    ⋯ pure rename CatchMeUpContext → AiRetrievalContext · 3 lines · expand</div>
+    <div>  57       {</div>
+    <div class="r">- 58           await RefreshTenantAsync(tenantId, ct);</div>
+    <div class="a">+ 58           await RefreshTenantAsync(tenantId, MaxContactsPerTenantPerRun, ct);</div>
+    <div>  59       }</div></div>`;
+}
+function centerHead(title) {
+  return `<div class="head"><div><div class="h3">${title}</div><div class="caption tert">src/AndrewCrm.Web/Services/Enrichment</div></div><div class="caption">Critical 1 of 2 <span class="kbd">J</span> <span class="kbd">K</span></div></div>`;
+}
+function windowHtml(v, w, h) {
+  const right = w >= 1900 ? 420 : 344, left = w >= 1900 ? 320 : 284;
+  let cols, body;
+  if (v === 'A') {
+    cols = `${left}px 1fr ${right}px`;
+    body = `<div class="pane left"><div class="pad">${fileTree()}</div></div>
+      <div class="center">${centerHead('EnrichmentScheduler.cs')}${diff()}</div>
+      <div class="pane right"><div class="pad"><div class="section-label">Review plan</div>${planList()}</div></div>`;
+  } else if (v === 'B') {
+    cols = `${left + 40}px 1fr ${right}px`;
+    body = `<div class="pane left"><div class="pad"><div class="seg"><span class="on">Plan</span><span>Files</span></div>${planList()}</div></div>
+      <div class="center">${centerHead('EnrichmentScheduler.cs')}${diff()}</div>
+      <div class="pane right"><div class="pad"><div class="h3">Why this is Critical</div><div class="caption">IgnoreQueryFilters reads every tenant. Isolation now depends on the loop below filtering by tenant id.</div><div class="h3">Relevant precedent</div><div class="caption">InboxService.QueueAsync · TenantScope.cs</div><div class="h3">Patterns in this repository</div><div class="caption tert">3 consistency notes, folded</div></div></div>`;
+  } else {
+    cols = `${left}px 1fr`;
+    const colHtml = plan.tiers.map(t => `<div class="col"><div class="tier-head"><span class="pill ${t.pill}">${t.name}</span><span class="n">${t.lines}</span></div>${t.items.map(it => `<div class="item" style="${it.ack ? 'opacity:.45' : ''}"><div class="t">${it.t}</div><div class="why caption">${it.why}</div></div>`).join('')}</div>`).join('')
+      + `<div class="col"><div class="tier-head"><span class="pill skip">Skip</span><span class="n">15,864 lines</span></div><div class="caption">14 generated files, 4 usings-only hunks. Proven mechanical.</div></div>`;
+    body = `<div class="pane left"><div class="pad">${fileTree()}</div></div>
+      <div class="center" style="grid-template-rows:auto auto 1fr"><div class="head"><div class="summary">${plan.summary}</div><span class="kbd">J start</span></div>
+      <div class="progress"><div class="meter"><i></i></div></div><div class="board">${colHtml}</div></div>`;
+  }
+  return `<div class="win" style="width:${w}px;height:${h}px"><div class="titlebar"><b>Lumen</b><span>KhaiStimpson / andrew-crm</span><span>#58 Contact data enrichment</span></div><div class="cols" style="grid-template-columns:${cols}">${body}</div></div>`;
+}
+function render() {
+  document.querySelectorAll('.frames').forEach(el => {
+    const v = el.dataset.variant;
+    el.innerHTML = [[1280, 800], [1920, 1080]].map(([w, h]) => `<div class="frame"><div class="viewport" style="aspect-ratio:${w}/${h}">${windowHtml(v, w, h)}</div><span class="label">${w}×${h}</span></div>`).join('');
+  });
+  fit();
+}
+function fit() {
+  document.querySelectorAll('.viewport').forEach(vp => {
+    const win = vp.firstElementChild;
+    const scale = vp.clientWidth / parseFloat(win.style.width);
+    win.style.transform = `scale(${scale})`;
+  });
+}
+render();
+addEventListener('resize', fit);
+</script>
