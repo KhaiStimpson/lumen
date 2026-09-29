@@ -25,6 +25,9 @@ service ReviewEngine {
   // Ticks or clears GitHub's per-file "Viewed" checkbox for the signed-in user.
   rpc SetFileViewed (SetFileViewedRequest) returns (SetFileViewedReply);
 
+  // Clears (or restores) a triage group, e.g. "Renamed `Foo`→`Bar`", for this pull request. Stored like dismissals.
+  rpc SetTriageGroupAcknowledged (SetTriageGroupAcknowledgedRequest) returns (SetTriageGroupAcknowledgedReply);
+
   // Connections (TDD §39). Checking status spends no usage. Keys go to the platform credential store and are never
   // returned or logged.
   rpc GetConnections (GetConnectionsRequest) returns (Connections);
@@ -77,8 +80,23 @@ message PullRequestEvent {
     FileViewed file_viewed = 10;
     // Where to spend attention, per hunk. Sent once per analysis, after the snapshot and before review points.
     TriageReady triage_ready = 11;
+    TriageGroupAcknowledged triage_group_acknowledged = 12;
   }
 }
+
+// A triage group was acknowledged or restored after TriageReady was sent.
+message TriageGroupAcknowledged {
+  string group_id = 1;
+  bool acknowledged = 2;
+}
+
+message SetTriageGroupAcknowledgedRequest {
+  PullRequestRef pull_request = 1;
+  string group_id = 2;
+  bool acknowledged = 3;
+}
+
+message SetTriageGroupAcknowledgedReply {}
 
 // A file's "Viewed" checkbox changed after the snapshot was sent.
 message FileViewed {

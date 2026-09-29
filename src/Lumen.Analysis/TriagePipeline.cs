@@ -112,7 +112,7 @@ public sealed class TriagePipeline(IReadOnlyList<IHunkClassifier> classifiers)
                         continue;
                     }
 
-                    var groupId = part.Group is { } claim ? $"g{GroupIndex(claim.Key, groupKeys)}" : null;
+                    var groupId = part.Group is { } claim ? GroupId(claim.Key, groupKeys) : null;
                     var triage = new HunkTriage
                     {
                         Path = file.Path,
@@ -143,7 +143,7 @@ public sealed class TriagePipeline(IReadOnlyList<IHunkClassifier> classifiers)
         }
 
         var groups = groupKeys
-            .Select((_, i) => $"g{i}")
+            .Select(key => IdFor(key))
             .Select(id => new TriageGroup { Id = id, Class = groupInfo[id].Class, Title = groupInfo[id].Title, Members = groupInfo[id].Members })
             .ToList();
 
@@ -175,16 +175,21 @@ public sealed class TriagePipeline(IReadOnlyList<IHunkClassifier> classifiers)
             ? new(ChangeClass.NewCode, TriageTier.Skim, ["new file"])
             : new(ChangeClass.BehaviourChange, TriageTier.WorthALook, ["changes existing code"]);
 
-    private static int GroupIndex(string key, List<string> keys)
+    /// <summary>
+    /// A group's id is derived from what the group is (its claim key), not its position, so an acknowledgement stored
+    /// for a pull request still points at the same group after a new push or a re-analysis.
+    /// </summary>
+    public static string IdFor(string groupKey) =>
+        "g" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(groupKey)))[..12].ToLowerInvariant();
+
+    private static string GroupId(string key, List<string> keys)
     {
-        var index = keys.IndexOf(key);
-        if (index >= 0)
+        if (!keys.Contains(key))
         {
-            return index;
+            keys.Add(key);
         }
 
-        keys.Add(key);
-        return keys.Count - 1;
+        return IdFor(key);
     }
 
     /// <summary>The tightest old/new line spans covering the hunk's changed lines; context is not part of the span.</summary>

@@ -108,6 +108,13 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
     [ObservableProperty]
     public partial TriageReady? Triage { get; set; }
 
+    /// <summary>A group's acknowledged flag changed (the group in <see cref="Triage"/> is already updated).</summary>
+    public event EventHandler<string>? TriageGroupChanged;
+
+    /// <summary>Clears or restores a triage group; the change arrives back as an event, like the Viewed tick.</summary>
+    public Task SetTriageGroupAcknowledgedAsync(string groupId, bool acknowledged) =>
+        _source.SetTriageGroupAcknowledgedAsync(Ref, groupId, acknowledged, CancellationToken.None);
+
     // Files ----------------------------------------------------------------------------------------
 
     public ObservableCollection<FileEntryViewModel> Files { get; } = [];
@@ -332,6 +339,15 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
             case PullRequestEvent.EventOneofCase.TriageReady:
                 Triage = evt.TriageReady;
+                break;
+
+            case PullRequestEvent.EventOneofCase.TriageGroupAcknowledged:
+                if (Triage?.Groups.FirstOrDefault(g => g.Id == evt.TriageGroupAcknowledged.GroupId) is { } group)
+                {
+                    group.Acknowledged = evt.TriageGroupAcknowledged.Acknowledged;
+                    TriageGroupChanged?.Invoke(this, group.Id);
+                }
+
                 break;
 
             case PullRequestEvent.EventOneofCase.ReviewPointAdded:

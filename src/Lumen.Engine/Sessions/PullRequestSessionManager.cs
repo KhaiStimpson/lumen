@@ -74,13 +74,14 @@ public sealed partial class PullRequestSessionManager(
             Progress(session, "triage", "Separating mechanical changes from real ones…");
             var triageResult = await triage.RunAsync(snapshot, checkout, settings, ct).ConfigureAwait(false);
             session.SetTriage(triageResult);
+            var states = await store.GetLatestActionsAsync(key, ct).ConfigureAwait(false);
             if (triageResult is not null)
             {
-                session.Publish(new PullRequestEvent { TriageReady = ProtoMapper.ToProto(triageResult, snapshot, viewed) });
+                var acknowledged = TriageAcknowledgement.AcknowledgedGroups(states);
+                session.Publish(new PullRequestEvent { TriageReady = ProtoMapper.ToProto(triageResult, snapshot, viewed, acknowledged) });
             }
 
             Progress(session, "analysis", "Comparing with repository precedent…");
-            var states = await store.GetLatestActionsAsync(key, ct).ConfigureAwait(false);
 
             var result = await pipeline.RunAsync(
                 new AnalysisContext(snapshot, checkout) { Settings = settings },

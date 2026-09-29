@@ -89,6 +89,10 @@ public enum ReviewAction
     Commented,
     Examined,
     Restored,
+
+    /// <summary>A triage group the reviewer has cleared (recorded against <see cref="TriageAcknowledgement.InteractionId"/>).</summary>
+    Acknowledged,
+    Unacknowledged,
 }
 
 public sealed record ReviewInteraction(

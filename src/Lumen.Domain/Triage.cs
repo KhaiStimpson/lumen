@@ -91,3 +91,18 @@ public interface ITriageStore
 
     Task SaveTriageAsync(PullRequestKey key, string headSha, string version, TriageResult result, CancellationToken cancellationToken);
 }
+
+/// <summary>Acknowledging a group is stored like a dismissal: an interaction on a per-PR id, latest action wins.</summary>
+public static class TriageAcknowledgement
+{
+    private const string Prefix = "triage-group:";
+
+    public static string InteractionId(string groupId) => Prefix + groupId;
+
+    /// <summary>Group ids whose latest recorded action is Acknowledged.</summary>
+    public static IReadOnlySet<string> AcknowledgedGroups(IReadOnlyDictionary<string, ReviewAction> latestActions) =>
+        latestActions
+            .Where(kv => kv.Key.StartsWith(Prefix, StringComparison.Ordinal) && kv.Value == ReviewAction.Acknowledged)
+            .Select(kv => kv.Key[Prefix.Length..])
+            .ToHashSet(StringComparer.Ordinal);
+}

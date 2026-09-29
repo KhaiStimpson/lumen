@@ -115,6 +115,18 @@ public class TriagePipelineTests
     }
 
     [Fact]
+    public void GroupIdsComeFromWhatTheGroupIsNotItsPosition()
+    {
+        var claim = new Fixed(c => new(ChangeClass.Rename, TriageTier.Skip, ["r"], new GroupClaim(c.File.Path == "src/A.cs" ? "k1" : "k2", "t")));
+        var both = new TriagePipeline([claim]).Run(Snapshot(TestDiffs.RewrittenFile("src/A.cs", "a", "b"), TestDiffs.RewrittenFile("src/B.cs", "a", "b")));
+        var onlyB = new TriagePipeline([claim]).Run(Snapshot(TestDiffs.RewrittenFile("src/B.cs", "a", "b")));
+
+        Assert.Equal(TriagePipeline.IdFor("k2"), both.Groups.Single(g => g.Members[0].Path == "src/B.cs").Id);
+        Assert.Equal(TriagePipeline.IdFor("k2"), Assert.Single(onlyB.Groups).Id);
+        Assert.NotEqual(TriagePipeline.IdFor("k1"), TriagePipeline.IdFor("k2"));
+    }
+
+    [Fact]
     public void SpansCoverChangedLinesNotContext()
     {
         const string diff = "diff --git a/src/A.cs b/src/A.cs\n" +

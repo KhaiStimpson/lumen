@@ -110,7 +110,7 @@ Compute triage in the engine, cache it, and stream it to the app.
       existing behaviour", with per-tier line counts.
 - [x] Re-record `tests/fixtures/andrew-crm-58/events.jsonl` so `--fixture` replay includes triage; `FixtureReviewSource`
       and `GrpcLikeReviewSource` updated; App tests green.
-- [ ] Acknowledging a group persists like dismissals (`SetTriageGroupAcknowledged` RPC, stored per PR); engine test.
+- [x] Acknowledging a group persists like dismissals (`SetTriageGroupAcknowledged` RPC, stored per PR); engine test.
 
 ## Phase 4 — The Review plan in the app
 
