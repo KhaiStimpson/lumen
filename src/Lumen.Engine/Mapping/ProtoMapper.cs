@@ -150,8 +150,10 @@ public static class ProtoMapper
 
     public static TriageSummary Summarise(D.TriageResult triage) => new()
     {
+        Text = Analysis.TriageSummaryText.Describe(triage),
         TotalLines = triage.Hunks.Sum(h => h.ChangedLines),
-        MechanicalLines = triage.Hunks.Where(h => h.Class.IsMechanical()).Sum(h => h.ChangedLines),
+        MechanicalLines = Analysis.TriageSummaryText.ProvenMechanical(triage),
+        LikelyMechanicalLines = Analysis.TriageSummaryText.LikelyMechanical(triage),
         NewCodeLines = triage.Hunks.Where(h => h.Class == D.ChangeClass.NewCode).Sum(h => h.ChangedLines),
         BehaviourChangeLines = triage.Hunks.Where(h => h.Class == D.ChangeClass.BehaviourChange).Sum(h => h.ChangedLines),
         TierLines = TierLinesOf(triage.Hunks),

@@ -179,10 +179,13 @@ message TriageSummary {
   // e.g. "19,700 lines changed: 14,100 proven mechanical, 3,200 new code, 2,400 changing existing behaviour".
   string text = 1;
   int32 total_lines = 2;
+  // Mechanical and proven: a mechanical class in Skip.
   int32 mechanical_lines = 3;
   int32 new_code_lines = 4;
   int32 behaviour_change_lines = 5;
   TierLines tier_lines = 6;
+  // A mechanical class left above Skip, e.g. ripple call sites or a move into another type.
+  int32 likely_mechanical_lines = 7;
 }
 
 message TriageReady {

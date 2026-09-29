@@ -101,6 +101,7 @@ public class TriageMappingTests
         Assert.Equal((2, 6, true), (group.MemberCount, group.ChangedLines, group.Acknowledged));
 
         Assert.Equal((41, 6, 30, 5), (ready.Summary.TotalLines, ready.Summary.MechanicalLines, ready.Summary.NewCodeLines, ready.Summary.BehaviourChangeLines));
+        Assert.Equal("41 lines changed: 6 proven mechanical, 30 new code, 5 changing existing behaviour", ready.Summary.Text);
         Assert.Equal((5, 0, 30, 6), (ready.Summary.TierLines.Critical, ready.Summary.TierLines.WorthALook, ready.Summary.TierLines.Skim, ready.Summary.TierLines.Skip));
     }
 
