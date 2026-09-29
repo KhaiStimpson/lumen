@@ -29,7 +29,7 @@ public sealed record TriageLabel
 }
 
 /// <summary>The contents of <c>tests/fixtures/triage/&lt;owner&gt;-&lt;repo&gt;-&lt;pr&gt;/labels.json</c>.</summary>
-public sealed record TriageLabelSet(IReadOnlyList<TriageLabel> Labels)
+public sealed record TriageLabelSet(IReadOnlyList<TriageLabel> Labels, string? Pr = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {

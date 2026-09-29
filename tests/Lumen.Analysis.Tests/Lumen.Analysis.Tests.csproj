@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <None Include="..\fixtures\triage\**" LinkBase="fixtures/triage" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\andrew-crm-58\diffs.jsonl" LinkBase="fixtures/andrew-crm-58" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

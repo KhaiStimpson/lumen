@@ -22,3 +22,15 @@ Everything in the plan's "Already decided" list. Open question pending at end of
 - Recall counts a Critical label as recalled if ANY overlapping hunk is Critical/WorthALook. FP = label Critical/WorthALook overlapping a Skip hunk of a mechanical class.
 - Hand-made fixture: `tests/fixtures/triage/acme-shop-1/{diff.patch,labels.json}`; copied to test output via csproj `None` item.
 - Tool quirk: bash heredocs with lone `'` in content can fail; use the Write tool for source files. Backslashes in python-in-bash get eaten; use Edit for csproj paths.
+
+## Task 4 — STOPPED FOR A QUESTION (task NOT ticked)
+Work is committed: draft labels `tests/fixtures/triage/KhaiStimpson-andrew-crm-58/labels.json` (32 labels, all `"draft": true`), `tests/Lumen.Analysis.Tests/Support/DiffsJsonl.cs` (replay parser), and `TriageGoldenEvaluationTests` (opt-in `LUMEN_TRIAGE_EVAL=1`; run with `dotnet test tests/Lumen.Analysis.Tests --filter TriageGoldenEvaluationTests --logger "console;verbosity=detailed"`).
+
+Baseline (pipeline with only the file-level classifier): critical recall 2/3, 0 mechanical false positives, 3,887 changed lines = 659 WorthALook (BehaviourChange) / 3,228 Skim (NewCode) / 0 Critical / 0 Skip. The one miss is EnrichmentScheduler.cs (a NEW file, so it defaults to NewCode/Skim) — expected; Phase 5 risk signals must lift it.
+
+**Question for the user (the plan requires an answer before ticking):** please confirm or correct the three drafted CRITICAL labels, and say if any WorthALook/Skim label should be Critical:
+1. `Services/Ai/AiSourceAuthorization.cs` 74-83 — new ExternalKnowledge branch in the AI-source authorization gate.
+2. `Services/CatchMeUpService.cs` 515-531 — untrusted external enrichment text enters the AI prompt context.
+3. `Services/Enrichment/EnrichmentScheduler.cs` 46-50 — `IgnoreQueryFilters` across all tenants in the scheduled refresh.
+Other candidates I rated WorthALook: opt-in consent toggle (Settings/Index.cshtml.cs 108-117), PeopleDataLabsProvider sending contact email to a paid third party (30-45), ImportService auto-enrich fan-out (105-116), DataProtection key handling (EnrichmentSettingsService 80-110).
+After the answer: set `"draft": false` on confirmed labels (edit the tiers as corrected), tick task 4, then Phase 1 is done and `scripts/phase-boundary.sh` will report the boundary -> start Phase 2 on fresh context.
