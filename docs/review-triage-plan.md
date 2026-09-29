@@ -108,7 +108,7 @@ Compute triage in the engine, cache it, and stream it to the app.
       `WatchPullRequest`; `ChangedFileSummary` gains per-file tier counts. Mapping tests both directions.
 - [x] `TriageSummary` in words: "19,700 lines changed: 14,100 proven mechanical, 3,200 new code, 2,400 changing
       existing behaviour", with per-tier line counts.
-- [ ] Re-record `tests/fixtures/andrew-crm-58/events.jsonl` so `--fixture` replay includes triage; `FixtureReviewSource`
+- [x] Re-record `tests/fixtures/andrew-crm-58/events.jsonl` so `--fixture` replay includes triage; `FixtureReviewSource`
       and `GrpcLikeReviewSource` updated; App tests green.
 - [ ] Acknowledging a group persists like dismissals (`SetTriageGroupAcknowledged` RPC, stored per PR); engine test.
 

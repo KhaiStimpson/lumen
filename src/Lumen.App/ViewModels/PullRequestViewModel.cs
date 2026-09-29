@@ -102,6 +102,12 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
     public bool ViewerIsAuthor => ViewerLogin.Length > 0 && string.Equals(ViewerLogin, Author, StringComparison.OrdinalIgnoreCase);
 
+    // Triage ---------------------------------------------------------------------------------------
+
+    /// <summary>Where to spend attention, per hunk; null until the engine sends it (or when it could not compute it).</summary>
+    [ObservableProperty]
+    public partial TriageReady? Triage { get; set; }
+
     // Files ----------------------------------------------------------------------------------------
 
     public ObservableCollection<FileEntryViewModel> Files { get; } = [];
@@ -322,6 +328,10 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
             case PullRequestEvent.EventOneofCase.Snapshot:
                 await ApplySnapshotAsync(evt.Snapshot).ConfigureAwait(true);
+                break;
+
+            case PullRequestEvent.EventOneofCase.TriageReady:
+                Triage = evt.TriageReady;
                 break;
 
             case PullRequestEvent.EventOneofCase.ReviewPointAdded:
