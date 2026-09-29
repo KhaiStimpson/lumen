@@ -112,12 +112,6 @@ public sealed record TriageEvaluationReport(
 /// <summary>Scores a triage against human labels: did critical hunks surface, and was anything real called mechanical?</summary>
 public static class TriageEvaluation
 {
-    private static readonly HashSet<ChangeClass> MechanicalClasses =
-    [
-        ChangeClass.Formatting, ChangeClass.CommentsOnly, ChangeClass.ImportsOnly,
-        ChangeClass.Rename, ChangeClass.Move, ChangeClass.Ripple, ChangeClass.Generated,
-    ];
-
     public static TriageEvaluationReport Evaluate(TriageLabelSet labels, TriageResult triage)
     {
         var missed = new List<TriageLabel>();
@@ -145,7 +139,7 @@ public static class TriageEvaluation
             if (label.Tier is TriageTier.Critical or TriageTier.WorthALook)
             {
                 falsePositives.AddRange(overlapping
-                    .Where(h => h.Tier == TriageTier.Skip && MechanicalClasses.Contains(h.Class))
+                    .Where(h => h.Tier == TriageTier.Skip && h.Class.IsMechanical())
                     .Select(h => new MechanicalFalsePositive(label, h)));
             }
         }

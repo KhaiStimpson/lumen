@@ -104,7 +104,7 @@ Compute triage in the engine, cache it, and stream it to the app.
 
 - [x] Engine runs `TriagePipeline` after the snapshot and before detectors; results cached per head SHA in SQLite
       (`SqliteReviewStore`, new table) with a store test.
-- [ ] Contracts: `HunkTriage`, `TriageGroup`, `TriageSummary` messages and a `TriageReady` event on
+- [x] Contracts: `HunkTriage`, `TriageGroup`, `TriageSummary` messages and a `TriageReady` event on
       `WatchPullRequest`; `ChangedFileSummary` gains per-file tier counts. Mapping tests both directions.
 - [ ] `TriageSummary` in words: "19,700 lines changed: 14,100 proven mechanical, 3,200 new code, 2,400 changing
       existing behaviour", with per-tier line counts.

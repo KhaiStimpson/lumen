@@ -75,6 +75,8 @@ message PullRequestEvent {
     ReviewPoint review_point_updated = 8;
     InvestigationStatus investigation_status = 9;
     FileViewed file_viewed = 10;
+    // Where to spend attention, per hunk. Sent once per analysis, after the snapshot and before review points.
+    TriageReady triage_ready = 11;
   }
 }
 
@@ -114,6 +116,81 @@ message ChangedFileSummary {
   string mechanical_reason = 8;
   // The viewer ticked "Viewed" on GitHub and the file has not changed since.
   bool is_viewed = 9;
+  // Changed lines per triage tier. Empty in the snapshot; filled in the files TriageReady re-sends.
+  TierLines tier_lines = 10;
+}
+
+// Changed lines (added plus removed) per triage tier.
+message TierLines {
+  int32 critical = 1;
+  int32 worth_a_look = 2;
+  int32 skim = 3;
+  int32 skip = 4;
+}
+
+// What kind of change a hunk is. The zero value is the conservative one: an unset class is never mechanical.
+enum ChangeClass {
+  CHANGE_CLASS_BEHAVIOUR_CHANGE = 0;
+  CHANGE_CLASS_NEW_CODE = 1;
+  CHANGE_CLASS_FORMATTING = 2;
+  CHANGE_CLASS_COMMENTS_ONLY = 3;
+  CHANGE_CLASS_IMPORTS_ONLY = 4;
+  CHANGE_CLASS_RENAME = 5;
+  CHANGE_CLASS_MOVE = 6;
+  CHANGE_CLASS_RIPPLE = 7;
+  CHANGE_CLASS_GENERATED = 8;
+}
+
+// Where a reviewer should spend attention. The zero value is the conservative one: an unset tier is never Skip.
+enum TriageTier {
+  TRIAGE_TIER_WORTH_A_LOOK = 0;
+  TRIAGE_TIER_CRITICAL = 1;
+  TRIAGE_TIER_SKIM = 2;
+  TRIAGE_TIER_SKIP = 3;
+}
+
+// One hunk (or part of one). Lines are 1-based and inclusive; 0 when the side has no lines.
+message HunkTriage {
+  string path = 1;
+  int32 old_start = 2;
+  int32 old_end = 3;
+  int32 new_start = 4;
+  int32 new_end = 5;
+  ChangeClass change_class = 6;
+  TriageTier tier = 7;
+  // In words, e.g. "pure rename `Foo`→`Bar`". Never a score.
+  repeated string reasons = 8;
+  int32 changed_lines = 9;
+  // Empty when the hunk is in no group.
+  string group_id = 10;
+}
+
+// Hunks that are one idea across the pull request; members are the hunks carrying this group_id.
+message TriageGroup {
+  string id = 1;
+  ChangeClass change_class = 2;
+  string title = 3;
+  int32 member_count = 4;
+  int32 changed_lines = 5;
+  bool acknowledged = 6;
+}
+
+message TriageSummary {
+  // e.g. "19,700 lines changed: 14,100 proven mechanical, 3,200 new code, 2,400 changing existing behaviour".
+  string text = 1;
+  int32 total_lines = 2;
+  int32 mechanical_lines = 3;
+  int32 new_code_lines = 4;
+  int32 behaviour_change_lines = 5;
+  TierLines tier_lines = 6;
+}
+
+message TriageReady {
+  repeated HunkTriage hunks = 1;
+  repeated TriageGroup groups = 2;
+  TriageSummary summary = 3;
+  // The snapshot's files again, with tier_lines filled; the client takes tier_lines from here by path.
+  repeated ChangedFileSummary files = 4;
 }
 
 message PullRequestSnapshot {

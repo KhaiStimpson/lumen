@@ -72,7 +72,12 @@ public sealed partial class PullRequestSessionManager(
 
             // Triage runs before detectors (it needs only the snapshot) and never blocks the review: null means unavailable.
             Progress(session, "triage", "Separating mechanical changes from real ones…");
-            session.SetTriage(await triage.RunAsync(snapshot, checkout, settings, ct).ConfigureAwait(false));
+            var triageResult = await triage.RunAsync(snapshot, checkout, settings, ct).ConfigureAwait(false);
+            session.SetTriage(triageResult);
+            if (triageResult is not null)
+            {
+                session.Publish(new PullRequestEvent { TriageReady = ProtoMapper.ToProto(triageResult, snapshot, viewed) });
+            }
 
             Progress(session, "analysis", "Comparing with repository precedent…");
             var states = await store.GetLatestActionsAsync(key, ct).ConfigureAwait(false);

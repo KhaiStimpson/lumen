@@ -17,6 +17,14 @@ public enum ChangeClass
     BehaviourChange,
 }
 
+public static class ChangeClasses
+{
+    /// <summary>Classes a proof has shown to be mechanical (Ripple call sites included: they only follow another change).</summary>
+    public static bool IsMechanical(this ChangeClass value) => value is
+        ChangeClass.Formatting or ChangeClass.CommentsOnly or ChangeClass.ImportsOnly or ChangeClass.Rename or
+        ChangeClass.Move or ChangeClass.Ripple or ChangeClass.Generated;
+}
+
 /// <summary>Where a reviewer should spend attention. The names read as instructions to a reviewer.</summary>
 [JsonConverter(typeof(JsonStringEnumConverter<TriageTier>))]
 public enum TriageTier
