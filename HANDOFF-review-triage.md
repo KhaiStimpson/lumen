@@ -23,7 +23,10 @@ Everything in the plan's "Already decided" list. Open question pending at end of
 - Hand-made fixture: `tests/fixtures/triage/acme-shop-1/{diff.patch,labels.json}`; copied to test output via csproj `None` item.
 - Tool quirk: bash heredocs with lone `'` in content can fail; use the Write tool for source files. Backslashes in python-in-bash get eaten; use Edit for csproj paths.
 
-## Task 4 — STOPPED FOR A QUESTION (task NOT ticked)
+## Task 4 — ticked on the user's instruction "don't wait, keep going"
+The user chose to proceed without confirming labels. Labels stay `"draft": true`; the plan's open question stays open for them to correct later. Loop continues in the same session across phase boundaries (user instruction).
+
+### Original question (still open)
 Work is committed: draft labels `tests/fixtures/triage/KhaiStimpson-andrew-crm-58/labels.json` (32 labels, all `"draft": true`), `tests/Lumen.Analysis.Tests/Support/DiffsJsonl.cs` (replay parser), and `TriageGoldenEvaluationTests` (opt-in `LUMEN_TRIAGE_EVAL=1`; run with `dotnet test tests/Lumen.Analysis.Tests --filter TriageGoldenEvaluationTests --logger "console;verbosity=detailed"`).
 
 Baseline (pipeline with only the file-level classifier): critical recall 2/3, 0 mechanical false positives, 3,887 changed lines = 659 WorthALook (BehaviourChange) / 3,228 Skim (NewCode) / 0 Critical / 0 Skip. The one miss is EnrichmentScheduler.cs (a NEW file, so it defaults to NewCode/Skim) — expected; Phase 5 risk signals must lift it.

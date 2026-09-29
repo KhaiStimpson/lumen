@@ -75,7 +75,7 @@ Define what a tier is and build the yardstick first, so every later phase is mea
 - [x] Golden label format `tests/fixtures/triage/<owner>-<repo>-<pr>/labels.json` (path, line span, expected tier,
       note) and a `TriageEvaluation` that reports critical recall, mechanical false positives, and lines per tier.
       Unit-tested on a hand-made fixture.
-- [ ] Draft labels for andrew-crm#58 from `tests/fixtures/andrew-crm-58/diffs.jsonl`, marked `"draft": true`, and
+- [x] Draft labels for andrew-crm#58 from `tests/fixtures/andrew-crm-58/diffs.jsonl`, marked `"draft": true`, and
       an opt-in test (`LUMEN_TRIAGE_EVAL=1`) that prints the evaluation. **Stop and ask the user to confirm or
       correct the critical labels** before ticking.
 
