@@ -12,6 +12,7 @@ public static class RoslynTriage
         new CommentsOnlyClassifier(),
         new ImportsOnlyClassifier(),
         new RenameClassifier(),
+        new MoveClassifier(),
     ];
 
     public static TriagePipeline CreatePipeline() => new(Classifiers());

@@ -39,7 +39,17 @@ public sealed class TriageWorkspace
 public sealed record GroupClaim(string Key, string Title);
 
 /// <summary>A classifier's proof that a hunk is of a given class. <see cref="Reasons"/> are words, never a score.</summary>
-public sealed record HunkVerdict(ChangeClass Class, TriageTier Tier, IReadOnlyList<string> Reasons, GroupClaim? Group = null);
+public sealed record HunkVerdict(ChangeClass Class, TriageTier Tier, IReadOnlyList<string> Reasons, GroupClaim? Group = null)
+{
+    /// <summary>
+    /// When set, the hunk is reported as these parts instead (for example the moved lines and the lines edited
+    /// during the move); each part's span and line count come from its own changed lines.
+    /// </summary>
+    public IReadOnlyList<HunkPart> Parts { get; init; } = [];
+}
+
+/// <summary>Some of a hunk's changed lines, with their own verdict.</summary>
+public sealed record HunkPart(ChangeClass Class, TriageTier Tier, IReadOnlyList<string> Reasons, GroupClaim? Group, IReadOnlyList<DiffLine> Lines);
 
 /// <summary>
 /// One proof about a hunk. Return null when the hunk is not provably of this class: any doubt, parse error or
@@ -84,7 +94,7 @@ public sealed class TriagePipeline(IReadOnlyList<IHunkClassifier> classifiers)
         {
             foreach (var hunk in file.Hunks)
             {
-                if (SpanOf(hunk) is not { } span)
+                if (SpanOf(hunk.Lines) is null)
                 {
                     continue;
                 }
@@ -96,31 +106,43 @@ public sealed class TriagePipeline(IReadOnlyList<IHunkClassifier> classifiers)
                     Sources = sources,
                     Workspace = workspace,
                 }) ?? Fallback(file);
-                var groupId = verdict.Group is { } claim ? $"g{GroupIndex(claim.Key, groupKeys)}" : null;
-                var triage = new HunkTriage
-                {
-                    Path = file.Path,
-                    OldStart = span.OldStart,
-                    OldEnd = span.OldEnd,
-                    NewStart = span.NewStart,
-                    NewEnd = span.NewEnd,
-                    Class = verdict.Class,
-                    Tier = verdict.Tier,
-                    Reasons = verdict.Reasons,
-                    ChangedLines = hunk.Lines.Count(l => l.Kind != DiffLineKind.Context),
-                    GroupId = groupId,
-                };
-                hunks.Add(triage);
 
-                if (groupId is not null)
+                var parts = verdict.Parts.Count > 0
+                    ? verdict.Parts
+                    : [new HunkPart(verdict.Class, verdict.Tier, verdict.Reasons, verdict.Group, hunk.Lines)];
+                foreach (var part in parts)
                 {
-                    if (!groupInfo.TryGetValue(groupId, out var info))
+                    if (SpanOf(part.Lines) is not { } partSpan)
                     {
-                        info = (verdict.Class, verdict.Group!.Title, []);
-                        groupInfo[groupId] = info;
+                        continue;
                     }
 
-                    info.Members.Add(triage);
+                    var groupId = part.Group is { } claim ? $"g{GroupIndex(claim.Key, groupKeys)}" : null;
+                    var triage = new HunkTriage
+                    {
+                        Path = file.Path,
+                        OldStart = partSpan.OldStart,
+                        OldEnd = partSpan.OldEnd,
+                        NewStart = partSpan.NewStart,
+                        NewEnd = partSpan.NewEnd,
+                        Class = part.Class,
+                        Tier = part.Tier,
+                        Reasons = part.Reasons,
+                        ChangedLines = part.Lines.Count(l => l.Kind != DiffLineKind.Context),
+                        GroupId = groupId,
+                    };
+                    hunks.Add(triage);
+
+                    if (groupId is not null)
+                    {
+                        if (!groupInfo.TryGetValue(groupId, out var info))
+                        {
+                            info = (part.Class, part.Group!.Title, []);
+                            groupInfo[groupId] = info;
+                        }
+
+                        info.Members.Add(triage);
+                    }
                 }
             }
         }
@@ -171,10 +193,10 @@ public sealed class TriagePipeline(IReadOnlyList<IHunkClassifier> classifiers)
     }
 
     /// <summary>The tightest old/new line spans covering the hunk's changed lines; context is not part of the span.</summary>
-    private static (int? OldStart, int? OldEnd, int? NewStart, int? NewEnd)? SpanOf(DiffHunk hunk)
+    private static (int? OldStart, int? OldEnd, int? NewStart, int? NewEnd)? SpanOf(IEnumerable<DiffLine> lines)
     {
         int? oldStart = null, oldEnd = null, newStart = null, newEnd = null;
-        foreach (var line in hunk.Lines)
+        foreach (var line in lines)
         {
             if (line.Kind == DiffLineKind.Removed && line.OldNumber is { } o)
             {
