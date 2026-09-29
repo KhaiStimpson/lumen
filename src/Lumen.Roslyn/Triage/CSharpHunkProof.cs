@@ -12,7 +12,12 @@ public sealed record CSharpHunkProof(CodeFingerprint Before, CodeFingerprint Aft
     public static bool IsCSharp(string path) => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Null when the file is not C#, its base was not loaded, the hunk does not apply, or either side fails to parse.</summary>
-    public static CSharpHunkProof? For(HunkContext context)
+    public static CSharpHunkProof? For(HunkContext context) =>
+        context.Workspace.GetOrAdd(
+            $"proof:{context.File.Path}:{context.Hunk.OldStart}:{context.Hunk.NewStart}",
+            () => Create(context));
+
+    private static CSharpHunkProof? Create(HunkContext context)
     {
         if (!IsCSharp(context.File.Path) || context.BaseText is not { } baseText)
         {

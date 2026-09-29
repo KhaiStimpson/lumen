@@ -9,6 +9,8 @@ public static class RoslynTriage
     [
         new MechanicalFileClassifier(),
         new FormattingClassifier(),
+        new CommentsOnlyClassifier(),
+        new ImportsOnlyClassifier(),
     ];
 
     public static TriagePipeline CreatePipeline() => new(Classifiers());

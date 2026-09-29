@@ -51,3 +51,5 @@ After the answer: set `"draft": false` on confirmed labels (edit the tiers as co
 - Tests: `tests/Lumen.Analysis.Tests/Triage/`; `Support/TriageHarness.cs` builds minimal LCS diffs from base/head texts (`TriageHarness.Single(base, head)`, `Run(new TestFile(path, base, head), ...)`).
 - Gate script (scratchpad, not committed): builds+tests with artifacts output.
 - Shell gotcha: never put `'\r'` through bash/sed/python -c — it becomes a literal CR. Use Write/Edit tools.
+5. Imports-only covers plain `using Ns;` only. Alias, `using static`, `global using` changes rebind names → not mechanical.
+6. Worked directly on `integration/review-triage` rather than per-task ticket branches (single unattended session, one commit per task keeps history reviewable).

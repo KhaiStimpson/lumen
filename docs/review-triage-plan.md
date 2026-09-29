@@ -85,7 +85,7 @@ Layer 1: take the noise out with Roslyn proofs, each classifier independent and 
 
 - [x] Formatting-only: the member's token stream is identical ignoring trivia (whitespace, line breaks). Near-miss
       tests (one changed literal, reordered tokens).
-- [ ] Comments/docs-only and imports-only (`using` directives added/removed/reordered, nothing else changed).
+- [x] Comments/docs-only and imports-only (`using` directives added/removed/reordered, nothing else changed).
 - [ ] Pure rename: old and new syntax trees are equal under a single consistent identifier map; reports the map
       and becomes a `TriageGroup` across files. Near-miss tests (rename plus a changed literal; inconsistent map).
 - [ ] Moved code: normalised member bodies removed in one place and added in another within the PR (same file or
