@@ -19,6 +19,13 @@ internal static class TriageHarness
         var sources = new TriageSources(
             files.Where(f => f.Base is not null).ToDictionary(f => f.Path, f => f.Base!),
             files.Where(f => f.Head is not null).ToDictionary(f => f.Path, f => f.Head!));
+
+        // A hunk that does not apply proves nothing, which would make every "not mechanical" test pass vacuously.
+        foreach (var file in snapshot.Files.Where(f => sources.Base(f.Path) is not null))
+        {
+            Assert.All(file.Hunks, h => Assert.NotNull(HunkApplier.ApplyToBase(sources.Base(file.Path)!, h)));
+        }
+
         return pipeline.Run(snapshot, sources);
     }
 
@@ -28,8 +35,8 @@ internal static class TriageHarness
 
     public static string Diff(string path, string? baseText, string? headText, int context = 3)
     {
-        var a = baseText is null ? [] : TestDiffs.Lines(baseText);
-        var b = headText is null ? [] : TestDiffs.Lines(headText);
+        var a = baseText is null ? [] : FileLines(baseText);
+        var b = headText is null ? [] : FileLines(headText);
         var ops = Ops(a, b);
 
         var sb = new StringBuilder();
@@ -76,6 +83,13 @@ internal static class TriageHarness
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>Lines as git counts them: a final newline ends the last line rather than starting an empty one.</summary>
+    private static string[] FileLines(string text)
+    {
+        var lines = TestDiffs.Lines(text);
+        return lines.Length > 0 && lines[^1].Length == 0 ? lines[..^1] : lines;
     }
 
     private static List<(char Kind, string Text)> Ops(string[] a, string[] b)

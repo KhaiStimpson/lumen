@@ -11,6 +11,7 @@ public static class RoslynTriage
         new FormattingClassifier(),
         new CommentsOnlyClassifier(),
         new ImportsOnlyClassifier(),
+        new RenameClassifier(),
     ];
 
     public static TriagePipeline CreatePipeline() => new(Classifiers());
