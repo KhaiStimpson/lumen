@@ -126,6 +126,8 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         {
             file.TierLines = value?.Files.FirstOrDefault(f => f.Path == file.Path)?.TierLines;
         }
+
+        OnPropertyChanged(nameof(GeneratedSummary));
     }
 
     /// <summary>Clears or restores a triage group; the change arrives back as an event, like the Viewed tick.</summary>
@@ -222,7 +224,9 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
     public string GeneratedSummary => GeneratedFiles.Count == 0
         ? ""
-        : string.Create(CultureInfo.InvariantCulture, $"{GeneratedFiles.Count} generated files · +{GeneratedFiles.Sum(f => f.Model.Additions)}");
+        : GeneratedFiles.All(f => f.TierLines is not null)
+            ? string.Create(CultureInfo.InvariantCulture, $"{GeneratedFiles.Count} generated files · {GeneratedFiles.Sum(f => f.TierLines!.Skip):N0} lines")
+            : string.Create(CultureInfo.InvariantCulture, $"{GeneratedFiles.Count} generated files · +{GeneratedFiles.Sum(f => f.Model.Additions)}");
 
     // Review points --------------------------------------------------------------------------------
 

@@ -17,6 +17,10 @@ public static class Converters
     public static readonly IValueConverter IsZero =
         new FuncValueConverter<int, bool>(n => n == 0);
 
+    /// <summary>Empty text → null, so an empty tooltip does not show.</summary>
+    public static readonly IValueConverter EmptyToNull =
+        new FuncValueConverter<string?, string?>(s => string.IsNullOrEmpty(s) ? null : s);
+
     public static readonly IValueConverter NotEmpty =
         new FuncValueConverter<string?, bool>(s => !string.IsNullOrEmpty(s));
 

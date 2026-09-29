@@ -55,10 +55,13 @@
               <Style Selector="TextBlock.name.viewed">
                 <Setter Property="Foreground" Value="{DynamicResource Text.Tertiary}" />
               </Style>
+              <Style Selector="TextBlock.name.mechanical">
+                <Setter Property="Foreground" Value="{DynamicResource Text.Tertiary}" />
+              </Style>
             </TreeView.Styles>
             <TreeView.ItemTemplate>
               <TreeDataTemplate DataType="vm:FileTreeNode" ItemsSource="{Binding Children}">
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,3,6,3">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,3,6,3">
                   <Path Data="{StaticResource Icon.Folder}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke"
                         Width="12" Height="12" Margin="0,0,8,0" IsVisible="{Binding IsFolder}" />
                   <CheckBox Classes="viewed" IsVisible="{Binding !IsFolder}"
@@ -66,13 +69,23 @@
                             Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).ToggleViewedCommand}"
                             CommandParameter="{Binding File}" ToolTip.Tip="Viewed" />
                   <TextBlock Grid.Column="1" Classes="name" Classes.viewed="{Binding File.IsViewed, FallbackValue=False}"
+                             Classes.mechanical="{Binding File.IsMechanicalOnly, FallbackValue=False}"
+                             ToolTip.Tip="{Binding File.MechanicalLabel, FallbackValue={x:Null}, Converter={x:Static views:Converters.EmptyToNull}}"
                              Text="{Binding Name}" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                  <Path Grid.Column="2" Data="{StaticResource Icon.Deviation}" Fill="{DynamicResource Marker.Deviation}"
+                  <!-- Triage heat: a Critical hunk is marked by shape as well as colour (TDD §28) -->
+                  <Path Grid.Column="2" Name="CriticalMark" Data="{StaticResource Icon.Correctness}" Fill="{DynamicResource Severity.High}"
+                        Width="10" Height="10" Stretch="Uniform" Margin="6,0,0,0" ToolTip.Tip="Has Critical changes"
+                        IsVisible="{Binding File.HasCritical, FallbackValue=False}" />
+                  <Path Grid.Column="3" Data="{StaticResource Icon.Deviation}" Fill="{DynamicResource Marker.Deviation}"
                         Width="10" Height="10" Stretch="Uniform" Margin="6,0,6,0"
                         IsVisible="{Binding File.HasReviewPoints, FallbackValue=False}" />
-                  <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" IsVisible="{Binding !IsFolder}">
-                    <TextBlock Classes="added" Text="{Binding File.AdditionsLabel, FallbackValue=''}" />
-                    <TextBlock Classes="removed" Text="{Binding File.DeletionsLabel, FallbackValue=''}" />
+                  <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" IsVisible="{Binding !IsFolder}">
+                    <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding !File.IsMechanicalOnly, FallbackValue=True}">
+                      <TextBlock Classes="added" Text="{Binding File.AdditionsLabel, FallbackValue=''}" />
+                      <TextBlock Classes="removed" Text="{Binding File.DeletionsLabel, FallbackValue=''}" />
+                    </StackPanel>
+                    <TextBlock Classes="caption tertiary" FontSize="11" Text="{Binding File.MechanicalLabel, FallbackValue=''}"
+                               IsVisible="{Binding File.IsMechanicalOnly, FallbackValue=False}" VerticalAlignment="Center" />
                   </StackPanel>
                 </Grid>
               </TreeDataTemplate>

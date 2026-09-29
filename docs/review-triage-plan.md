@@ -120,7 +120,7 @@ Replace the flat review-point list with a tiered plan the reviewer works through
       record the decision in `docs/design/review-plan.md`. **Stop for the user's pick** before ticking.
 - [x] Review plan pane: summary line, then Critical / Worth a look / Skim / Skip sections with groups and review
       points in their tier; Consistency collapsed at the bottom. View-model tests; screenshots.
-- [ ] File tree heat: mechanical-only files greyed with a "N lines mechanical" count, files with Critical hunks
+- [x] File tree heat: mechanical-only files greyed with a "N lines mechanical" count, files with Critical hunks
       marked. Screenshots.
 - [ ] Diff: mechanical hunks collapsed behind a reason badge ("pure rename `Foo`→`Bar`", "formatting only"),
       expandable; group members link to each other. Screenshots.
