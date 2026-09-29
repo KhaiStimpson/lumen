@@ -130,6 +130,7 @@ public class TriagePipelineTests
         var hunk = Assert.Single(TriagePipeline.Default.Run(Snapshot(diff)).Hunks);
 
         Assert.Equal((11, 11, 11, 11), (hunk.OldStart, hunk.OldEnd, hunk.NewStart, hunk.NewEnd));
+        Assert.Equal(2, hunk.ChangedLines);
     }
 
     [Fact]

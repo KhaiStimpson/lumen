@@ -50,6 +50,9 @@ public sealed record HunkTriage
 
     public required IReadOnlyList<string> Reasons { get; init; }
 
+    /// <summary>Added plus removed lines in the hunk (context excluded); the unit for "lines per tier".</summary>
+    public int ChangedLines { get; init; }
+
     /// <summary>Set when this hunk belongs to a <see cref="TriageGroup"/> (a rename, a move, a ripple).</summary>
     public string? GroupId { get; init; }
 }

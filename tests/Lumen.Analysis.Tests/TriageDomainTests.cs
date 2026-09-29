@@ -15,6 +15,7 @@ public class TriageDomainTests
         Class = cls,
         Tier = tier,
         Reasons = ["pure rename `Foo`→`Bar`"],
+        ChangedLines = 9,
         GroupId = group,
     };
 
@@ -34,6 +35,7 @@ public class TriageDomainTests
         Assert.Equal(original.Class, back.Class);
         Assert.Equal(original.Tier, back.Tier);
         Assert.Equal(original.Reasons, back.Reasons);
+        Assert.Equal(9, back.ChangedLines);
         Assert.Equal("g1", back.GroupId);
     }
 

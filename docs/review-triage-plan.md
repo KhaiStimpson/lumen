@@ -72,7 +72,7 @@ Define what a tier is and build the yardstick first, so every later phase is mea
 - [x] `IHunkClassifier` seam in `Lumen.Analysis` and a `TriagePipeline` that runs classifiers in order, lets the
       first proof win, and defaults unclaimed hunks to NewCode (added file/type) or BehaviourChange. Existing
       file-level `MechanicalClassifier` results become Generated/Skip through it. Unit tests.
-- [ ] Golden label format `tests/fixtures/triage/<owner>-<repo>-<pr>/labels.json` (path, line span, expected tier,
+- [x] Golden label format `tests/fixtures/triage/<owner>-<repo>-<pr>/labels.json` (path, line span, expected tier,
       note) and a `TriageEvaluation` that reports critical recall, mechanical false positives, and lines per tier.
       Unit-tested on a hand-made fixture.
 - [ ] Draft labels for andrew-crm#58 from `tests/fixtures/andrew-crm-58/diffs.jsonl`, marked `"draft": true`, and

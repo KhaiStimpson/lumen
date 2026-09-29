@@ -19,6 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\fixtures\triage\**" LinkBase="fixtures/triage" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Lumen.Analysis\Lumen.Analysis.csproj" />
     <ProjectReference Include="..\..\src\Lumen.Domain\Lumen.Domain.csproj" />
     <ProjectReference Include="..\..\src\Lumen.Roslyn\Lumen.Roslyn.csproj" />

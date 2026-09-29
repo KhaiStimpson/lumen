@@ -69,6 +69,7 @@ public sealed class TriagePipeline(IReadOnlyList<IHunkClassifier> classifiers)
                     Class = verdict.Class,
                     Tier = verdict.Tier,
                     Reasons = verdict.Reasons,
+                    ChangedLines = hunk.Lines.Count(l => l.Kind != DiffLineKind.Context),
                     GroupId = groupId,
                 };
                 hunks.Add(triage);

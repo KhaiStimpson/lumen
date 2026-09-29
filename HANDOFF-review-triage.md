@@ -15,3 +15,10 @@ Branch: `integration/review-triage` (from main). Session: Phase 1.
 
 ## Do not re-litigate
 Everything in the plan's "Already decided" list. Open question pending at end of Phase 1: golden labels for PR #58 need user confirmation.
+
+## Task 3 notes (golden labels)
+- `src/Lumen.Analysis/TriageEvaluation.cs`: `TriageLabel(Path, StartLine, EndLine, Tier, Note, Side "head"|"old", Draft)`, `TriageLabelSet.Load/Parse/ToJson` (web camelCase, string enums), `TriageEvaluation.Evaluate(labels, TriageResult)` -> report (recall, mechanical false positives, unmatched labels, lines per tier/class, `Describe()`).
+- `HunkTriage` gained `ChangedLines` (added+removed), filled by the pipeline.
+- Recall counts a Critical label as recalled if ANY overlapping hunk is Critical/WorthALook. FP = label Critical/WorthALook overlapping a Skip hunk of a mechanical class.
+- Hand-made fixture: `tests/fixtures/triage/acme-shop-1/{diff.patch,labels.json}`; copied to test output via csproj `None` item.
+- Tool quirk: bash heredocs with lone `'` in content can fail; use the Write tool for source files. Backslashes in python-in-bash get eaten; use Edit for csproj paths.
