@@ -279,7 +279,11 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         catch (OperationCanceledException)
         {
         }
-        catch (RpcException ex) when (ex.StatusCode != StatusCode.Cancelled)
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled && token.IsCancellationRequested)
+        {
+            // gRPC reports our own cancellation (Re-analyse, Retry, closing the PR) this way, not as OperationCanceledException.
+        }
+        catch (RpcException ex)
         {
             Fail(ex.Status.Detail, isAuthentication: false);
         }

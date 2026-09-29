@@ -35,6 +35,28 @@ public sealed class PullRequestViewModelTests
     }
 
     [AvaloniaFact]
+    public async Task ReanalysingCancelsTheLiveStreamWithoutFailing()
+    {
+        // The fixture's watch never ends on its own, so re-analysing always cancels a live stream, as with the engine.
+        var pr = await Fixture.LoadAsync(new GrpcLikeReviewSource(Fixture.CreateSource()));
+        try
+        {
+            pr.NeedsReanalysis = true;
+
+            await pr.ReanalyseCommand.ExecuteAsync(null);
+            await Fixture.WaitUntilAsync(() => !pr.IsAnalysing);
+
+            Assert.Null(pr.Error);
+            Assert.False(pr.NeedsReanalysis);
+            Assert.NotEmpty(pr.ReviewPoints);
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task RanksReviewPointsAndTagsThemInOrder()
     {
         var pr = await Fixture.LoadAsync(Fixture.CreateSource());

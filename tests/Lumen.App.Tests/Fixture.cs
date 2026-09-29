@@ -24,7 +24,7 @@ internal static class Fixture
     public static FixtureReviewSource CreateSource() => new(DirectoryPath);
 
     /// <summary>Starts a view model over the fixture and waits for the analysis to complete.</summary>
-    public static async Task<PullRequestViewModel> LoadAsync(FixtureReviewSource source)
+    public static async Task<PullRequestViewModel> LoadAsync(IReviewSource source)
     {
         var pr = new PullRequestViewModel(source, PullRequest);
         pr.Start();
