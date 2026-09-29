@@ -82,6 +82,7 @@ public static class EngineHost
         services.AddSingleton<IReviewStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
         services.AddSingleton<IAttentionEvaluationStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
         services.AddSingleton<IInvestigationStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
+        services.AddSingleton<ITriageStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
 
         services.AddSingleton(_ => EngineSettings.Load(options.DataDirectory));
         services.AddSingleton(sp => new EngineSettingsStore(sp.GetRequiredService<EngineSettings>(), options.DataDirectory));
@@ -94,6 +95,7 @@ public static class EngineHost
         services.AddSingleton<IReviewPointExplainer, PeerDeviationExplainer>();
         services.AddSingleton<ReviewPointPipeline>();
         AddAgents(services, options);
+        services.AddSingleton<TriageRunner>();
         services.AddSingleton<PullRequestSessionManager>();
         services.AddTransient(sp => new ConnectionsProbe(
             sp.GetRequiredService<EngineSettingsStore>(),

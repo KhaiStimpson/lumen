@@ -69,3 +69,17 @@ public sealed record TriageGroup
 
     public required IReadOnlyList<HunkTriage> Members { get; init; }
 }
+
+/// <summary>Every hunk's triage for one head commit, and the groups that tie hunks together.</summary>
+public sealed record TriageResult(IReadOnlyList<HunkTriage> Hunks, IReadOnlyList<TriageGroup> Groups)
+{
+    public static readonly TriageResult Empty = new([], []);
+}
+
+/// <summary>Triage is computed once per head commit and triage version, then served from here (like investigations).</summary>
+public interface ITriageStore
+{
+    Task<TriageResult?> FindTriageAsync(PullRequestKey key, string headSha, string version, CancellationToken cancellationToken);
+
+    Task SaveTriageAsync(PullRequestKey key, string headSha, string version, TriageResult result, CancellationToken cancellationToken);
+}

@@ -60,11 +60,6 @@ public interface IHunkClassifier
     HunkVerdict? Classify(HunkContext context);
 }
 
-public sealed record TriageResult(IReadOnlyList<HunkTriage> Hunks, IReadOnlyList<TriageGroup> Groups)
-{
-    public static readonly TriageResult Empty = new([], []);
-}
-
 /// <summary>Claims hunks in files the built-in mechanical rules recognise (generated code, lock files, migrations).</summary>
 public sealed class MechanicalFileClassifier : IHunkClassifier
 {

@@ -102,7 +102,7 @@ Layer 1: take the noise out with Roslyn proofs, each classifier independent and 
 
 Compute triage in the engine, cache it, and stream it to the app.
 
-- [ ] Engine runs `TriagePipeline` after the snapshot and before detectors; results cached per head SHA in SQLite
+- [x] Engine runs `TriagePipeline` after the snapshot and before detectors; results cached per head SHA in SQLite
       (`SqliteReviewStore`, new table) with a store test.
 - [ ] Contracts: `HunkTriage`, `TriageGroup`, `TriageSummary` messages and a `TriageReady` event on
       `WatchPullRequest`; `ChangedFileSummary` gains per-file tier counts. Mapping tests both directions.

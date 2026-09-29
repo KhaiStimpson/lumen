@@ -63,3 +63,8 @@ After the answer: set `"draft": false` on confirmed labels (edit the tiers as co
 12. Destructive migrations: beyond the plan's list, `RenameTable` and `DeleteData` are also Critical; "narrowing AlterColumn" = smaller maxLength (or newly bounded), any `type`≠`oldType`, or nullable→required. Only `Up` is scanned. Migrations are now loaded into `TriageSources` despite being mechanical; an added migration is rebuilt from its hunk when sources are absent (fixture replay).
 13. Phase 2 evaluation used the local andrew-crm clone for sources (`LUMEN_TRIAGE_REPO`, `git show` only, no fetch) — the recorded fixture has diffs but no file texts. Added an opt-in safety sweep (`LUMEN_TRIAGE_SWEEP=<clone>`) that prints every proven-mechanical hunk of recent commits; 152 read by hand, 0 false positives. Results in the plan.
 - PHASE 2 DONE. Next: Phase 3 (engine: run pipeline after snapshot, cache per head SHA, contracts, TriageReady event, fixture re-record, acknowledge RPC).
+
+## Phase 3 notes
+- `TriageResult` moved to Lumen.Domain (with `ITriageStore`). SQLite schema v3 adds `TriageResults` (PK Repository, PullRequest, HeadSha, Version; JSON Result). Storage tests that pinned the schema version now expect 3.
+- `src/Lumen.Engine/Sessions/TriageRunner.cs`: cache version = `triage/1` + hash of the repo's mechanical path rules (bump `ClassifierVersion` whenever a classifier's proof changes). Failures log and return null; the review continues. Session keeps `Triage`.
+- `PullRequestSessionManager` runs triage after publishing the snapshot, before detectors (progress stage "triage").

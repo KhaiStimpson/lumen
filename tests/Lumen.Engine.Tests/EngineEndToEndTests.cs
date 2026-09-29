@@ -196,6 +196,23 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
         Assert.Equal(Environment.ProcessId, ping.ProcessId);
     }
 
+    [Fact]
+    public async Task TriagesTheSnapshotAndCachesItPerHead()
+    {
+        using var channel = EngineEndpoint.CreateChannel(_pipe);
+        await CollectUntilCompleteAsync(new ReviewEngine.ReviewEngineClient(channel));
+
+        var key = new PullRequestKey(new RepositoryRef(Pr.Owner, Pr.Name), Pr.Number);
+        var session = _engine!.Services.GetRequiredService<Sessions.PullRequestSessionManager>().Find(key);
+        var triage = session!.Triage;
+        Assert.NotNull(triage);
+        Assert.Contains(triage.Hunks, h => h.Path == WorkerScenario.NewWorkerPath && h.Class == ChangeClass.NewCode);
+
+        var cached = await _engine.Services.GetRequiredService<ITriageStore>()
+            .FindTriageAsync(key, WorkerScenario.HeadSha, Sessions.TriageRunner.VersionFor(Analysis.ReviewSettings.Default), CancellationToken.None);
+        Assert.Equal(triage.Hunks.Count, cached!.Hunks.Count);
+    }
+
     private static Task<List<PullRequestEvent>> CollectUntilCompleteAsync(ReviewEngine.ReviewEngineClient client, bool refresh = false) =>
         CollectUntilAsync(client, e => e.Complete is not null || e.Failed is not null, refresh);
 
