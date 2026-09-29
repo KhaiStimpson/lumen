@@ -19,6 +19,54 @@ public sealed class MainWindowTests
     private static string ScreensDirectory => Path.Combine(AppContext.BaseDirectory, "screens");
 
     [AvaloniaFact]
+    public async Task DraggingSplittersResizesPanesToAnyWidthAndSavesThem()
+    {
+        await using var session = await Session.OpenAsync();
+        var view = session.Window.GetVisualDescendants().OfType<PullRequestView>().Single();
+        var columns = view.FindControl<Grid>("Layout")!.ColumnDefinitions;
+        var left = columns[0];
+        var right = columns[4];
+        var leftSplitter = view.FindControl<GridSplitter>("LeftSplitter")!;
+        var rightSplitter = view.FindControl<GridSplitter>("RightSplitter")!;
+        Assert.Equal(284, left.ActualWidth, 1);
+        Assert.Equal(344, right.ActualWidth, 1);
+
+        async Task DragAsync(GridSplitter splitter, double dx)
+        {
+            var origin = splitter.TranslatePoint(new Point(splitter.Bounds.Width / 2, 200), session.Window)!.Value;
+            session.Window.MouseDown(origin, MouseButton.Left);
+            await Fixture.PumpAsync(2);
+            session.Window.MouseMove(new Point(origin.X + dx / 2, origin.Y));
+            session.Window.MouseMove(new Point(origin.X + dx, origin.Y));
+            await Fixture.PumpAsync(2);
+            session.Window.MouseUp(new Point(origin.X + dx, origin.Y), MouseButton.Left);
+            await Fixture.PumpAsync();
+        }
+
+        await DragAsync(leftSplitter, 150);
+        Assert.Equal(434, left.ActualWidth, 1);
+
+        await DragAsync(leftSplitter, -400);
+        Assert.True(left.ActualWidth < 60, $"left pane should shrink well below the old 200px minimum, was {left.ActualWidth}");
+
+        await DragAsync(rightSplitter, -200);
+        Assert.Equal(544, right.ActualWidth, 1);
+
+        var saved = AppSettings.Load(session.SettingsPath);
+        Assert.Equal(left.ActualWidth, saved.LeftPaneWidth!.Value, 1);
+        Assert.Equal(right.ActualWidth, saved.RightPaneWidth!.Value, 1);
+    }
+
+    [AvaloniaFact]
+    public async Task SavedPaneWidthsAreRestoredAtStartup()
+    {
+        await using var session = await Session.OpenAsync(new AppSettings { LeftPaneWidth = 410, RightPaneWidth = 275 });
+        var view = session.Window.GetVisualDescendants().OfType<PullRequestView>().Single();
+        Assert.Equal(410, view.FindControl<Grid>("Layout")!.ColumnDefinitions[0].ActualWidth, 1);
+        Assert.Equal(275, view.FindControl<Grid>("Layout")!.ColumnDefinitions[4].ActualWidth, 1);
+    }
+
+    [AvaloniaFact]
     public async Task JAndKStepThroughReviewPoints()
     {
         await using var session = await Session.OpenAsync();
@@ -517,6 +565,8 @@ public sealed class MainWindowTests
     {
         private readonly string _settingsPath;
 
+        public string SettingsPath => _settingsPath;
+
         private Session(MainWindow window, MainWindowViewModel viewModel, PullRequestViewModel pullRequest, FixtureReviewSource source, string settingsPath)
         {
             Source = source;
@@ -534,11 +584,11 @@ public sealed class MainWindowTests
 
         public PullRequestViewModel PullRequest { get; }
 
-        public static async Task<Session> OpenAsync()
+        public static async Task<Session> OpenAsync(AppSettings? settings = null)
         {
             var settingsPath = Path.Combine(Path.GetTempPath(), "lumen-app-tests", $"{Guid.NewGuid():N}.json");
             var source = Fixture.CreateSource();
-            var viewModel = new MainWindowViewModel(source, new AppSettings(), settingsPath);
+            var viewModel = new MainWindowViewModel(source, settings ?? new AppSettings(), settingsPath);
             var window = new MainWindow { DataContext = viewModel };
             window.Show();
 

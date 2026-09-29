@@ -51,6 +51,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public AppearanceViewModel Appearance { get; }
 
+    public (double? Left, double? Right) PaneWidths => (_settings.LeftPaneWidth, _settings.RightPaneWidth);
+
+    public void SavePaneWidths(double left, double right)
+    {
+        _settings.LeftPaneWidth = left;
+        _settings.RightPaneWidth = right;
+        _settings.Save(_settingsPath);
+    }
+
     /// <summary>The Settings overlay (docs/design/settings-overlay.md): modal, closed by Escape or a click outside.</summary>
     [ObservableProperty]
     public partial bool IsSettingsOpen { get; set; }

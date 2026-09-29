@@ -15,6 +15,11 @@ public sealed class AppSettings
     /// <summary>Null follows the OS setting; true/false overrides it (TDD §25.4).</summary>
     public bool? ReducedMotion { get; set; }
 
+    /// <summary>Widths of the review view's left and right panes; null uses the built-in default.</summary>
+    public double? LeftPaneWidth { get; set; }
+
+    public double? RightPaneWidth { get; set; }
+
     public static string DefaultPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lumen", "app.json");
 

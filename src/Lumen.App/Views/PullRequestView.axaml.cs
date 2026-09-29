@@ -1,6 +1,9 @@
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using Avalonia.Threading;
 using Lumen.App.Diff;
 using Lumen.App.ViewModels;
@@ -33,6 +36,29 @@ public sealed partial class PullRequestView : UserControl, IDisposable
                 e.Handled = true;
             }
         }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        if (this.FindAncestorOfType<Window>()?.DataContext is not MainWindowViewModel shell)
+        {
+            return;
+        }
+
+        if (shell.PaneWidths.Left is { } left)
+        {
+            Layout.ColumnDefinitions[0].Width = new GridLength(Math.Max(0, left));
+        }
+
+        if (shell.PaneWidths.Right is { } right)
+        {
+            Layout.ColumnDefinitions[4].Width = new GridLength(Math.Max(0, right));
+        }
+
+        void Commit(object? sender, VectorEventArgs args) => shell.SavePaneWidths(Layout.ColumnDefinitions[0].ActualWidth, Layout.ColumnDefinitions[4].ActualWidth);
+        LeftSplitter.DragCompleted += Commit;
+        RightSplitter.DragCompleted += Commit;
     }
 
     protected override void OnDataContextChanged(EventArgs e)

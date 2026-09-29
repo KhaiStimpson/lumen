@@ -8,11 +8,11 @@
   <Panel>
     <Grid Name="Layout">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="284" MinWidth="200" MaxWidth="600" />
+        <ColumnDefinition Width="284" />
         <ColumnDefinition Width="Auto" />
-        <ColumnDefinition Width="*" MinWidth="360" />
+        <ColumnDefinition Width="*" />
         <ColumnDefinition Width="Auto" />
-        <ColumnDefinition Width="344" MinWidth="240" MaxWidth="700" />
+        <ColumnDefinition Width="344" />
       </Grid.ColumnDefinitions>
 
       <!-- ===================== Left: pull request + files ===================== -->
@@ -283,8 +283,8 @@
       </Border>
 
       <!-- ===================== Examine mode: replaces center + right ===================== -->
-      <GridSplitter Grid.Column="1" Width="5" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Cursor="SizeWestEast" />
-      <GridSplitter Grid.Column="3" Width="5" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Cursor="SizeWestEast" IsVisible="{Binding !IsExamining}" />
+      <GridSplitter Name="LeftSplitter" Grid.Column="1" Width="5" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Cursor="SizeWestEast" />
+      <GridSplitter Name="RightSplitter" Grid.Column="3" Width="5" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Cursor="SizeWestEast" IsVisible="{Binding !IsExamining}" />
 
       <views:ExamineView Grid.Column="2" Grid.ColumnSpan="3" Name="Examine" IsVisible="{Binding IsExamining}" />
     </Grid>
