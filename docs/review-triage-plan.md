@@ -95,7 +95,7 @@ Layer 1: take the noise out with Roslyn proofs, each classifier independent and 
 - [x] Destructive migrations: parse `Migrations/*.cs` `Up` bodies for `DropColumn`, `DropTable`, `RenameColumn`,
       narrowing `AlterColumn`, `Sql(...)`; those lines become Critical ("drops column `Invoices.Total`"); the rest
       stays Skip.
-- [ ] Run the evaluation on PR #58 (fixture replay, no network); record lines-per-class and false positives in the
+- [x] Run the evaluation on PR #58 (fixture replay, no network); record lines-per-class and false positives in the
       "Results" section below. Any mechanical false positive is fixed before ticking.
 
 ## Phase 3 — Triage through the engine
@@ -183,6 +183,27 @@ Layer 3: spend agent time only on the few spots that matter, and give the review
 ## Results
 
 (Filled in by Phases 2, 5 and 6.)
+
+### Phase 2 — mechanical proofs (2026-09-30)
+
+**andrew-crm#58, fixture replay** (`LUMEN_TRIAGE_EVAL=1`, sources from the local clone via `git show`, no network;
+labels still draft). 46 files, 3,887 changed lines, triaged in ~1.1 s.
+
+| Class | Lines | Tier |
+|---|---|---|
+| NewCode | 3,228 | Skim |
+| BehaviourChange | 651 | Worth a look |
+| ImportsOnly | 8 | Skip (4 hunks, all correct) |
+
+Mechanical false positives: **0**. Critical recall 2/3 — the miss (`EnrichmentScheduler.cs`, `IgnoreQueryFilters`) is
+in a new file and is Phase 5's job. #58 is almost all new code, so it barely exercises the proofs.
+
+**Safety sweep** (`LUMEN_TRIAGE_SWEEP`, last 150 commits of the andrew-crm clone → 123 non-merge commits, every
+proven-mechanical hunk printed and read by hand): 152 Skip hunks (93 imports-only, 18 rename, 17 comments-only,
+14 move, 10 formatting). **0 false positives found.** Changed lines by class across the sweep: Generated 93,656;
+NewCode 40,625; BehaviourChange 36,476; Move 2,341; ImportsOnly 168; CommentsOnly 79; Formatting 59; Rename 40;
+Ripple 25. One real false positive was found *during* development by a near-miss test (a line edit that opened a
+comment swallowing following members was matched as a move) and fixed before this run.
 
 ## Open questions
 
