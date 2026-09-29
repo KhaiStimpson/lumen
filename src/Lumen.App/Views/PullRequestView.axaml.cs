@@ -20,6 +20,19 @@ public sealed partial class PullRequestView : UserControl, IDisposable
     {
         InitializeComponent();
         Editor.CardFactory = CreateCard;
+        if (!App.Motion.ReducedMotion)
+        {
+            // Progress eases forward; with reduced motion it simply takes its new value.
+            ((Avalonia.Media.ScaleTransform)CoverageFill.RenderTransform!).Transitions =
+            [
+                new Avalonia.Animation.DoubleTransition
+                {
+                    Property = Avalonia.Media.ScaleTransform.ScaleXProperty,
+                    Duration = TimeSpan.FromMilliseconds(320),
+                    Easing = new Avalonia.Animation.Easings.CubicEaseOut(),
+                },
+            ];
+        }
         Editor.MarkerClicked += async (_, id) =>
         {
             if (_viewModel?.ReviewPoints.FirstOrDefault(p => p.Id == id) is { } point)

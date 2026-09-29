@@ -40,7 +40,11 @@
 
           <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="18,14,18,8">
             <TextBlock Classes="h3" Text="Files changed" />
-            <TextBlock Grid.Column="1" Classes="caption" Text="{Binding ViewedSummary}" />
+            <!-- Progress is coverage of what matters, not files opened; the Viewed count stays as the tooltip. -->
+            <TextBlock Grid.Column="1" Classes="caption" Text="{Binding ViewedSummary}" ToolTip.Tip="GitHub's Viewed ticks"
+                       IsVisible="{Binding CoverageShort, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+            <TextBlock Grid.Column="1" Name="CoverageShort" Classes="caption" Text="{Binding CoverageShort}" ToolTip.Tip="{Binding ViewedSummary}"
+                       IsVisible="{Binding CoverageShort, Converter={x:Static views:Converters.NotEmpty}}" />
           </Grid>
 
           <TreeView Grid.Row="3" Name="FileTree" ItemsSource="{Binding Tree}" SelectedItem="{Binding SelectedNode}"
@@ -226,6 +230,21 @@
                 <Border Grid.Column="2" Background="{DynamicResource Severity.Low}" ToolTip.Tip="Skim" />
                 <Border Grid.Column="3" Background="{DynamicResource Border.Strong}" CornerRadius="0,3,3,0" ToolTip.Tip="Skip" />
               </Grid>
+              <!-- Progress: coverage of Critical and Worth a look. The fill eases forward; instant with reduced motion (TDD §25). -->
+              <StackPanel Name="Coverage" Spacing="5" x:DataType="vm:PullRequestViewModel"
+                          DataContext="{Binding $parent[views:PullRequestView].DataContext}"
+                          IsVisible="{Binding CoverageLabel, Converter={x:Static views:Converters.NotEmpty}}">
+                <TextBlock Classes="caption" Text="{Binding CoverageLabel}" />
+                <Panel Height="4" ClipToBounds="True">
+                  <Border Background="{DynamicResource Border.Subtle}" CornerRadius="2" />
+                  <Border Name="CoverageFill" Background="{DynamicResource Marker.Verified}" CornerRadius="2"
+                          RenderTransformOrigin="0%,50%">
+                    <Border.RenderTransform>
+                      <ScaleTransform ScaleX="{Binding CoverageFraction}" ScaleY="1" />
+                    </Border.RenderTransform>
+                  </Border>
+                </Panel>
+              </StackPanel>
               <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
                          IsVisible="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).IsAnalysing}"
                          Text="Comparing this change with repository precedent…" />

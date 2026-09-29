@@ -221,6 +221,39 @@ public static class ReviewPlanBuilder
         return candidates.Count == 0 ? TriageTier.WorthALook : candidates.Select(h => h.Tier).OrderBy(Rank).First();
     }
 
+    /// <summary>
+    /// Changed lines in Critical and Worth a look, and how many of them the reviewer has covered: the file is ticked
+    /// Viewed, the hunk's group is acknowledged, a review point in it was handled, or the reviewer visited it.
+    /// </summary>
+    public static (int Covered, int Total) Coverage(
+        TriageReady? triage,
+        IReadOnlyList<ReviewPointViewModel> points,
+        IReadOnlySet<string> viewedPaths,
+        IReadOnlySet<string> visitedHunks)
+    {
+        if (triage is null)
+        {
+            return (0, 0);
+        }
+
+        var acknowledged = triage.Groups.Where(g => g.Acknowledged).Select(g => g.Id).ToHashSet(StringComparer.Ordinal);
+        var handled = points.Where(p => p.State != ReviewPointState.Visible).Select(p => (p.Path, p.Line)).ToList();
+        int covered = 0, total = 0;
+        foreach (var hunk in triage.Hunks.Where(h => h.Tier is TriageTier.Critical or TriageTier.WorthALook))
+        {
+            total += hunk.ChangedLines;
+            if (viewedPaths.Contains(hunk.Path) ||
+                (hunk.GroupId.Length > 0 && acknowledged.Contains(hunk.GroupId)) ||
+                visitedHunks.Contains(DiffFolds.IdFor(hunk)) ||
+                handled.Any(p => p.Path == hunk.Path && hunk.NewStart > 0 && hunk.NewStart <= p.Line && p.Line <= hunk.NewEnd))
+            {
+                covered += hunk.ChangedLines;
+            }
+        }
+
+        return (covered, total);
+    }
+
     public static ReviewPlan Build(TriageReady? triage, IReadOnlyList<ReviewPointViewModel> points, Dictionary<string, TriageGroupViewModel> groupState)
     {
         // Groups: reuse view models so acknowledgement and the current marker survive a rebuild.

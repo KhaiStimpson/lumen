@@ -117,7 +117,47 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
     /// <summary>A group or a set of hunks picked from the plan; drives the diff focus while no review point is current.</summary>
     private PlanTarget? _planFocus;
 
-    private void RebuildPlan() => ReviewPlan.Rebuild(Triage, ReviewPoints);
+    private void RebuildPlan()
+    {
+        ReviewPlan.Rebuild(Triage, ReviewPoints);
+        UpdateCoverage();
+    }
+
+    /// <summary>Hunks the reviewer has opened from the plan or landed on with J/K.</summary>
+    private readonly HashSet<string> _visitedHunks = new(StringComparer.Ordinal);
+
+    /// <summary>0..1 share of Critical and Worth a look lines covered; drives the progress meter.</summary>
+    [ObservableProperty]
+    public partial double CoverageFraction { get; set; }
+
+    [ObservableProperty]
+    public partial string CoverageLabel { get; set; } = "";
+
+    /// <summary>Short form for the files header, e.g. "38% covered"; empty until triage arrives.</summary>
+    [ObservableProperty]
+    public partial string CoverageShort { get; set; } = "";
+
+    private void UpdateCoverage()
+    {
+        var viewed = Files.Where(f => f.IsViewed).Select(f => f.Path).ToHashSet(StringComparer.Ordinal);
+        var (covered, total) = ReviewPlanBuilder.Coverage(Triage, ReviewPoints, viewed, _visitedHunks);
+        var percent = total == 0 ? 0 : (int)Math.Floor(100.0 * covered / total);
+        CoverageFraction = total == 0 ? 0 : (double)covered / total;
+        CoverageLabel = Triage is null ? "" : total == 0
+            ? "Nothing in Critical or Worth a look"
+            : string.Create(CultureInfo.InvariantCulture, $"You've covered {percent}% of Critical and Worth a look");
+        CoverageShort = Triage is null || total == 0 ? "" : string.Create(CultureInfo.InvariantCulture, $"{percent}% covered");
+    }
+
+    private void MarkVisited(string path, int startLine, int endLine)
+    {
+        foreach (var hunk in Triage?.Hunks.Where(h => h.Path == path && h.NewStart > 0 && h.NewStart <= endLine && startLine <= h.NewEnd) ?? [])
+        {
+            _visitedHunks.Add(DiffFolds.IdFor(hunk));
+        }
+
+        UpdateCoverage();
+    }
 
     /// <summary>Mechanical hunks the reviewer opened; everything else proven mechanical stays behind its badge.</summary>
     private readonly HashSet<string> _expandedFolds = new(StringComparer.Ordinal);
@@ -231,6 +271,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         }
 
         _planFocus = target;
+        MarkVisited(target.Path, target.StartLine, target.EndLine);
         if (Files.FirstOrDefault(f => f.Path == target.Path) is { } file && SelectedFile?.Path != target.Path)
         {
             await SelectFileAsync(file).ConfigureAwait(true);
@@ -496,6 +537,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
                 {
                     viewedFile.IsViewed = evt.FileViewed.Viewed;
                     OnPropertyChanged(nameof(ViewedSummary));
+                    UpdateCoverage();
                 }
 
                 break;
@@ -780,6 +822,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         var viewed = !file.IsViewed;
         file.IsViewed = viewed;
         OnPropertyChanged(nameof(ViewedSummary));
+        UpdateCoverage();
         try
         {
             await _source.SetFileViewedAsync(Ref, file.Path, viewed, _lifetime.Token).ConfigureAwait(true);
@@ -912,6 +955,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         point.IsCurrent = true;
         CurrentPoint = point;
         _planFocus = null;
+        MarkVisited(location.Path, location.Line, location.Line);
         foreach (var group in ReviewPlan.Groups)
         {
             group.IsCurrent = false;

@@ -126,7 +126,7 @@ Replace the flat review-point list with a tiered plan the reviewer works through
       expandable; group members link to each other. Screenshots.
 - [x] Keyboard: `A` acknowledges the focused group (all members), `J/K` walk the plan in tier order, acknowledged
       groups fade but stay reachable. Tests for navigation order.
-- [ ] Progress line "You've covered N% of Critical and Worth a look" replacing file counts; motion per §25 with
+- [x] Progress line "You've covered N% of Critical and Worth a look" replacing file counts; motion per §25 with
       reduced-motion equivalent. Screenshots light and dark.
 
 ## Phase 5 — Rank what's left by risk
