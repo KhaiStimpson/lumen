@@ -6,7 +6,14 @@
              x:Class="Lumen.App.Views.PullRequestView"
              x:DataType="vm:PullRequestViewModel">
   <Panel>
-    <Grid Name="Layout" ColumnDefinitions="284,*,344">
+    <Grid Name="Layout">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="284" MinWidth="200" MaxWidth="600" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" MinWidth="360" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="344" MinWidth="240" MaxWidth="700" />
+      </Grid.ColumnDefinitions>
 
       <!-- ===================== Left: pull request + files ===================== -->
       <Border Classes="pane" BorderThickness="0,1,1,0" CornerRadius="0,10,0,0">
@@ -91,7 +98,7 @@
       </Border>
 
       <!-- ===================== Center: code ===================== -->
-      <Grid Grid.Column="1" Name="Center" RowDefinitions="Auto,Auto,*" IsVisible="{Binding !IsExamining}">
+      <Grid Grid.Column="2" Name="Center" RowDefinitions="Auto,Auto,*" IsVisible="{Binding !IsExamining}">
         <!-- Guided review header -->
         <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="22,14,22,10">
           <Grid ColumnDefinitions="Auto,Auto,Auto" ClipToBounds="True">
@@ -162,7 +169,7 @@
       </Grid>
 
       <!-- ===================== Right: review focus / precedent / patterns ===================== -->
-      <Border Grid.Column="2" Name="RightPane" Classes="pane" BorderThickness="1,1,0,0" CornerRadius="10,0,0,0" IsVisible="{Binding !IsExamining}">
+      <Border Grid.Column="4" Name="RightPane" Classes="pane" BorderThickness="1,1,0,0" CornerRadius="10,0,0,0" IsVisible="{Binding !IsExamining}">
         <ScrollViewer>
           <StackPanel Margin="18,18,18,18" Spacing="22">
             <StackPanel Spacing="8">
@@ -276,7 +283,10 @@
       </Border>
 
       <!-- ===================== Examine mode: replaces center + right ===================== -->
-      <views:ExamineView Grid.Column="1" Grid.ColumnSpan="2" Name="Examine" IsVisible="{Binding IsExamining}" />
+      <GridSplitter Grid.Column="1" Width="5" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Cursor="SizeWestEast" />
+      <GridSplitter Grid.Column="3" Width="5" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Cursor="SizeWestEast" IsVisible="{Binding !IsExamining}" />
+
+      <views:ExamineView Grid.Column="2" Grid.ColumnSpan="3" Name="Examine" IsVisible="{Binding IsExamining}" />
     </Grid>
 
     <!-- Precedent source viewer -->
