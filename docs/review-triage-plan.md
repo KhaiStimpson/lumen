@@ -69,7 +69,7 @@ Define what a tier is and build the yardstick first, so every later phase is mea
       Generated, NewCode, BehaviourChange), `TriageTier` (Critical, WorthALook, Skim, Skip), `HunkTriage` (file,
       head/old line span, class, tier, reasons, optional group id) and `TriageGroup` (id, class, title such as
       "Renamed `Foo`→`Bar`", members). JSON round-trip tests.
-- [ ] `IHunkClassifier` seam in `Lumen.Analysis` and a `TriagePipeline` that runs classifiers in order, lets the
+- [x] `IHunkClassifier` seam in `Lumen.Analysis` and a `TriagePipeline` that runs classifiers in order, lets the
       first proof win, and defaults unclaimed hunks to NewCode (added file/type) or BehaviourChange. Existing
       file-level `MechanicalClassifier` results become Generated/Skip through it. Unit tests.
 - [ ] Golden label format `tests/fixtures/triage/<owner>-<repo>-<pr>/labels.json` (path, line span, expected tier,
