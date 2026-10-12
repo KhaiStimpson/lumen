@@ -4,7 +4,14 @@ A desktop pull-request review tool that keeps the code central and points the re
 deserve judgement — starting with **pattern deviations**: code that differs from how this repository normally
 solves the same problem, shown next to the precedent it deviates from.
 
-Design: [docs/tdd.md](docs/tdd.md) · Current plan and status: [docs/plan.md](docs/plan.md)
+Design: [docs/tdd.md](docs/tdd.md) · v1 plan: [docs/plan.md](docs/plan.md) · Current plan and status:
+[docs/plan-v2.md](docs/plan-v2.md)
+
+Version 2 makes Lumen a place to do the whole review: an **inbox** of the pull requests waiting on you, the PR's
+conversation, commits and checks, comments on any line (single or multi-line, with suggestions) gathered into a
+**pending review** you submit as Comment / Approve / Request changes, existing threads inline in the diff, split view,
+whitespace toggle, find in diff — and an optional AI **walkthrough** (intent, reading order, risky areas) from a fast
+model.
 
 ## Run it
 
@@ -18,7 +25,9 @@ dotnet build Lumen.slnx
 src/Lumen.App/bin/Debug/net10.0/Lumen.exe --pr https://github.com/KhaiStimpson/andrew-crm/pull/58
 ```
 
-Or start `Lumen.exe` with no arguments and paste a pull request URL (or `owner/repo#123`).
+Or start `Lumen.exe` with no arguments: the home screen is the **inbox** (review requested, your own, and
+watched repositories, with unread and new-since-your-last-visit marks), refreshed in the background. Paste a pull request URL (or `owner/repo#123`) into the go-to box
+(`Ctrl+K`) to open anything else. Repositories to watch beyond your own requests are under **Settings → Inbox**.
 
 The app starts the review engine (`engine/Lumen.Engine.exe` next to it) as a separate process and talks to it
 over a per-user named pipe with gRPC. The engine keeps a blobless clone and a worktree per PR head under
@@ -34,9 +43,28 @@ over a per-user named pipe with gRPC. The engine keeps a blobless clone and a wo
 | `--reduced-motion` | Reduced-motion equivalents for every transition (also follows the OS setting) |
 | `--capture <dir> --capture-script diff,next,examine,evidence,comment,dark` | Render states to PNGs and exit (design review without a human) |
 
+Capture steps for the v2 screens: `inbox`, `open`, `conversation`, `commits`, `checks`, `files`, `since`, `all`,
+`thread`, `draft`, `tray`, `split`, `find`, `palette`, `risk`, `group`, `order`.
+
+### Fast model and walkthrough (optional)
+
+The walkthrough uses **GLM 5.3 Flash on Cloudflare Workers AI** (`@cf/zai-org/glm-5.3-flash`, optionally through AI
+Gateway). It sends the PR's diff to Cloudflare, so it stays off until you connect it **and** turn on **Walk me through each
+pull request** (`privacy.allowCodeToFastModel`) in Connections. Add the account id and API token from Connections, or
+from a console (the token is read from input):
+
+```bash
+src/Lumen.Engine/bin/Debug/net10.0/Lumen.Engine.exe connections set-cloudflare
+```
+
+The walkthrough streams in after the diff and never blocks it; anything that cites a path or line outside the diff is
+dropped, results are cached per head, and a daily request cap lives under Cloud AI limits. On Linux/CI the engine
+also reads `LUMEN_CLOUDFLARE_ACCOUNT_ID` / `LUMEN_CLOUDFLARE_API_TOKEN`.
+
 ### JEV and investigation agents (optional)
 
-Both are off until you connect them, and a review never waits on either: if they're missing, slow or failing, the
+JEV is legacy in v2: it's off by default and its switches live under **Legacy** in Connections (enabling it takes
+effect after an engine restart). Both are off until you connect them, and a review never waits on either: if they're missing, slow or failing, the
 deterministic review is unchanged.
 
 - **JEV** (attention routing via OpenRouter's Decisions API, `typesafe/jev-1.13`) receives counts and categories only —
@@ -63,7 +91,8 @@ Connections is one section of the **Settings** overlay (plug button for Connecti
   them under Advanced. Edit it for all repositories, or override it for the open pull request's repository.
 - **Ignored & files**: names never treated as a convention, paths treated as mechanical, and paths never flagged. A
   repository's lists add to the ones for all repositories.
-- **Cloud AI limits**: the JEV model, timeout and zero-data-retention routing; investigations per pull request and at
+- **Inbox**: repositories to watch, whose open pull requests join the inbox.
+- **Cloud AI limits**: the fast model id, AI Gateway, timeout, diff size limit and daily request cap; the JEV model, timeout and zero-data-retention routing; investigations per pull request and at
   once; and metered usage (Lumen never switches to metered API billing without it).
 - **Appearance**: theme and motion.
 
@@ -85,11 +114,19 @@ src/Lumen.Engine/bin/Debug/net10.0/Lumen.Engine.exe connections
 | `Enter` | Examine the current point |
 | `Esc` | Back to the diff (or cancel a comment) |
 | `D` | Dismiss |
-| `C` | Comment (`Ctrl+Enter` posts) |
+| `C` | Comment on the current point (`Ctrl+Enter` adds to the review, `Ctrl+Shift+Enter` posts now) |
+| Gutter `+`, drag or shift-click | Comment on a line or a range of lines ("Suggest change" pre-fills a suggestion) |
+| `N` / `Shift+N` | Next / previous review thread |
+| `R` | Review tray: pending comments, summary, Comment / Approve / Request changes |
+| `S` | Split / unified diff |
+| `W` | Ignore whitespace |
+| `X` | Full file / diff only |
+| `Ctrl+F` | Find in diff (`Enter` / `Shift+Enter` next / previous) |
 | `P` / `E` | Show precedent / evidence |
-| `Ctrl+K`, `F` | Go to file |
+| `Ctrl+K`, `F` | Command palette: files, pull requests, actions |
 
-Posting a comment always requires an explicit click or `Ctrl+Enter`; nothing is sent to GitHub otherwise.
+With a walkthrough's reading order on, `J` / `K` step through its groups. Posting anything always requires an explicit
+click or key; nothing is sent to GitHub otherwise, and a review stays pending until you submit it.
 
 ## How a review point is found
 
@@ -123,11 +160,12 @@ confidence percentage.
 | `Lumen.Domain` | Pull request, diff, review point and evidence model; unified diff parser; ports |
 | `Lumen.Analysis` | Pipeline seams: detectors → attention policy → explainer; mechanical classifier |
 | `Lumen.Roslyn` | Type facts, repository index, peer-pattern detector, template explainer |
-| `Lumen.GitHub` | REST client and `gh` token source |
+| `Lumen.GitHub` | REST and GraphQL client (inbox, details, threads, pending reviews) and `gh` token source |
 | `Lumen.Repository` | git CLI: blobless clone, PR fetch, merge-base, worktrees, diff |
 | `Lumen.Jev` | JEV: typed attention questions, source-free state, OpenRouter Decisions API, `JevAttentionPolicy` |
+| `Lumen.Models` | Fast model providers (Cloudflare Workers AI) and the walkthrough generator with grounding |
 | `Lumen.Agents` | Agent providers (Claude Code), sandboxed process runner, investigators, scheduler |
-| `Lumen.Storage` | SQLite: review interactions, JEV answers, investigation results, cache; Windows Credential Manager |
+| `Lumen.Storage` | SQLite: review interactions, visits, walkthroughs, JEV answers, investigation results, cache; Windows Credential Manager |
 
 ## Tests
 
@@ -143,6 +181,8 @@ Opt-in suites that touch the network or a local clone:
 | `LUMEN_LIVE_PR` + `LUMEN_RECORD_FIXTURE=<dir>` | Re-record a UI fixture |
 | `LUMEN_GOLDEN_CHECKOUT=<clone at PR head>`, `LUMEN_GOLDEN_BASE=origin/dev` | Print the pipeline's review points, suppressions and conventions |
 | `LUMEN_LIVE_JEV=1` | One real Decisions API call with a synthetic state (needs a stored OpenRouter key; metered, a fraction of a cent) |
+| `LUMEN_LIVE_GLM=1` | One real walkthrough of a synthetic diff through Cloudflare Workers AI (needs Cloudflare credentials) |
+| `LUMEN_LIVE_PENDING_PR=owner/repo#n` | Creates and deletes a pending review on a scratch PR (never submits) — run only on a PR you own |
 | `LUMEN_LIVE_CLAUDE=1` | One real pattern investigation through your Claude Code sign-in (uses subscription quota; refuses metered billing) |
 
 `LUMEN_LIVE_PR` runs the real engine, so it will also call JEV if a key is stored and agents if they're enabled.
