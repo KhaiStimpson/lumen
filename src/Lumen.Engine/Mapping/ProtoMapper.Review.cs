@@ -196,3 +196,42 @@ public static partial class ProtoMapper
         IsViewed = viewed,
     };
 }
+
+/// <summary>Walkthrough mapping (plan v2 M8).</summary>
+public static partial class ProtoMapper
+{
+    public static Contracts.Walkthrough ToProto(D.Walkthrough walkthrough)
+    {
+        var proto = new Contracts.Walkthrough
+        {
+            Status = (Contracts.WalkthroughStatus)walkthrough.Status,
+            Detail = walkthrough.Detail,
+            Intent = walkthrough.Intent,
+            DescriptionMismatch = walkthrough.DescriptionMismatch,
+            Producer = walkthrough.Producer,
+            HeadSha = walkthrough.HeadSha,
+            FromCache = walkthrough.FromCache,
+            FilesDone = walkthrough.FilesDone,
+            FilesTotal = walkthrough.FilesTotal,
+        };
+        if (walkthrough.SinceSha is { } since)
+        {
+            proto.Since = new CommitRange { FromSha = since, ToSha = walkthrough.HeadSha };
+        }
+
+        proto.Groups.AddRange(walkthrough.Groups.Select(g =>
+        {
+            var group = new Contracts.WalkthroughGroup { Id = g.Id, Title = g.Title, Summary = g.Summary, Order = g.Order, IsMechanical = g.IsMechanical };
+            group.Paths.AddRange(g.Paths);
+            return group;
+        }));
+        proto.Risks.AddRange(walkthrough.Risks.Select(r => new Contracts.WalkthroughRisk
+        {
+            Id = r.Id,
+            Location = ToProto(r.Location),
+            Category = (Contracts.RiskCategory)r.Category,
+            Reason = r.Reason,
+        }));
+        return proto;
+    }
+}

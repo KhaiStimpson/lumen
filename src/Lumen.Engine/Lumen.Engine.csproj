@@ -23,6 +23,7 @@
     <ProjectReference Include="..\Lumen.Storage\Lumen.Storage.csproj" />
     <ProjectReference Include="..\Lumen.Jev\Lumen.Jev.csproj" />
     <ProjectReference Include="..\Lumen.Agents\Lumen.Agents.csproj" />
+    <ProjectReference Include="..\Lumen.Models\Lumen.Models.csproj" />
   </ItemGroup>
 
 </Project>
