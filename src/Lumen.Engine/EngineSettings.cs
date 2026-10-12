@@ -31,6 +31,34 @@ public sealed record AgentSettings
     public bool AllowMeteredUsage { get; init; }
 }
 
+public sealed record InboxPreferences
+{
+    /// <summary>"owner/name" of repositories whose open pull requests appear in the inbox.</summary>
+    public IReadOnlyList<string> WatchedRepositories { get; init; } = [];
+
+    public double PollSeconds { get; init; } = 120;
+}
+
+/// <summary>The fast model (plan v2 M7): GLM on Cloudflare Workers AI. Credentials live in the credential store.</summary>
+public sealed record FastModelSettings
+{
+    /// <summary>The Workers AI model id. GLM 5.3 Flash; confirm the exact name in the Workers AI catalog.</summary>
+    public string Model { get; init; } = "@cf/zai-org/glm-5.3-flash";
+
+    /// <summary>Optional AI Gateway id; empty calls Workers AI directly.</summary>
+    public string Gateway { get; init; } = "";
+
+    public double TimeoutSeconds { get; init; } = 30;
+
+    /// <summary>Largest diff sent per pull request, in KB. Larger files are cut and the rest summarised by path and size.</summary>
+    public int MaxDiffKb { get; init; } = 512;
+
+    public int DailyRequestCap { get; init; } = 500;
+
+    /// <summary>Files summarised at once.</summary>
+    public int MaxConcurrent { get; init; } = 6;
+}
+
 /// <summary>
 /// <c>{dataDir}/settings.json</c>, read at engine start. Holds preferences only — never credentials (TDD §39A).
 /// </summary>
@@ -50,6 +78,10 @@ public sealed record EngineSettings
     public JevSettings Jev { get; init; } = new();
 
     public AgentSettings Agents { get; init; } = new();
+
+    public InboxPreferences Inbox { get; init; } = new();
+
+    public FastModelSettings FastModel { get; init; } = new();
 
     /// <summary>The global review defaults; repositories override them in their own files (see ReviewSettingsStore).</summary>
     public ReviewSettings Review { get; init; } = new();

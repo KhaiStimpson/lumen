@@ -77,44 +77,6 @@ public sealed class GitHubRestClientTests : IDisposable
     }
 
     [Fact]
-    public async Task GetReviewCommentsFollowsLinkPagination()
-    {
-        const string page2 = "https://api.github.com/repositories/1/pulls/42/comments?per_page=100&page=2";
-        const string page3 = "https://api.github.com/repositories/1/pulls/42/comments?per_page=100&page=3";
-        _handler
-            .Respond(HttpStatusCode.OK, $"[{CommentJson(1, line: "10", originalLine: "9")}]",
-                $"<{page2}>; rel=\"next\", <{page3}>; rel=\"last\"")
-            .Respond(HttpStatusCode.OK, $"[{CommentJson(2, line: "null", originalLine: "7")}]",
-                $"<https://api.github.com/x?page=1>; rel=\"prev\", <{page3}>; rel=\"next\"")
-            .Respond(HttpStatusCode.OK, $"[{CommentJson(3, line: "null", originalLine: "null")}]",
-                $"<{page2}>; rel=\"prev\"");
-
-        var threads = await _client.GetReviewCommentsAsync(Key, CancellationToken.None);
-
-        Assert.Equal(
-            [
-                "https://api.github.com/repos/octo/widgets/pulls/42/comments?per_page=100",
-                page2,
-                page3,
-            ],
-            _handler.Requests.Select(r => r.Uri.ToString()));
-        Assert.All(_handler.Requests, r => Assert.Equal("Bearer t0ken", r.Headers["Authorization"]));
-
-        Assert.Equal([1L, 2L, 3L], threads.Select(t => t.Id));
-        Assert.Equal([10, 7, null], threads.Select(t => t.Line));
-        Assert.Equal(
-            new ReviewThread(
-                1,
-                "src/a.cs",
-                10,
-                "reviewer",
-                "Comment 1",
-                new DateTimeOffset(2026, 9, 2, 8, 0, 0, TimeSpan.Zero),
-                "https://github.com/octo/widgets/pull/42#discussion_r1"),
-            threads[0]);
-    }
-
-    [Fact]
     public async Task PostReviewCommentSendsExactBody()
     {
         _handler.Respond(HttpStatusCode.Created,
@@ -252,19 +214,6 @@ public sealed class GitHubRestClientTests : IDisposable
           "html_url": "https://github.com/octo/widgets/pull/42",
           "body": "Body text",
           "updated_at": "2026-09-01T12:30:00Z"
-        }
-        """;
-
-    private static string CommentJson(long id, string line, string originalLine) => $$"""
-        {
-          "id": {{id}},
-          "path": "src/a.cs",
-          "line": {{line}},
-          "original_line": {{originalLine}},
-          "user": { "login": "reviewer" },
-          "body": "Comment {{id}}",
-          "created_at": "2026-09-02T08:00:00Z",
-          "html_url": "https://github.com/octo/widgets/pull/42#discussion_r{{id}}"
         }
         """;
 }

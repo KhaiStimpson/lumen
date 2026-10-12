@@ -14,9 +14,14 @@ public sealed record PrivacySettings
 
     public bool LocalModelsOnly { get; init; }
 
+    /// <summary>The pull request's diff, title and description to the fast model (plan v2 M7). The walkthrough needs it.</summary>
+    public bool AllowCodeToFastModel { get; init; }
+
     public bool AllowsJev => AllowCloudReasoning && !LocalModelsOnly;
 
     public bool AllowsAgents => AllowCloudReasoning && !LocalModelsOnly && AllowCodeToAgents;
+
+    public bool AllowsFastModel => AllowCloudReasoning && !LocalModelsOnly && AllowCodeToFastModel;
 }
 
 /// <summary>
@@ -37,4 +42,8 @@ public interface ISecretStore
 public static class SecretNames
 {
     public const string OpenRouterApiKey = "Lumen/OpenRouter";
+
+    public const string CloudflareAccountId = "Lumen/Cloudflare/AccountId";
+
+    public const string CloudflareApiToken = "Lumen/Cloudflare/ApiToken";
 }

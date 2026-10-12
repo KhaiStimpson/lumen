@@ -8,12 +8,14 @@ using Lumen.GitHub;
 
 namespace Lumen.Engine.Services;
 
-public sealed class ReviewEngineService(
+public sealed partial class ReviewEngineService(
     PullRequestSessionManager sessions,
     IGitHubClient gitHub,
     IReviewStore store,
     ConnectionsProbe connections,
     ReviewSettingsStore reviewSettings,
+    Inbox.InboxService inbox,
+    ReviewActions actions,
     TimeProvider time) : ReviewEngine.ReviewEngineBase
 {
     private static readonly string Version =
@@ -34,13 +36,29 @@ public sealed class ReviewEngineService(
         }
     }
 
-    public override Task<FileDiff> GetFileDiff(GetFileDiffRequest request, ServerCallContext context)
+    public override async Task<FileDiff> GetFileDiff(GetFileDiffRequest request, ServerCallContext context)
     {
-        var snapshot = RequireSession(request.PullRequest).Snapshot
+        var session = RequireSession(request.PullRequest);
+        var snapshot = session.Snapshot
             ?? throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pull request is still loading."));
+
+        if (request.Range is { FromSha.Length: > 0, ToSha.Length: > 0 } range)
+        {
+            var result = await Run(() => actions.GetRangeAsync(session, range.FromSha, range.ToSha, request.IgnoreWhitespace, context.CancellationToken)).ConfigureAwait(false);
+            var inRange = result.Files.FirstOrDefault(f => f.Path == request.Path)
+                ?? throw new RpcException(new Status(StatusCode.NotFound, $"'{request.Path}' didn't change in that range."));
+            return ProtoMapper.ToProto(inRange);
+        }
+
         var file = snapshot.FindFile(request.Path)
             ?? throw new RpcException(new Status(StatusCode.NotFound, $"'{request.Path}' is not part of this pull request."));
-        return Task.FromResult(ProtoMapper.ToProto(file));
+        if (request.IgnoreWhitespace)
+        {
+            var insensitive = await Run(() => actions.GetWhitespaceInsensitiveFileAsync(session, request.Path, context.CancellationToken)).ConfigureAwait(false);
+            return ProtoMapper.ToProto(insensitive ?? file);
+        }
+
+        return ProtoMapper.ToProto(file);
     }
 
     public override async Task<SourceFile> GetSourceFile(GetSourceFileRequest request, ServerCallContext context)
@@ -76,21 +94,22 @@ public sealed class ReviewEngineService(
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Comment body is empty."));
         }
 
-        if (snapshot.FindFile(request.Path) is not { } file || !file.ContainsNewLine(request.Line))
+        if (!string.IsNullOrEmpty(request.ReviewPointId) && session.FindReviewPoint(request.ReviewPointId) is null)
         {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, $"{request.Path}:{request.Line} is not part of the diff, so GitHub can't attach a comment there."));
+            throw new RpcException(new Status(StatusCode.NotFound, $"Unknown review point '{request.ReviewPointId}'."));
         }
 
-        var posted = await gitHub.PostReviewCommentAsync(
-            new NewReviewComment(session.Key, snapshot.HeadSha, request.Path, request.Line, request.Body),
-            context.CancellationToken).ConfigureAwait(false);
+        var comment = NewComment(session.Key, snapshot.HeadSha, request.Path, request.Line, request.Body, request.Side, request.StartLine, request.StartSide);
+        var (posted, pending) = await Run(() => actions.PostNowAsync(session, comment, NullIfEmpty(request.ReviewPointId), context.CancellationToken)).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(request.ReviewPointId))
         {
-            await RecordAsync(session, request.ReviewPointId, Contracts.ReviewPointState.Commented, posted.Url, context.CancellationToken).ConfigureAwait(false);
+            await RecordAsync(session, request.ReviewPointId, Contracts.ReviewPointState.Commented, posted?.Url, context.CancellationToken).ConfigureAwait(false);
         }
 
-        return new PostReviewCommentReply { CommentId = posted.Id, Url = posted.Url };
+        return posted is not null
+            ? new PostReviewCommentReply { CommentId = posted.Id, Url = posted.Url }
+            : new PostReviewCommentReply { AddedToPendingReview = true, PendingReview = ProtoMapper.ToProto(pending, session.PendingPoints) };
     }
 
     public override async Task<SetFileViewedReply> SetFileViewed(SetFileViewedRequest request, ServerCallContext context)
@@ -282,6 +301,190 @@ public sealed class ReviewEngineService(
         MaxPointsPerType = sensitivity.MaxPointsPerType,
         MaxExamples = sensitivity.MaxExamples,
     };
+
+    // ---------------------------------------------------------------- v2: inbox (M1)
+
+    public override Task<Contracts.Inbox> ListInbox(ListInboxRequest request, ServerCallContext context) =>
+        inbox.GetAsync(request.Refresh, context.CancellationToken);
+
+    public override async Task WatchInbox(WatchInboxRequest request, IServerStreamWriter<Contracts.Inbox> responseStream, ServerCallContext context)
+    {
+        await foreach (var update in inbox.WatchAsync(context.CancellationToken).ConfigureAwait(false))
+        {
+            await responseStream.WriteAsync(update, context.CancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    public override Task<InboxSettings> GetInboxSettings(GetInboxSettingsRequest request, ServerCallContext context) =>
+        Task.FromResult(inbox.GetSettings());
+
+    public override Task<InboxSettings> UpdateInboxSettings(InboxSettings request, ServerCallContext context)
+    {
+        try
+        {
+            return Task.FromResult(inbox.UpdateSettings(request));
+        }
+        catch (ArgumentException ex)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new RpcException(new Status(StatusCode.Unavailable, $"Could not save settings: {ex.Message}"));
+        }
+    }
+
+    // ---------------------------------------------------------------- v2: context (M2)
+
+    public override async Task<Contracts.PullRequestDetails> GetPullRequestDetails(GetPullRequestDetailsRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        if (request.Refresh || session.Details is null)
+        {
+            await sessions.RefreshDetailsAsync(session, context.CancellationToken).ConfigureAwait(false);
+        }
+
+        var details = session.Details
+            ?? throw new RpcException(new Status(StatusCode.Unavailable, "Couldn't read the conversation from GitHub."));
+        var (lastReviewed, isOpen) = await actions.LastReviewedAsync(session, context.CancellationToken).ConfigureAwait(false);
+        return ProtoMapper.ToProto(details, lastReviewed, isOpen);
+    }
+
+    public override async Task<Contracts.DiffRange> GetDiffRange(GetDiffRangeRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        if (request.Range is not { FromSha.Length: > 0, ToSha.Length: > 0 } range)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Give both ends of the range."));
+        }
+
+        var result = await Run(() => actions.GetRangeAsync(session, range.FromSha, range.ToSha, request.IgnoreWhitespace, context.CancellationToken)).ConfigureAwait(false);
+        var reply = new Contracts.DiffRange { Range = range, IsForcePush = result.IsForcePush, Note = result.Note ?? "" };
+        reply.Files.AddRange(result.Files.Select(f => ProtoMapper.ToSummary(f, false)));
+        return reply;
+    }
+
+    public override async Task<Contracts.TimelineItem> PostIssueComment(PostIssueCommentRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        var item = await Run(() => actions.PostIssueCommentAsync(session, request.Body, context.CancellationToken)).ConfigureAwait(false);
+        return ProtoMapper.ToProto(item);
+    }
+
+    // ---------------------------------------------------------------- v2: threads (M4)
+
+    public override async Task<Contracts.ReviewThread> ReplyToThread(ReplyToThreadRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        var thread = await Run(() => actions.ReplyAsync(session, request.ThreadId, request.Body, context.CancellationToken)).ConfigureAwait(false);
+        return ProtoMapper.ToProto(thread);
+    }
+
+    public override async Task<Contracts.ReviewThread> SetThreadResolved(SetThreadResolvedRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        var thread = await Run(() => actions.SetResolvedAsync(session, request.ThreadId, request.Resolved, context.CancellationToken)).ConfigureAwait(false);
+        return ProtoMapper.ToProto(thread);
+    }
+
+    // ---------------------------------------------------------------- v2: pending review (M5)
+
+    public override async Task<Contracts.PendingReview> GetPendingReview(GetPendingReviewRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        await sessions.RefreshReviewStateAsync(session, context.CancellationToken).ConfigureAwait(false);
+        return ProtoMapper.ToProto(session.PendingReview, session.PendingPoints);
+    }
+
+    public override async Task<Contracts.PendingReview> AddPendingComment(AddPendingCommentRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        var snapshot = session.Snapshot
+            ?? throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pull request is still loading."));
+        if (!string.IsNullOrEmpty(request.ReviewPointId) && session.FindReviewPoint(request.ReviewPointId) is null)
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, $"Unknown review point '{request.ReviewPointId}'."));
+        }
+
+        var comment = NewComment(session.Key, snapshot.HeadSha, request.Path, request.Line, request.Body, request.Side, request.StartLine, request.StartSide);
+        var pending = await Run(() => actions.AddPendingAsync(
+            session, comment, NullIfEmpty(request.ReviewPointId), NullIfEmpty(request.ReplyToThreadId), context.CancellationToken)).ConfigureAwait(false);
+        if (!string.IsNullOrEmpty(request.ReviewPointId))
+        {
+            await RecordAsync(session, request.ReviewPointId, Contracts.ReviewPointState.Commented, "pending review", context.CancellationToken).ConfigureAwait(false);
+        }
+
+        return ProtoMapper.ToProto(pending, session.PendingPoints);
+    }
+
+    public override async Task<Contracts.PendingReview> UpdatePendingComment(UpdatePendingCommentRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        var pending = await Run(() => actions.UpdatePendingAsync(session, request.CommentId, request.Body, context.CancellationToken)).ConfigureAwait(false);
+        return ProtoMapper.ToProto(pending, session.PendingPoints);
+    }
+
+    public override async Task<Contracts.PendingReview> DeletePendingComment(DeletePendingCommentRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        var pending = await Run(() => actions.DeletePendingAsync(session, request.CommentId, context.CancellationToken)).ConfigureAwait(false);
+        return ProtoMapper.ToProto(pending, session.PendingPoints);
+    }
+
+    public override async Task<SubmitReviewReply> SubmitReview(SubmitReviewRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        var reviewEvent = request.Event switch
+        {
+            Contracts.ReviewEvent.Approve => Domain.ReviewEvent.Approve,
+            Contracts.ReviewEvent.RequestChanges => Domain.ReviewEvent.RequestChanges,
+            _ => Domain.ReviewEvent.Comment,
+        };
+        var (review, head) = await Run(() => actions.SubmitAsync(session, reviewEvent, request.Body, context.CancellationToken)).ConfigureAwait(false);
+        return new SubmitReviewReply { Url = review.Url, HeadSha = head };
+    }
+
+    private static NewReviewComment NewComment(
+        PullRequestKey key,
+        string headSha,
+        string path,
+        int line,
+        string body,
+        Contracts.DiffSide side,
+        int startLine,
+        Contracts.DiffSide startSide) =>
+        new(
+            key,
+            headSha,
+            path,
+            line,
+            body,
+            ProtoMapper.FromProto(side),
+            startLine > 0 && startLine != line ? startLine : null,
+            startLine > 0 && startLine != line ? ProtoMapper.FromProto(startSide) : null);
+
+    private static string? NullIfEmpty(string value) => string.IsNullOrEmpty(value) ? null : value;
+
+    /// <summary>Turns a refused review action into the matching RPC status.</summary>
+    private static async Task<T> Run<T>(Func<Task<T>> action)
+    {
+        try
+        {
+            return await action().ConfigureAwait(false);
+        }
+        catch (ReviewActionException ex)
+        {
+            throw new RpcException(new Status(
+                ex.Error switch
+                {
+                    ReviewActionError.Loading => StatusCode.FailedPrecondition,
+                    ReviewActionError.Invalid => StatusCode.InvalidArgument,
+                    ReviewActionError.NotFound => StatusCode.NotFound,
+                    _ => StatusCode.Unavailable,
+                },
+                ex.Message));
+        }
+    }
 
     private async Task RecordAsync(
         PullRequestSession session,

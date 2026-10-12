@@ -51,6 +51,78 @@ internal sealed class GitPullRequestCheckout : IPullRequestCheckout
         return result.StandardOutput;
     }
 
+    public async Task<string> GetRangeDiffAsync(string fromSha, string toSha, bool ignoreWhitespace, string? path, CancellationToken cancellationToken)
+    {
+        ValidateSha(fromSha);
+        ValidateSha(toSha);
+        var env = await environment(cancellationToken).ConfigureAwait(false);
+        List<string> args =
+        [
+            "diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative",
+            "--src-prefix=a/", "--dst-prefix=b/", "-M", "-U3",
+        ];
+        if (ignoreWhitespace)
+        {
+            args.Add("-w");
+        }
+
+        args.AddRange([fromSha, toSha, "--"]);
+        if (path is not null)
+        {
+            args.Add(NormalizeRelative(path));
+        }
+
+        var result = await git.RunAsync(gitDir, args, cancellationToken, env).ConfigureAwait(false);
+        return result.StandardOutput;
+    }
+
+    public async Task<bool> IsAncestorAsync(string ancestor, string descendant, CancellationToken cancellationToken)
+    {
+        ValidateSha(ancestor);
+        ValidateSha(descendant);
+        var result = await git.RunAsync(gitDir, ["merge-base", "--is-ancestor", ancestor, descendant], cancellationToken, throwOnError: false)
+            .ConfigureAwait(false);
+        return result.Succeeded;
+    }
+
+    public async Task<bool> EnsureCommitAsync(string sha, CancellationToken cancellationToken)
+    {
+        ValidateSha(sha);
+        if (await HasCommitAsync(sha, cancellationToken).ConfigureAwait(false))
+        {
+            return true;
+        }
+
+        // A force-pushed-away head can still be fetched by SHA while GitHub keeps it (it usually does for a while).
+        var env = await environment(cancellationToken).ConfigureAwait(false);
+        await git.RunAsync(
+            gitDir,
+            ["fetch", "--no-tags", "--no-write-fetch-head", "origin", $"+{sha}:refs/lumen/commits/{sha[..12]}"],
+            cancellationToken,
+            env,
+            throwOnError: false).ConfigureAwait(false);
+        return await HasCommitAsync(sha, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<bool> HasCommitAsync(string sha, CancellationToken cancellationToken)
+    {
+        var result = await git.RunAsync(
+            gitDir,
+            ["cat-file", "-e", sha + "^{commit}"],
+            cancellationToken,
+            new Dictionary<string, string> { ["GIT_NO_LAZY_FETCH"] = "1" },
+            throwOnError: false).ConfigureAwait(false);
+        return result.Succeeded;
+    }
+
+    private static void ValidateSha(string sha)
+    {
+        if (sha is not { Length: 40 or 64 } || !sha.All(char.IsAsciiHexDigit))
+        {
+            throw new ArgumentException($"'{sha}' is not a full commit SHA.", nameof(sha));
+        }
+    }
+
     public async Task<string?> ReadBaseFileAsync(string path, CancellationToken cancellationToken)
     {
         var gitPath = NormalizeRelative(path);
