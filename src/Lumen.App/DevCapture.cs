@@ -17,7 +17,8 @@ internal static class DevCapture
     {
         Directory.CreateDirectory(directory);
         var deadline = DateTime.UtcNow.AddSeconds(90);
-        while (DateTime.UtcNow < deadline && viewModel.PullRequest is not { IsAnalysing: false } && viewModel.PullRequest?.Error is null)
+        while (DateTime.UtcNow < deadline && viewModel.PullRequest is not { IsAnalysing: false } && viewModel.PullRequest?.Error is null
+               && !(viewModel.IsHome && !viewModel.Home.IsLoading))
         {
             await Task.Delay(200).ConfigureAwait(true);
         }
@@ -74,6 +75,62 @@ internal static class DevCapture
                 break;
             case "generated" when pr is not null:
                 pr.ToggleGenerated();
+                break;
+
+            // Plan v2 states.
+            case "inbox":
+                await viewModel.GoHomeCommand.ExecuteAsync(null).ConfigureAwait(true);
+                break;
+            case "open" when viewModel.Home.AllItems.FirstOrDefault() is { } item:
+                await viewModel.OpenAsync(item.Reference).ConfigureAwait(true);
+                await Task.Delay(1500).ConfigureAwait(true);
+                break;
+            case "conversation" when pr is not null:
+                pr.ShowTab(PullRequestTab.Conversation);
+                break;
+            case "commits" when pr is not null:
+                pr.ShowTab(PullRequestTab.Commits);
+                break;
+            case "checks" when pr is not null:
+                pr.ShowTab(PullRequestTab.Checks);
+                break;
+            case "files" when pr is not null:
+                pr.ShowTab(PullRequestTab.Files);
+                break;
+            case "since" when pr is { CanShowSinceLastReview: true }:
+                pr.ShowSinceLastReview = true;
+                await Task.Delay(500).ConfigureAwait(true);
+                break;
+            case "all" when pr is not null:
+                await pr.ClearScopeAsync().ConfigureAwait(true);
+                break;
+            case "thread" when pr is not null:
+                await pr.NextThreadAsync().ConfigureAwait(true);
+                break;
+            case "draft" when pr?.CurrentDiff?.Rows.FirstOrDefault(r => r.Kind == Diff.DiffRowKind.Added) is { } row:
+                pr.StartLineComment(Diff.LineSide.Right, row.NewNumber)?.Body = "A comment written in the gutter composer.";
+                break;
+            case "tray" when pr is not null:
+                pr.IsTrayOpen = !pr.IsTrayOpen;
+                break;
+            case "split" when pr is not null:
+                pr.ToggleSplitView();
+                break;
+            case "find" when pr is not null:
+                pr.OpenFind();
+                pr.FindQuery = "Enrichment";
+                break;
+            case "palette":
+                viewModel.Palette.Open();
+                break;
+            case "risk" when pr?.Walkthrough?.Risks is [var risk, ..]:
+                await pr.SelectRiskAsync(risk).ConfigureAwait(true);
+                break;
+            case "group" when pr is not null:
+                await pr.NextGroupAsync().ConfigureAwait(true);
+                break;
+            case "order" when pr is not null:
+                pr.GroupOrder = !pr.GroupOrder;
                 break;
             case "dark" when Application.Current is { } app:
                 app.RequestedThemeVariant = ThemeVariant.Dark;

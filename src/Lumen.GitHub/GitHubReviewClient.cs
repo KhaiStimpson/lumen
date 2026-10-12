@@ -600,6 +600,16 @@ public sealed partial class GitHubRestClient
             cancellationToken);
     }
 
+    /// <summary>Discards a pending review and its comments (nothing was ever visible to others).</summary>
+    public Task DeletePendingReviewAsync(string reviewId, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(reviewId);
+        return GraphQlNodeAsync(
+            "mutation($id: ID!) { deletePullRequestReview(input: { pullRequestReviewId: $id }) { pullRequestReview { id } } }",
+            new JsonObject { ["id"] = reviewId },
+            cancellationToken);
+    }
+
     public async Task<SubmittedReview> SubmitReviewAsync(string reviewId, ReviewEvent reviewEvent, string body, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(reviewId);

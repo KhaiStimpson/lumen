@@ -95,7 +95,7 @@ public sealed class EngineWalkthroughTests : IAsyncLifetime, IDisposable
 
         // Reopening (a fresh analysis) serves it from the cache without a single model request.
         var again = await CollectUntilAsync(e => e.WalkthroughUpdated?.Walkthrough.FromCache == true, refresh: true);
-        Assert.Equal("Adds a retry worker.", again.Last().WalkthroughUpdated.Walkthrough.Intent);
+        Assert.Equal("Adds a retry worker.", again.Last(e => e.WalkthroughUpdated is not null).WalkthroughUpdated.Walkthrough.Intent);
         Assert.Equal(requests, _model.Requests.Count);
     }
 

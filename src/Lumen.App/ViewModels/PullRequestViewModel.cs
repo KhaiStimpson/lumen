@@ -952,7 +952,8 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
                     PullRequest = Ref,
                     ReviewPointId = point.Id,
                     Path = point.Path,
-                    Line = point.Line,
+                    Line = PointRange(point).Line,
+                    StartLine = PointRange(point).StartLine,
                     Body = point.CommentDraft.Trim(),
                 },
                 _lifetime.Token).ConfigureAwait(true);

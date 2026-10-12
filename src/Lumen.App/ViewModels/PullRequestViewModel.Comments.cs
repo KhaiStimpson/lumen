@@ -258,7 +258,8 @@ public sealed partial class PullRequestViewModel
                     PullRequest = Ref,
                     ReviewPointId = point.Id,
                     Path = point.Path,
-                    Line = point.Line,
+                    Line = PointRange(point).Line,
+                    StartLine = PointRange(point).StartLine,
                     Body = point.CommentDraft.Trim(),
                 },
                 _lifetime.Token).ConfigureAwait(true);
@@ -289,6 +290,25 @@ public sealed partial class PullRequestViewModel
 
         var block = $"```suggestion\n{original}\n```";
         point.CommentDraft = string.IsNullOrWhiteSpace(point.CommentDraft) ? block : $"{point.CommentDraft.TrimEnd()}\n\n{block}";
+    }
+
+    /// <summary>
+    /// A review point's comment covers its whole anchor (e.g. a method's signature) when every line of it is in the
+    /// diff; otherwise just its first line.
+    /// </summary>
+    internal (int StartLine, int Line) PointRange(ReviewPointViewModel point)
+    {
+        var anchor = point.Model.Anchor;
+        if (anchor.EndLine > anchor.StartLine && _diffCache.TryGetValue(DiffKey(point.Path), out var diff))
+        {
+            var lines = diff.Hunks.SelectMany(h => h.Lines).Where(l => l.NewNumber > 0).Select(l => l.NewNumber).ToHashSet();
+            if (Enumerable.Range(anchor.StartLine, anchor.EndLine - anchor.StartLine + 1).All(lines.Contains))
+            {
+                return (anchor.StartLine, anchor.EndLine);
+            }
+        }
+
+        return (0, point.Line);
     }
 
     private string PendingToast => PendingComments.Count == 1
