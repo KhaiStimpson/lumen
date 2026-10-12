@@ -10,7 +10,11 @@ public interface IReviewSource : IAsyncDisposable
 
     IAsyncEnumerable<PullRequestEvent> WatchAsync(PullRequestRef pullRequest, bool refresh, CancellationToken cancellationToken);
 
-    Task<FileDiff> GetFileDiffAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken);
+    Task<FileDiff> GetFileDiffAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken) =>
+        GetFileDiffAsync(new GetFileDiffRequest { PullRequest = pullRequest, Path = path }, cancellationToken);
+
+    /// <summary>A file's diff, optionally limited to a commit range or ignoring whitespace.</summary>
+    Task<FileDiff> GetFileDiffAsync(GetFileDiffRequest request, CancellationToken cancellationToken);
 
     Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken);
 
@@ -36,4 +40,42 @@ public interface IReviewSource : IAsyncDisposable
 
     /// <summary>Replaces one layer: the global settings, or the named repository's overrides.</summary>
     Task<ReviewSettingsReply> UpdateReviewSettingsAsync(UpdateReviewSettingsRequest request, CancellationToken cancellationToken);
+
+    // ---- v2 ----
+
+    Task<Inbox> ListInboxAsync(bool refresh, CancellationToken cancellationToken);
+
+    /// <summary>The inbox now, then each refresh, until cancelled.</summary>
+    IAsyncEnumerable<Inbox> WatchInboxAsync(CancellationToken cancellationToken);
+
+    Task<InboxSettings> GetInboxSettingsAsync(CancellationToken cancellationToken);
+
+    Task<InboxSettings> UpdateInboxSettingsAsync(InboxSettings settings, CancellationToken cancellationToken);
+
+    Task<PullRequestDetails> GetPullRequestDetailsAsync(PullRequestRef pullRequest, bool refresh, CancellationToken cancellationToken);
+
+    Task<DiffRange> GetDiffRangeAsync(GetDiffRangeRequest request, CancellationToken cancellationToken);
+
+    Task<TimelineItem> PostIssueCommentAsync(PullRequestRef pullRequest, string body, CancellationToken cancellationToken);
+
+    Task<ReviewThread> ReplyToThreadAsync(PullRequestRef pullRequest, string threadId, string body, CancellationToken cancellationToken);
+
+    Task<ReviewThread> SetThreadResolvedAsync(PullRequestRef pullRequest, string threadId, bool resolved, CancellationToken cancellationToken);
+
+    Task<PendingReview> GetPendingReviewAsync(PullRequestRef pullRequest, CancellationToken cancellationToken);
+
+    Task<PendingReview> AddPendingCommentAsync(AddPendingCommentRequest request, CancellationToken cancellationToken);
+
+    Task<PendingReview> UpdatePendingCommentAsync(PullRequestRef pullRequest, string commentId, string body, CancellationToken cancellationToken);
+
+    Task<PendingReview> DeletePendingCommentAsync(PullRequestRef pullRequest, string commentId, CancellationToken cancellationToken);
+
+    Task<SubmitReviewReply> SubmitReviewAsync(SubmitReviewRequest request, CancellationToken cancellationToken);
+
+    Task<Connections> SetCloudflareCredentialsAsync(string accountId, string apiToken, CancellationToken cancellationToken);
+
+    Task<Connections> RemoveCloudflareCredentialsAsync(CancellationToken cancellationToken);
+
+    /// <summary>Results arrive on the pull request's stream as WalkthroughUpdated.</summary>
+    Task StartWalkthroughAsync(StartWalkthroughRequest request, CancellationToken cancellationToken);
 }

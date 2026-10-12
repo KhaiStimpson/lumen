@@ -65,8 +65,8 @@
 
     <ContentControl Grid.Row="1" Content="{Binding Current}">
       <ContentControl.DataTemplates>
-        <DataTemplate DataType="vm:OpenPullRequestViewModel">
-          <views:OpenPullRequestView />
+        <DataTemplate DataType="vm:InboxViewModel">
+          <views:InboxView />
         </DataTemplate>
         <DataTemplate DataType="vm:PullRequestViewModel">
           <views:PullRequestView />

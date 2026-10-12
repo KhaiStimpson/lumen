@@ -8,13 +8,13 @@ namespace Lumen.App.Services;
 /// Replays a recorded engine session (events.jsonl + diffs.jsonl). Used by UI tests and by <c>--fixture</c>
 /// for design work without GitHub. Writes are accepted and echoed back as events; nothing leaves the machine.
 /// </summary>
-public sealed class FixtureReviewSource : IReviewSource
+public sealed partial class FixtureReviewSource : IReviewSource
 {
     private readonly List<PullRequestEvent> _events;
     private readonly Dictionary<string, FileDiff> _diffs;
     private readonly List<System.Threading.Channels.Channel<PullRequestEvent>> _live = [];
 
-    public FixtureReviewSource(string directory, TimeSpan? eventDelay = null)
+    public FixtureReviewSource(string directory, TimeSpan? eventDelay = null, string? viewerLogin = null)
     {
         var parser = new JsonParser(JsonParser.Settings.Default.WithIgnoreUnknownFields(true));
         _events = [.. File.ReadAllLines(Path.Combine(directory, "events.jsonl")).Where(l => l.Length > 0).Select(parser.Parse<PullRequestEvent>)];
@@ -23,6 +23,16 @@ public sealed class FixtureReviewSource : IReviewSource
             .Select(parser.Parse<FileDiff>)
             .ToDictionary(d => d.Path, StringComparer.Ordinal);
         EventDelay = eventDelay ?? TimeSpan.Zero;
+
+        if (viewerLogin is not null)
+        {
+            foreach (var evt in _events.Where(e => e.Snapshot is not null))
+            {
+                evt.Snapshot.ViewerLogin = viewerLogin;
+            }
+        }
+
+        LoadV2(directory, parser, viewerLogin);
     }
 
     public TimeSpan EventDelay { get; }
@@ -42,7 +52,7 @@ public sealed class FixtureReviewSource : IReviewSource
             _live.Add(live);
         }
 
-        foreach (var evt in _events)
+        foreach (var evt in _events.Concat(CurrentState()))
         {
             if (EventDelay > TimeSpan.Zero)
             {
@@ -58,8 +68,19 @@ public sealed class FixtureReviewSource : IReviewSource
         }
     }
 
-    public Task<FileDiff> GetFileDiffAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken) =>
-        Task.FromResult(_diffs.TryGetValue(path, out var diff) ? diff : new FileDiff { Path = path });
+    /// <summary>Every file diff request, so tests can see ranges and whitespace flags.</summary>
+    public List<GetFileDiffRequest> DiffRequests { get; } = [];
+
+    public Task<FileDiff> GetFileDiffAsync(GetFileDiffRequest request, CancellationToken cancellationToken)
+    {
+        lock (DiffRequests)
+        {
+            DiffRequests.Add(request.Clone());
+        }
+
+        // The recording has whole-PR diffs only; a range or whitespace-insensitive request gets the same hunks.
+        return Task.FromResult(_diffs.TryGetValue(request.Path, out var diff) ? diff : new FileDiff { Path = request.Path });
+    }
 
     public Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken)
     {
@@ -87,7 +108,16 @@ public sealed class FixtureReviewSource : IReviewSource
 
     public Task<PostReviewCommentReply> PostCommentAsync(PostReviewCommentRequest request, CancellationToken cancellationToken)
     {
+        // Like GitHub: no single comments while a pending review exists, so it joins the review instead.
+        if (_pending.Id.Length > 0)
+        {
+            var pending = AddPending(request.Path, request.Side, request.Line, request.StartLine, request.Body, request.ReviewPointId, null);
+            MarkCommented(request.ReviewPointId);
+            return Task.FromResult(new PostReviewCommentReply { AddedToPendingReview = true, PendingReview = pending });
+        }
+
         PostedComments.Add(request);
+        AddThread(request.Path, request.Side, request.Line, request.StartLine, request.Body, pending: false);
         if (!string.IsNullOrEmpty(request.ReviewPointId))
         {
             Broadcast(new PullRequestEvent
@@ -118,6 +148,12 @@ public sealed class FixtureReviewSource : IReviewSource
         MaxInvestigationsPerPullRequest = 3,
         MaxConcurrentInvestigations = 1,
         AllowMeteredUsage = false,
+        AllowCodeToFastModel = true,
+        FastModelId = "@cf/zai-org/glm-5.3-flash",
+        FastModelTimeoutSeconds = 30,
+        FastModelMaxDiffKb = 512,
+        FastModelDailyRequestCap = 500,
+        FastModelGateway = "",
     };
 
     public Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken) => Task.FromResult(FixtureConnections());
@@ -158,6 +194,36 @@ public sealed class FixtureReviewSource : IReviewSource
         if (settings.HasAllowMeteredUsage)
         {
             next.AllowMeteredUsage = settings.AllowMeteredUsage;
+        }
+
+        if (settings.HasAllowCodeToFastModel)
+        {
+            next.AllowCodeToFastModel = settings.AllowCodeToFastModel;
+        }
+
+        if (settings.HasFastModelId)
+        {
+            next.FastModelId = settings.FastModelId;
+        }
+
+        if (settings.HasFastModelTimeoutSeconds)
+        {
+            next.FastModelTimeoutSeconds = settings.FastModelTimeoutSeconds;
+        }
+
+        if (settings.HasFastModelMaxDiffKb)
+        {
+            next.FastModelMaxDiffKb = settings.FastModelMaxDiffKb;
+        }
+
+        if (settings.HasFastModelDailyRequestCap)
+        {
+            next.FastModelDailyRequestCap = settings.FastModelDailyRequestCap;
+        }
+
+        if (settings.HasFastModelGateway)
+        {
+            next.FastModelGateway = settings.FastModelGateway;
         }
 
         ConnectionSettings = next;
@@ -227,6 +293,20 @@ public sealed class FixtureReviewSource : IReviewSource
 
     private Connections FixtureConnections() => new()
     {
+        FastModel = new FastModelConnection
+        {
+            State = !ConnectionSettings.AllowCloudReasoning ? ConnectionState.Off
+                : !CloudflareStored ? ConnectionState.NotConnected
+                : ConnectionSettings.AllowCodeToFastModel ? ConnectionState.Connected : ConnectionState.Off,
+            Detail = !ConnectionSettings.AllowCloudReasoning ? "Off: cloud AI is turned off"
+                : !CloudflareStored ? "No Cloudflare account id and API token"
+                : ConnectionSettings.AllowCodeToFastModel ? "Token active · @cf/zai-org/glm-5.3-flash" : "Connected · walkthrough off until you allow the diff to be sent",
+            Model = ConnectionSettings.FastModelId,
+            CredentialsStored = CloudflareStored,
+            CanStoreCredentials = true,
+            Sends = "The pull request's diff, title, description and commit messages (generated files by path and size only)",
+            RequestsToday = 42,
+        },
         Settings = ConnectionSettings.Clone(),
         Jev = new JevConnection
         {

@@ -64,9 +64,9 @@ public sealed class EngineReviewSource : IReviewSource
         }
     }
 
-    public async Task<FileDiff> GetFileDiffAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken) =>
+    public async Task<FileDiff> GetFileDiffAsync(GetFileDiffRequest request, CancellationToken cancellationToken) =>
         await (await ClientAsync(cancellationToken).ConfigureAwait(false))
-            .GetFileDiffAsync(new GetFileDiffRequest { PullRequest = pullRequest, Path = path }, cancellationToken: cancellationToken)
+            .GetFileDiffAsync(request, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
     public async Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken) =>
@@ -121,6 +121,96 @@ public sealed class EngineReviewSource : IReviewSource
     public async Task<ReviewSettingsReply> UpdateReviewSettingsAsync(UpdateReviewSettingsRequest request, CancellationToken cancellationToken) =>
         await (await ClientAsync(cancellationToken).ConfigureAwait(false))
             .UpdateReviewSettingsAsync(request, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<Inbox> ListInboxAsync(bool refresh, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .ListInboxAsync(new ListInboxRequest { Refresh = refresh }, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async IAsyncEnumerable<Inbox> WatchInboxAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var client = await ClientAsync(cancellationToken).ConfigureAwait(false);
+        using var call = client.WatchInbox(new WatchInboxRequest(), cancellationToken: cancellationToken);
+        await foreach (var inbox in call.ResponseStream.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        {
+            yield return inbox;
+        }
+    }
+
+    public async Task<InboxSettings> GetInboxSettingsAsync(CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .GetInboxSettingsAsync(new GetInboxSettingsRequest(), cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<InboxSettings> UpdateInboxSettingsAsync(InboxSettings settings, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .UpdateInboxSettingsAsync(settings, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<PullRequestDetails> GetPullRequestDetailsAsync(PullRequestRef pullRequest, bool refresh, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .GetPullRequestDetailsAsync(new GetPullRequestDetailsRequest { PullRequest = pullRequest, Refresh = refresh }, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<DiffRange> GetDiffRangeAsync(GetDiffRangeRequest request, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .GetDiffRangeAsync(request, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<TimelineItem> PostIssueCommentAsync(PullRequestRef pullRequest, string body, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .PostIssueCommentAsync(new PostIssueCommentRequest { PullRequest = pullRequest, Body = body }, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<ReviewThread> ReplyToThreadAsync(PullRequestRef pullRequest, string threadId, string body, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .ReplyToThreadAsync(new ReplyToThreadRequest { PullRequest = pullRequest, ThreadId = threadId, Body = body }, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<ReviewThread> SetThreadResolvedAsync(PullRequestRef pullRequest, string threadId, bool resolved, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .SetThreadResolvedAsync(new SetThreadResolvedRequest { PullRequest = pullRequest, ThreadId = threadId, Resolved = resolved }, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<PendingReview> GetPendingReviewAsync(PullRequestRef pullRequest, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .GetPendingReviewAsync(new GetPendingReviewRequest { PullRequest = pullRequest }, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<PendingReview> AddPendingCommentAsync(AddPendingCommentRequest request, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .AddPendingCommentAsync(request, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<PendingReview> UpdatePendingCommentAsync(PullRequestRef pullRequest, string commentId, string body, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .UpdatePendingCommentAsync(new UpdatePendingCommentRequest { PullRequest = pullRequest, CommentId = commentId, Body = body }, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<PendingReview> DeletePendingCommentAsync(PullRequestRef pullRequest, string commentId, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .DeletePendingCommentAsync(new DeletePendingCommentRequest { PullRequest = pullRequest, CommentId = commentId }, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<SubmitReviewReply> SubmitReviewAsync(SubmitReviewRequest request, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .SubmitReviewAsync(request, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<Connections> SetCloudflareCredentialsAsync(string accountId, string apiToken, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .SetCloudflareCredentialsAsync(new SetCloudflareCredentialsRequest { AccountId = accountId, ApiToken = apiToken }, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<Connections> RemoveCloudflareCredentialsAsync(CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .RemoveCloudflareCredentialsAsync(new RemoveCloudflareCredentialsRequest(), cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task StartWalkthroughAsync(StartWalkthroughRequest request, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .StartWalkthroughAsync(request, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
     private async Task<ReviewEngine.ReviewEngineClient> ClientAsync(CancellationToken cancellationToken)

@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <None Include="..\fixtures\andrew-crm-58\**" LinkBase="fixtures/andrew-crm-58" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\inbox\**" LinkBase="fixtures/inbox" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

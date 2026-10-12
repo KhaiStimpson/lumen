@@ -12,6 +12,7 @@ namespace Lumen.App.ViewModels;
 public enum SettingsSection
 {
     Connections,
+    Inbox,
     Review,
     Files,
     CloudLimits,
@@ -29,7 +30,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _source = source;
         _settings = settings;
         _settingsPath = settingsPath;
-        Home = new OpenPullRequestViewModel(settings.RecentPullRequests, OpenAsync);
+        Home = new InboxViewModel(source, settings.RecentPullRequests, OpenAsync);
+        InboxSettings = new InboxSettingsViewModel(source);
+        InboxSettings.Saved += async (_, _) => await Home.RefreshAsync().ConfigureAwait(true);
         Connections = new ConnectionsViewModel(source);
         Review = new ReviewSettingsViewModel(source);
         Appearance = new AppearanceViewModel(settings, settingsPath);
@@ -41,9 +44,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
         };
         Current = Home;
+        Home.Start();
     }
 
-    public OpenPullRequestViewModel Home { get; }
+    public InboxViewModel Home { get; }
+
+    public InboxSettingsViewModel InboxSettings { get; }
+
+    public bool IsHome => Current == Home;
+
+    /// <summary>The window came back to the foreground: refresh what's on screen (plan v2 M1: polled, and on focus).</summary>
+    public Task OnActivatedAsync() => IsHome ? Home.RefreshAsync() : Task.CompletedTask;
 
     public ConnectionsViewModel Connections { get; }
 
@@ -70,8 +81,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string SourceDescription => _source.Description;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PullRequest), nameof(IsPullRequestOpen))]
+    [NotifyPropertyChangedFor(nameof(PullRequest), nameof(IsPullRequestOpen), nameof(IsHome))]
     public partial object Current { get; set; }
+
+    partial void OnCurrentChanged(object value)
+    {
+        // The inbox polls only while it is on screen.
+        if (value == Home)
+        {
+            Home.Start();
+        }
+        else
+        {
+            Home.Stop();
+        }
+    }
 
     public PullRequestViewModel? PullRequest => Current as PullRequestViewModel;
 
@@ -131,7 +155,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         Section = section;
         IsSettingsOpen = true;
-        return Task.WhenAll(Connections.LoadAsync(), Review.LoadAsync(PullRequest?.Ref));
+        return Task.WhenAll(Connections.LoadAsync(), Review.LoadAsync(PullRequest?.Ref), InboxSettings.LoadAsync());
     }
 
     [RelayCommand]
@@ -170,44 +194,5 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             pr.FileFilter = value;
         }
-    }
-}
-
-public sealed partial class OpenPullRequestViewModel : ObservableObject
-{
-    private readonly Func<string, Task> _open;
-
-    public OpenPullRequestViewModel(IEnumerable<string> recent, Func<string, Task> open)
-    {
-        _open = open;
-        SetRecent(recent);
-        Reference = Recent.FirstOrDefault() ?? "";
-    }
-
-    public ObservableCollection<string> Recent { get; } = [];
-
-    [ObservableProperty]
-    public partial string Reference { get; set; }
-
-    [ObservableProperty]
-    public partial string? Error { get; set; }
-
-    public void SetRecent(IEnumerable<string> recent)
-    {
-        Recent.Clear();
-        foreach (var item in recent)
-        {
-            Recent.Add(item);
-        }
-    }
-
-    [RelayCommand]
-    private Task OpenAsync() => _open(Reference);
-
-    [RelayCommand]
-    private Task OpenRecentAsync(string reference)
-    {
-        Reference = reference;
-        return _open(reference);
     }
 }

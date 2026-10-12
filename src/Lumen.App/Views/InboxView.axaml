@@ -1,0 +1,125 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             x:Class="Lumen.App.Views.InboxView"
+             x:DataType="vm:InboxViewModel">
+  <!-- The start screen (plan v2 M1): what needs the reviewer, their own pull requests, and watched repositories. -->
+  <ScrollViewer Name="InboxScroll">
+    <Grid ColumnDefinitions="*,Auto,*" Margin="0,28,0,32">
+      <StackPanel Grid.Column="1" Width="980" Spacing="20">
+        <Grid ColumnDefinitions="*,Auto" Margin="4,0">
+          <StackPanel Spacing="4">
+            <TextBlock Classes="h1" Text="Inbox" />
+            <TextBlock Classes="caption" TextWrapping="Wrap">
+              <Run Text="Pull requests waiting on you, your own, and the repositories you watch." />
+              <Run Text="{Binding UpdatedLabel}" Foreground="{DynamicResource Text.Tertiary}" />
+            </TextBlock>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Width="430">
+              <TextBox Name="Reference" Text="{Binding Reference}" PlaceholderText="Open a URL or owner/repo#123"
+                       MinHeight="34" VerticalContentAlignment="Center">
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding OpenCommand}" />
+                </TextBox.KeyBindings>
+              </TextBox>
+              <Button Grid.Column="1" Classes="primary" Content="Open" Command="{Binding OpenCommand}" MinHeight="34" Padding="16,0"
+                      VerticalContentAlignment="Center" />
+            </Grid>
+            <Button Name="RefreshInbox" Classes="ghost" Padding="8" Command="{Binding RefreshCommand}" ToolTip.Tip="Refresh from GitHub"
+                    IsEnabled="{Binding !IsRefreshing}">
+              <Path Data="{StaticResource Icon.Refresh}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="14" Height="14" />
+            </Button>
+          </StackPanel>
+        </Grid>
+
+        <TextBlock Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+                   Foreground="{DynamicResource Severity.High}" FontSize="12" Margin="4,-12,0,0" HorizontalAlignment="Right" />
+
+        <Border Name="InboxError" Classes="card" Padding="16,12" BorderBrush="{DynamicResource Severity.High}"
+                IsVisible="{Binding LoadError, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <StackPanel Spacing="4">
+            <TextBlock Classes="h3" Text="Couldn't reach GitHub" />
+            <TextBlock Classes="body secondary" Text="{Binding LoadError}" TextWrapping="Wrap" />
+            <TextBlock Classes="caption" IsVisible="{Binding IsAuthenticationError}" Text="Sign in with the GitHub CLI: run  gh auth login  then refresh." />
+          </StackPanel>
+        </Border>
+
+        <TextBlock Classes="caption tertiary" Text="Loading your pull requests…" IsVisible="{Binding IsLoading}" Margin="4,0" />
+
+        <ItemsControl Name="Sections" ItemsSource="{Binding Sections}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:InboxSectionViewModel">
+              <Border Classes="card" Margin="0,0,0,16" Padding="0,6,0,6">
+                <StackPanel>
+                  <Grid ColumnDefinitions="*,Auto" Margin="18,10,18,8">
+                    <TextBlock Classes="h3" Text="{Binding Title}" />
+                    <TextBlock Grid.Column="1" Classes="caption" Text="{Binding CountLabel}" />
+                  </Grid>
+                  <TextBlock Classes="caption tertiary" Text="{Binding Detail}" Margin="18,0,18,10" TextWrapping="Wrap"
+                             IsVisible="{Binding IsEmpty}" />
+                  <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:InboxItemViewModel">
+                        <Button Classes="row inbox" Margin="6,0" Padding="12,9"
+                                Command="{Binding $parent[views:InboxView].((vm:InboxViewModel)DataContext).OpenItemCommand}"
+                                CommandParameter="{Binding}" ToolTip.Tip="{Binding Reference}">
+                          <Grid ColumnDefinitions="14,*,Auto,Auto,Auto" ColumnSpacing="10">
+                            <Ellipse Width="7" Height="7" Fill="{DynamicResource Accent}" VerticalAlignment="Top" Margin="0,7,0,0"
+                                     IsVisible="{Binding IsUnread}" ToolTip.Tip="New activity since you last opened it" />
+                            <StackPanel Grid.Column="1" Spacing="3">
+                              <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="560" />
+                                <Border Classes="pill" IsVisible="{Binding IsDraft}"><TextBlock Text="Draft" /></Border>
+                              </StackPanel>
+                              <TextBlock Classes="caption">
+                                <Run Text="{Binding RepositoryLabel}" /><Run Text=" " /><Run Text="{Binding NumberLabel}" FontWeight="SemiBold" />
+                                <Run Text=" · " /><Run Text="{Binding Author}" /><Run Text=" · " /><Run Text="{Binding AgeLabel}" />
+                              </TextBlock>
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Classes="caption tertiary" Text="{Binding SizeLabel}" VerticalAlignment="Center" />
+                            <Ellipse Grid.Column="3" Width="9" Height="9" VerticalAlignment="Center" IsVisible="{Binding HasChecks}"
+                                     Fill="{Binding ChecksKind, Converter={x:Static views:Converters.CheckToBrush}}" ToolTip.Tip="{Binding ChecksLabel}" />
+                            <Border Grid.Column="4" Classes="pill" VerticalAlignment="Center" IsVisible="{Binding HasReviewState}" MinWidth="0"
+                                    Classes.open="{Binding ReviewKind, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=approved}"
+                                    Classes.High="{Binding ReviewKind, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=changes}"
+                                    Classes.Medium="{Binding ReviewKind, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=awaiting}">
+                              <TextBlock Text="{Binding ReviewLabel}" />
+                            </Border>
+                          </Grid>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <StackPanel Spacing="4" IsVisible="{Binding Recent.Count, Converter={x:Static views:Converters.IsPositive}}" Margin="4,0">
+          <TextBlock Classes="section" Text="RECENT" Margin="0,0,0,2" />
+          <WrapPanel>
+            <ItemsControl ItemsSource="{Binding Recent}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <Button Classes="subtle" Margin="0,0,8,8" Command="{Binding $parent[ItemsControl].((vm:InboxViewModel)DataContext).OpenRecentCommand}"
+                          CommandParameter="{Binding}">
+                    <TextBlock Text="{Binding}" FontSize="12" />
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </WrapPanel>
+        </StackPanel>
+
+        <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="4,0"
+                   Text="Uses your GitHub CLI sign-in (gh auth login). Code is analysed locally. Nothing is posted to GitHub without a click or Ctrl+Enter, and nothing goes to an AI service unless you turn it on in Connections." />
+      </StackPanel>
+    </Grid>
+  </ScrollViewer>
+</UserControl>
