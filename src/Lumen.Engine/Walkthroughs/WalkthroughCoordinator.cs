@@ -127,10 +127,21 @@ public sealed partial class WalkthroughCoordinator
                 SinceSha = sinceSha,
             };
 
-            var result = await generator.RunAsync(input, w => Publish(session, w), ct).ConfigureAwait(false);
+            // The finished walkthrough is cached before it is announced, so a reopen right after never misses it.
+            var result = await generator.RunAsync(
+                input,
+                w =>
+                {
+                    if (w.Status != WalkthroughStatus.Complete)
+                    {
+                        Publish(session, w);
+                    }
+                },
+                ct).ConfigureAwait(false);
             if (result.Status == WalkthroughStatus.Complete)
             {
                 await _cache.SaveWalkthroughAsync(session.Key, snapshot.HeadSha, scope, generator.SettingsHash, JsonSerializer.Serialize(result, Json), ct).ConfigureAwait(false);
+                Publish(session, result);
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

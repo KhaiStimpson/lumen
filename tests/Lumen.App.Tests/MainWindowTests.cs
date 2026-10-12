@@ -364,6 +364,11 @@ public sealed class MainWindowTests
         Assert.Equal("No OpenRouter key", connections.JevStatus);
         Assert.False(connections.SaveKeyCommand.CanExecute(null));
 
+        // JEV is legacy (plan v2): its controls are behind a disclosure.
+        Assert.False(connections.ShowLegacy);
+        Find<Button>(window, "LegacyToggle").Command!.Execute(null);
+        await Fixture.PumpAsync();
+
         var box = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "OpenRouterKey");
         box.Focus();
         window.KeyTextInput("sk-or-v1-fixture");

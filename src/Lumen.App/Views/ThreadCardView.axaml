@@ -26,6 +26,7 @@
           </TextBlock>
           <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
             <TextBlock Classes="caption tertiary" Text="{Binding Thread.ReplyCountLabel}" VerticalAlignment="Center" />
+            <Border Classes="pill Medium" IsVisible="{Binding Thread.IsPendingOnly}"><TextBlock Text="Pending" /></Border>
             <Border Classes="pill" IsVisible="{Binding Thread.IsOutdated}"><TextBlock Text="Outdated" /></Border>
             <Border Classes="pill open" IsVisible="{Binding Thread.IsResolved}"><TextBlock Text="Resolved" /></Border>
             <Path Data="{StaticResource Icon.ChevronDown}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="10" Height="10"

@@ -19,11 +19,105 @@
 
     <Border Classes="divider" />
 
+    <!-- Fast model (plan v2 M7): GLM on Cloudflare Workers AI, for the walkthrough. -->
+    <StackPanel Spacing="12">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                 Fill="{Binding FastModelState, Converter={x:Static views:Converters.ConnectionToBrush}}" />
+        <TextBlock Grid.Column="1" Classes="h3" Text="Walkthrough · fast model" VerticalAlignment="Center" />
+        <Border Grid.Column="2" Classes="pill" VerticalAlignment="Center">
+          <TextBlock Text="Metered · Cloudflare" />
+        </Border>
+      </Grid>
+
+      <StackPanel Spacing="4" Margin="18,0,0,0">
+        <TextBlock Name="FastModelStatus" Classes="body" Text="{Binding FastModelStatus}" TextWrapping="Wrap" />
+        <TextBlock Classes="caption tertiary" FontFamily="{StaticResource CodeFont}">
+          <Run Text="{Binding FastModelName}" /><Run Text="  ·  " /><Run Text="{Binding RequestsTodayLabel}" />
+        </TextBlock>
+      </StackPanel>
+
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="18,0,0,0" IsEnabled="{Binding AllowCloudReasoning}">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="Walk me through each pull request" />
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="{Binding FastModelSends, StringFormat='Sends: {0}'}" />
+        </StackPanel>
+        <ToggleSwitch Name="AllowCodeToFastModel" Grid.Column="1" Classes="setting" IsChecked="{Binding AllowCodeToFastModel}"
+                      IsEnabled="{Binding IsLoaded}" />
+      </Grid>
+
+      <StackPanel Spacing="8" Margin="18,4,0,0" IsVisible="{Binding CanStoreCloudflare}">
+        <TextBlock Classes="section" Text="{Binding CloudflareLabel}" />
+        <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="8">
+          <TextBox Name="CloudflareAccount" Text="{Binding CloudflareAccountInput}" PlaceholderText="Account id" MinHeight="36"
+                   VerticalContentAlignment="Center" FontFamily="{StaticResource CodeFont}" FontSize="12" />
+          <TextBox Name="CloudflareToken" Grid.Column="1" Text="{Binding CloudflareTokenInput}" PasswordChar="•" RevealPassword="False"
+                   PlaceholderText="API token (Workers AI)" MinHeight="36" VerticalContentAlignment="Center">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding SaveCloudflareCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          <Button Grid.Column="2" Classes="primary" Content="Save" Command="{Binding SaveCloudflareCommand}"
+                  MinHeight="36" Padding="16,0" VerticalContentAlignment="Center" />
+        </Grid>
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap" VerticalAlignment="Center"
+                     Text="Stored in Windows Credential Manager, never in settings files. Checking the token is free." />
+          <Button Grid.Column="1" Classes="link" Content="Remove" Command="{Binding RemoveCloudflareCommand}"
+                  IsVisible="{Binding IsCloudflareStored}" Margin="12,0,0,0" />
+        </Grid>
+      </StackPanel>
+    </StackPanel>
+
+    <Border Classes="divider" />
+
+    <StackPanel Spacing="12">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                 Fill="{Binding ClaudeState, Converter={x:Static views:Converters.ConnectionToBrush}}" />
+        <TextBlock Grid.Column="1" Classes="h3" Text="Claude" VerticalAlignment="Center" />
+        <Border Grid.Column="2" Classes="pill" VerticalAlignment="Center"
+                IsVisible="{Binding ClaudeBilling, Converter={x:Static views:Converters.NotEmpty}}">
+          <TextBlock Text="{Binding ClaudeBilling}" />
+        </Border>
+      </Grid>
+      <StackPanel Spacing="4" Margin="18,0,0,0">
+        <TextBlock Classes="body" Text="{Binding ClaudeStatus}" TextWrapping="Wrap" />
+        <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                   Text="Uses your own signed-in Claude Code CLI. Sign in with: claude" />
+      </StackPanel>
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="18,0,0,0" IsEnabled="{Binding AllowCloudReasoning}">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="Run investigations" />
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                     Text="Claude Code reads this repository to check a finding, so repository code is sent to Anthropic." />
+          <TextBlock Classes="caption secondary" TextWrapping="Wrap" Text="{Binding InvestigationsStatus}"
+                     IsVisible="{Binding IsLoaded}" />
+        </StackPanel>
+        <ToggleSwitch Name="InvestigationsEnabled" Grid.Column="1" Classes="setting" IsChecked="{Binding InvestigationsEnabled}"
+                      IsEnabled="{Binding IsLoaded}" />
+      </Grid>
+    </StackPanel>
+
+
+    <!-- JEV is legacy in v2: kept, off by default, out of the way. -->
+    <Border Classes="divider" />
+    <StackPanel Spacing="12">
+      <Button Name="LegacyToggle" Classes="row" Padding="0,4" HorizontalAlignment="Left" Command="{Binding ToggleLegacyCommand}">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Path Data="{StaticResource Icon.ChevronRight}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="10" Height="10"
+                IsVisible="{Binding !ShowLegacy}" />
+          <Path Data="{StaticResource Icon.ChevronDown}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="10" Height="10"
+                IsVisible="{Binding ShowLegacy}" />
+          <TextBlock Classes="section" Text="LEGACY" />
+        </StackPanel>
+      </Button>
+      <StackPanel Spacing="12" IsVisible="{Binding ShowLegacy}">
     <StackPanel Spacing="12">
       <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
         <Ellipse Width="8" Height="8" VerticalAlignment="Center"
                  Fill="{Binding JevState, Converter={x:Static views:Converters.ConnectionToBrush}}" />
-        <TextBlock Grid.Column="1" Classes="h3" Text="JEV" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Classes="h3" Text="JEV (legacy)" VerticalAlignment="Center" />
         <Border Grid.Column="2" Classes="pill" VerticalAlignment="Center">
           <TextBlock Text="Metered · OpenRouter" />
         </Border>
@@ -75,34 +169,9 @@
       </StackPanel>
     </StackPanel>
 
-    <Border Classes="divider" />
-
-    <StackPanel Spacing="12">
-      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
-                 Fill="{Binding ClaudeState, Converter={x:Static views:Converters.ConnectionToBrush}}" />
-        <TextBlock Grid.Column="1" Classes="h3" Text="Claude" VerticalAlignment="Center" />
-        <Border Grid.Column="2" Classes="pill" VerticalAlignment="Center"
-                IsVisible="{Binding ClaudeBilling, Converter={x:Static views:Converters.NotEmpty}}">
-          <TextBlock Text="{Binding ClaudeBilling}" />
-        </Border>
-      </Grid>
-      <StackPanel Spacing="4" Margin="18,0,0,0">
-        <TextBlock Classes="body" Text="{Binding ClaudeStatus}" TextWrapping="Wrap" />
         <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
-                   Text="Uses your own signed-in Claude Code CLI. Sign in with: claude" />
+                   Text="JEV is no longer developed. Turning it on takes effect when the engine next starts; the rules decide either way." />
       </StackPanel>
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="18,0,0,0" IsEnabled="{Binding AllowCloudReasoning}">
-        <StackPanel Spacing="2">
-          <TextBlock Classes="body" Text="Run investigations" />
-          <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
-                     Text="Claude Code reads this repository to check a finding, so repository code is sent to Anthropic." />
-          <TextBlock Classes="caption secondary" TextWrapping="Wrap" Text="{Binding InvestigationsStatus}"
-                     IsVisible="{Binding IsLoaded}" />
-        </StackPanel>
-        <ToggleSwitch Name="InvestigationsEnabled" Grid.Column="1" Classes="setting" IsChecked="{Binding InvestigationsEnabled}"
-                      IsEnabled="{Binding IsLoaded}" />
-      </Grid>
     </StackPanel>
 
     <TextBlock Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"

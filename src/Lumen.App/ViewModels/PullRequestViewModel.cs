@@ -449,6 +449,9 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         Additions = snapshot.Files.Sum(f => f.Additions);
         Deletions = snapshot.Files.Sum(f => f.Deletions);
         _headSha = snapshot.HeadSha;
+        _snapshotBody = snapshot.Body;
+        OnPropertyChanged(nameof(Description));
+        OnPropertyChanged(nameof(HasDescription));
         _mergeBaseSha = snapshot.MergeBaseSha.Length > 0 ? snapshot.MergeBaseSha : snapshot.BaseSha;
         OnPropertyChanged(nameof(ViewerIsAuthor));
         OnPropertyChanged(nameof(CanApprove));
