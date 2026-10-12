@@ -1,0 +1,33 @@
+{
+  "data": {
+    "viewer": { "login": "mona" },
+    "repository": {
+      "pullRequest": {
+        "id": "PR_kw42",
+        "reviews": { "nodes": [
+          { "id": "PRR_other", "body": "", "viewerDidAuthor": false, "comments": { "nodes": [] } },
+          { "id": "PRR_pending", "body": "Draft summary", "viewerDidAuthor": true, "comments": { "nodes": [
+            { "id": "C_p1", "body": "New thought", "path": "src/Foo.cs", "line": 12, "startLine": 10, "originalLine": 12, "originalStartLine": 10, "replyTo": null },
+            { "id": "C_p2", "body": "Agree", "path": "src/Foo.cs", "line": null, "startLine": null, "originalLine": 3, "originalStartLine": null, "replyTo": { "id": "C_1" } }
+          ] } }
+        ] },
+        "reviewThreads": {
+          "pageInfo": { "hasNextPage": false, "endCursor": null },
+          "nodes": [
+            { "id": "T_1", "path": "src/Foo.cs", "diffSide": "LEFT", "startDiffSide": null, "line": null, "startLine": null, "originalLine": 3, "originalStartLine": null,
+              "isResolved": false, "isOutdated": true, "viewerCanReply": true, "viewerCanResolve": true, "viewerCanUnresolve": false,
+              "comments": { "nodes": [
+                { "id": "C_1", "databaseId": 101, "author": { "login": "octocat" }, "body": "Why remove this?", "createdAt": "2026-10-02T09:00:00Z", "url": "https://github.com/x#r101", "diffHunk": "@@ -1,3 +1,2 @@", "originalCommit": { "oid": "head111" }, "pullRequestReview": { "id": "PRR_a", "state": "COMMENTED" } },
+                { "id": "C_p2", "databaseId": 103, "author": { "login": "mona" }, "body": "Agree", "createdAt": "2026-10-04T09:00:00Z", "url": "", "diffHunk": "@@ -1,3 +1,2 @@", "originalCommit": { "oid": "head111" }, "pullRequestReview": { "id": "PRR_pending", "state": "PENDING" } }
+              ] } },
+            { "id": "T_2", "path": "src/Foo.cs", "diffSide": "RIGHT", "startDiffSide": "RIGHT", "line": 12, "startLine": 10, "originalLine": 12, "originalStartLine": 10,
+              "isResolved": false, "isOutdated": false, "viewerCanReply": true, "viewerCanResolve": true, "viewerCanUnresolve": false,
+              "comments": { "nodes": [
+                { "id": "C_p1", "databaseId": 102, "author": { "login": "mona" }, "body": "New thought", "createdAt": "2026-10-04T09:00:00Z", "url": "", "diffHunk": "@@", "originalCommit": { "oid": "head333" }, "pullRequestReview": { "id": "PRR_pending", "state": "PENDING" } }
+              ] } }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -41,6 +41,58 @@ service ReviewEngine {
   rpc GetReviewSettings (ReviewSettingsRequest) returns (ReviewSettingsReply);
 
   rpc UpdateReviewSettings (UpdateReviewSettingsRequest) returns (ReviewSettingsReply);
+
+  // ---- v2: inbox (M1) ----
+
+  // One round trip to GitHub (unless a recent result is cached and refresh is false).
+  rpc ListInbox (ListInboxRequest) returns (Inbox);
+
+  // The inbox now, then again whenever it is refreshed (polled every 2 minutes while someone is watching).
+  rpc WatchInbox (WatchInboxRequest) returns (stream Inbox);
+
+  rpc GetInboxSettings (GetInboxSettingsRequest) returns (InboxSettings);
+
+  rpc UpdateInboxSettings (InboxSettings) returns (InboxSettings);
+
+  // ---- v2: pull request context (M2) ----
+
+  rpc GetPullRequestDetails (GetPullRequestDetailsRequest) returns (PullRequestDetails);
+
+  // The files changed between two commits of the pull request (a commit, a range, or "since last review").
+  rpc GetDiffRange (GetDiffRangeRequest) returns (DiffRange);
+
+  // A top-level comment on the pull request's conversation. Posted at once (an explicit action).
+  rpc PostIssueComment (PostIssueCommentRequest) returns (TimelineItem);
+
+  // ---- v2: threads (M4) ----
+
+  rpc ReplyToThread (ReplyToThreadRequest) returns (ReviewThread);
+
+  rpc SetThreadResolved (SetThreadResolvedRequest) returns (ReviewThread);
+
+  // ---- v2: pending review (M5) ----
+
+  // The viewer's pending review on GitHub, if any (one started on github.com is picked up too).
+  rpc GetPendingReview (GetPendingReviewRequest) returns (PendingReview);
+
+  // Starts the pending review if there is none.
+  rpc AddPendingComment (AddPendingCommentRequest) returns (PendingReview);
+
+  rpc UpdatePendingComment (UpdatePendingCommentRequest) returns (PendingReview);
+
+  rpc DeletePendingComment (DeletePendingCommentRequest) returns (PendingReview);
+
+  rpc SubmitReview (SubmitReviewRequest) returns (SubmitReviewReply);
+
+  // ---- v2: fast model and walkthrough (M7, M8) ----
+
+  // Stored in the platform credential store, never returned or logged.
+  rpc SetCloudflareCredentials (SetCloudflareCredentialsRequest) returns (Connections);
+
+  rpc RemoveCloudflareCredentials (RemoveCloudflareCredentialsRequest) returns (Connections);
+
+  // Runs (or re-sends from cache) the walkthrough; results arrive as WalkthroughUpdated on the pull request's stream.
+  rpc StartWalkthrough (StartWalkthroughRequest) returns (StartWalkthroughReply);
 }
 
 message PingRequest {}
@@ -75,6 +127,13 @@ message PullRequestEvent {
     ReviewPoint review_point_updated = 8;
     InvestigationStatus investigation_status = 9;
     FileViewed file_viewed = 10;
+    // v2
+    TimelineUpdated timeline_updated = 11;
+    ChecksUpdated checks_updated = 12;
+    HeadChanged head_changed = 13;
+    ThreadsUpdated threads_updated = 14;
+    WalkthroughUpdated walkthrough_updated = 15;
+    PendingReview pending_review_updated = 16;
   }
 }
 
@@ -138,6 +197,16 @@ message PullRequestSnapshot {
 message GetFileDiffRequest {
   PullRequestRef pull_request = 1;
   string path = 2;
+  // Optional: limit the diff to from_sha..to_sha (a commit, a range, or "since last review"). Empty: the whole PR.
+  CommitRange range = 3;
+  // git diff -w
+  bool ignore_whitespace = 4;
+}
+
+message CommitRange {
+  // The commit before the range (exclusive).
+  string from_sha = 1;
+  string to_sha = 2;
 }
 
 enum DiffLineKind {
@@ -302,18 +371,33 @@ message SetReviewPointStateRequest {
 
 message SetReviewPointStateReply {}
 
+enum DiffSide {
+  // The head side (added and unchanged lines).
+  DIFF_SIDE_RIGHT = 0;
+  // The base side (deleted lines).
+  DIFF_SIDE_LEFT = 1;
+}
+
 message PostReviewCommentRequest {
   PullRequestRef pull_request = 1;
   // Optional: the review point this comment responds to; it is marked Commented.
   string review_point_id = 2;
   string path = 3;
+  // The last line of the comment's range, on `side`.
   int32 line = 4;
   string body = 5;
+  DiffSide side = 6;
+  // Optional (0): the first line of a multi-line range.
+  int32 start_line = 7;
+  DiffSide start_side = 8;
 }
 
 message PostReviewCommentReply {
   int64 comment_id = 1;
   string url = 2;
+  // GitHub refuses single comments while a pending review exists, so the comment went into it instead.
+  bool added_to_pending_review = 3;
+  PendingReview pending_review = 4;
 }
 
 message SetFileViewedRequest {
@@ -387,6 +471,16 @@ message ConnectionSettings {
   optional int32 max_concurrent_investigations = 9;
   // Never switch an investigation from subscription to metered billing without this opt-in (TDD §37.5).
   optional bool allow_metered_usage = 10;
+
+  // privacy.allowCodeToFastModel: the diff goes to the fast model (Cloudflare Workers AI). Unset leaves it alone.
+  optional bool allow_code_to_fast_model = 11;
+  optional string fast_model_id = 12;
+  optional double fast_model_timeout_seconds = 13;
+  // Largest diff sent, in KB; bigger files are truncated and the rest summarised by path and size.
+  optional int32 fast_model_max_diff_kb = 14;
+  optional int32 fast_model_daily_request_cap = 15;
+  // Optional Cloudflare AI Gateway id: requests go through the gateway (caching, logs) instead of Workers AI directly.
+  optional string fast_model_gateway = 16;
 }
 
 message Connections {
@@ -395,6 +489,7 @@ message Connections {
   // Where the non-secret preferences live (jev.enabled, privacy.*, agents.*).
   string settings_path = 3;
   ConnectionSettings settings = 4;
+  FastModelConnection fast_model = 5;
 }
 
 // How picky convention detection is. The detector's looser pre-filter is derived from minimum_support.
@@ -443,4 +538,433 @@ message UpdateReviewSettingsRequest {
   string owner = 1;
   string name = 2;
   ReviewRules rules = 3;
+}
+
+// ===================================== v2 =====================================
+
+// ---- Inbox (M1) ----
+
+message ListInboxRequest {
+  // Ask GitHub now rather than returning a result from the last poll.
+  bool refresh = 1;
+}
+
+message WatchInboxRequest {}
+
+enum InboxCheckState {
+  INBOX_CHECK_STATE_NONE = 0;
+  INBOX_CHECK_STATE_PENDING = 1;
+  INBOX_CHECK_STATE_SUCCESS = 2;
+  INBOX_CHECK_STATE_FAILURE = 3;
+}
+
+enum InboxReviewState {
+  INBOX_REVIEW_STATE_AWAITING = 0;
+  INBOX_REVIEW_STATE_APPROVED = 1;
+  INBOX_REVIEW_STATE_CHANGES_REQUESTED = 2;
+  // No review required (e.g. no branch protection) and none given.
+  INBOX_REVIEW_STATE_NONE = 3;
+}
+
+message InboxItem {
+  PullRequestRef pull_request = 1;
+  string title = 2;
+  string author = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+  int32 additions = 6;
+  int32 deletions = 7;
+  int32 changed_files = 8;
+  bool is_draft = 9;
+  InboxCheckState checks = 10;
+  InboxReviewState review = 11;
+  // Activity since the viewer last opened it in Lumen (or never opened).
+  bool unread = 12;
+  string url = 13;
+  string head_sha = 14;
+  // Never opened in Lumen.
+  bool is_new = 15;
+}
+
+message InboxSection {
+  // "review-requested", "mine", "watched".
+  string id = 1;
+  string title = 2;
+  repeated InboxItem items = 3;
+  // Why the section is empty, e.g. "Add repositories to watch in Settings".
+  string detail = 4;
+}
+
+message Inbox {
+  repeated InboxSection sections = 1;
+  string viewer_login = 2;
+  google.protobuf.Timestamp fetched_at = 3;
+  // Set when GitHub could not be reached; sections then hold the last good result, if any.
+  string error = 4;
+  bool is_authentication_error = 5;
+}
+
+message GetInboxSettingsRequest {}
+
+message InboxSettings {
+  // "owner/name"
+  repeated string watched_repositories = 1;
+}
+
+// ---- Pull request context (M2) ----
+
+message GetPullRequestDetailsRequest {
+  PullRequestRef pull_request = 1;
+  // Ask GitHub now rather than returning what the session already has.
+  bool refresh = 2;
+}
+
+message Label {
+  string name = 1;
+  // "rrggbb"
+  string color = 2;
+}
+
+enum ReviewVerdict {
+  REVIEW_VERDICT_COMMENTED = 0;
+  REVIEW_VERDICT_APPROVED = 1;
+  REVIEW_VERDICT_CHANGES_REQUESTED = 2;
+  REVIEW_VERDICT_DISMISSED = 3;
+  REVIEW_VERDICT_PENDING = 4;
+}
+
+message Reviewer {
+  string login = 1;
+  // A team review request ("org/team").
+  bool is_team = 2;
+  // Requested and not yet reviewed.
+  bool is_requested = 3;
+  ReviewVerdict verdict = 4;
+  bool has_verdict = 5;
+}
+
+enum TimelineItemKind {
+  TIMELINE_ITEM_KIND_COMMENT = 0;
+  TIMELINE_ITEM_KIND_REVIEW = 1;
+}
+
+message TimelineItem {
+  string id = 1;
+  TimelineItemKind kind = 2;
+  string author = 3;
+  // Markdown.
+  string body = 4;
+  google.protobuf.Timestamp created_at = 5;
+  string url = 6;
+  // Reviews only.
+  ReviewVerdict verdict = 7;
+  int32 review_comment_count = 8;
+}
+
+message CommitInfo {
+  string sha = 1;
+  string headline = 2;
+  string message = 3;
+  string author = 4;
+  google.protobuf.Timestamp authored_at = 5;
+}
+
+enum CheckState {
+  CHECK_STATE_PENDING = 0;
+  CHECK_STATE_SUCCESS = 1;
+  CHECK_STATE_FAILURE = 2;
+  CHECK_STATE_NEUTRAL = 3;
+  CHECK_STATE_SKIPPED = 4;
+  CHECK_STATE_CANCELLED = 5;
+}
+
+message CheckRun {
+  string name = 1;
+  CheckState state = 2;
+  // Raw GitHub status/conclusion, e.g. "IN_PROGRESS", "TIMED_OUT".
+  string detail = 3;
+  google.protobuf.Timestamp started_at = 4;
+  google.protobuf.Timestamp completed_at = 5;
+  string url = 6;
+  // A commit status (rather than a check run).
+  bool is_status = 7;
+}
+
+enum Mergeability {
+  MERGEABILITY_UNKNOWN = 0;
+  MERGEABILITY_MERGEABLE = 1;
+  MERGEABILITY_CONFLICTING = 2;
+}
+
+message PullRequestDetails {
+  PullRequestRef pull_request = 1;
+  string title = 2;
+  string author = 3;
+  // Markdown.
+  string body = 4;
+  string state = 5;
+  bool is_draft = 6;
+  string base_ref = 7;
+  string head_ref = 8;
+  string head_sha = 9;
+  Mergeability mergeability = 10;
+  // GitHub's mergeStateStatus, e.g. "BLOCKED", "CLEAN", "BEHIND".
+  string merge_state = 11;
+  repeated Label labels = 12;
+  repeated Reviewer reviewers = 13;
+  repeated TimelineItem timeline = 14;
+  repeated CommitInfo commits = 15;
+  repeated CheckRun checks = 16;
+  string viewer_login = 17;
+  // The head at the viewer's last submitted review (GitHub, or a review submitted from Lumen), else at last open.
+  string last_reviewed_sha = 18;
+  // True when last_reviewed_sha came from opening the pull request, not from a review.
+  bool last_reviewed_is_open = 19;
+  string url = 20;
+  google.protobuf.Timestamp created_at = 21;
+}
+
+message TimelineUpdated {
+  repeated TimelineItem timeline = 1;
+}
+
+message ChecksUpdated {
+  repeated CheckRun checks = 1;
+  string head_sha = 2;
+}
+
+// New commits were pushed while the pull request was open. The app offers to reload.
+message HeadChanged {
+  string old_sha = 1;
+  string new_sha = 2;
+}
+
+message GetDiffRangeRequest {
+  PullRequestRef pull_request = 1;
+  CommitRange range = 2;
+  bool ignore_whitespace = 3;
+}
+
+message DiffRange {
+  CommitRange range = 1;
+  repeated ChangedFileSummary files = 2;
+  // The old commit is not an ancestor of the new one (history was rewritten): file contents are compared directly.
+  bool is_force_push = 3;
+  // Shown to the reviewer, e.g. "History was rewritten since your last review; comparing file contents."
+  string note = 4;
+}
+
+message PostIssueCommentRequest {
+  PullRequestRef pull_request = 1;
+  string body = 2;
+}
+
+// ---- Threads (M4) ----
+
+message ThreadComment {
+  string id = 1;
+  int64 database_id = 2;
+  string author = 3;
+  // Markdown.
+  string body = 4;
+  google.protobuf.Timestamp created_at = 5;
+  string url = 6;
+  // Part of the viewer's pending review (not yet visible to others).
+  bool is_pending = 7;
+}
+
+message ReviewThread {
+  string id = 1;
+  string path = 2;
+  DiffSide side = 3;
+  // Current position at the head; 0 when the thread is outdated (its line no longer exists).
+  int32 line = 4;
+  int32 start_line = 5;
+  // Position in the commit it was written against.
+  int32 original_line = 6;
+  int32 original_start_line = 7;
+  string original_commit_sha = 8;
+  bool is_resolved = 9;
+  bool is_outdated = 10;
+  repeated ThreadComment comments = 11;
+  bool can_reply = 12;
+  bool can_resolve = 13;
+  bool can_unresolve = 14;
+  // The diff hunk the first comment was written on, for outdated threads.
+  string diff_hunk = 15;
+}
+
+message ThreadsUpdated {
+  repeated ReviewThread threads = 1;
+}
+
+message ReplyToThreadRequest {
+  PullRequestRef pull_request = 1;
+  string thread_id = 2;
+  string body = 3;
+}
+
+message SetThreadResolvedRequest {
+  PullRequestRef pull_request = 1;
+  string thread_id = 2;
+  bool resolved = 3;
+}
+
+// ---- Pending review (M5) ----
+
+message GetPendingReviewRequest {
+  PullRequestRef pull_request = 1;
+}
+
+message PendingComment {
+  string id = 1;
+  string thread_id = 2;
+  string path = 3;
+  DiffSide side = 4;
+  int32 line = 5;
+  int32 start_line = 6;
+  string body = 7;
+  // A reply to an existing thread rather than a new one.
+  bool is_reply = 8;
+  // The review point it was written for, when Lumen knows.
+  string review_point_id = 9;
+}
+
+message PendingReview {
+  // Empty when there is no pending review.
+  string id = 1;
+  string body = 2;
+  repeated PendingComment comments = 3;
+}
+
+message AddPendingCommentRequest {
+  PullRequestRef pull_request = 1;
+  string path = 2;
+  DiffSide side = 3;
+  int32 line = 4;
+  int32 start_line = 5;
+  DiffSide start_side = 6;
+  string body = 7;
+  string review_point_id = 8;
+  // Set to reply to an existing thread inside the pending review instead of starting a new one.
+  string reply_to_thread_id = 9;
+}
+
+message UpdatePendingCommentRequest {
+  PullRequestRef pull_request = 1;
+  string comment_id = 2;
+  string body = 3;
+}
+
+message DeletePendingCommentRequest {
+  PullRequestRef pull_request = 1;
+  string comment_id = 2;
+}
+
+enum ReviewEvent {
+  REVIEW_EVENT_COMMENT = 0;
+  REVIEW_EVENT_APPROVE = 1;
+  REVIEW_EVENT_REQUEST_CHANGES = 2;
+}
+
+message SubmitReviewRequest {
+  PullRequestRef pull_request = 1;
+  ReviewEvent event = 2;
+  string body = 3;
+}
+
+message SubmitReviewReply {
+  string url = 1;
+  // The head the review was submitted at (feeds "since last review").
+  string head_sha = 2;
+}
+
+// ---- Fast model (M7) ----
+
+message SetCloudflareCredentialsRequest {
+  string account_id = 1;
+  string api_token = 2;
+}
+
+message RemoveCloudflareCredentialsRequest {}
+
+message FastModelConnection {
+  ConnectionState state = 1;
+  string detail = 2;
+  string model = 3;
+  bool credentials_stored = 4;
+  bool can_store_credentials = 5;
+  // What is sent, e.g. "The pull request's diff, title and description".
+  string sends = 6;
+  int32 requests_today = 7;
+}
+
+// ---- Walkthrough (M8) ----
+
+message StartWalkthroughRequest {
+  PullRequestRef pull_request = 1;
+  // Optional: a short "what changed since you last looked" walkthrough of this range instead of the whole PR.
+  CommitRange since = 2;
+  // Ignore the cache.
+  bool refresh = 3;
+}
+
+message StartWalkthroughReply {}
+
+enum WalkthroughStatus {
+  // Not offered: the fast model is off, not connected, or not allowed to see code.
+  WALKTHROUGH_STATUS_UNAVAILABLE = 0;
+  WALKTHROUGH_STATUS_RUNNING = 1;
+  WALKTHROUGH_STATUS_COMPLETE = 2;
+  WALKTHROUGH_STATUS_FAILED = 3;
+}
+
+message WalkthroughGroup {
+  string id = 1;
+  string title = 2;
+  string summary = 3;
+  repeated string paths = 4;
+  // 1-based reading order.
+  int32 order = 5;
+  bool is_mechanical = 6;
+}
+
+enum RiskCategory {
+  RISK_CATEGORY_OTHER = 0;
+  RISK_CATEGORY_CONCURRENCY = 1;
+  RISK_CATEGORY_ERROR_HANDLING = 2;
+  RISK_CATEGORY_SECURITY = 3;
+  RISK_CATEGORY_BEHAVIOUR_CHANGE = 4;
+  RISK_CATEGORY_MISSING_TESTS = 5;
+}
+
+message WalkthroughRisk {
+  string id = 1;
+  CodeLocation location = 2;
+  RiskCategory category = 3;
+  string reason = 4;
+}
+
+message Walkthrough {
+  WalkthroughStatus status = 1;
+  // Progress or why it is unavailable / failed.
+  string detail = 2;
+  string intent = 3;
+  // Where the description and the diff disagree; empty if they agree.
+  string description_mismatch = 4;
+  repeated WalkthroughGroup groups = 5;
+  repeated WalkthroughRisk risks = 6;
+  // e.g. "glm-5.3-flash · walkthrough/v1"
+  string producer = 7;
+  string head_sha = 8;
+  // Set for a "since last review" walkthrough.
+  CommitRange since = 9;
+  bool from_cache = 10;
+  // Files summarised so far / total (while running).
+  int32 files_done = 11;
+  int32 files_total = 12;
+}
+
+message WalkthroughUpdated {
+  Walkthrough walkthrough = 1;
 }

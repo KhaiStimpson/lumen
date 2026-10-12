@@ -10,7 +10,7 @@ using Lumen.GitHub.Internal;
 namespace Lumen.GitHub;
 
 /// <summary>Minimal GitHub REST v3 client over <see cref="HttpClient"/>.</summary>
-public sealed class GitHubRestClient : IGitHubClient
+public sealed partial class GitHubRestClient : IGitHubClient
 {
     public static readonly Uri DefaultBaseAddress = new("https://api.github.com/");
 
@@ -61,39 +61,18 @@ public sealed class GitHubRestClient : IGitHubClient
         return new PullRequestInfo(key, metadata, pr.Base.Sha, pr.Head.Sha);
     }
 
-    public async Task<IReadOnlyList<ReviewThread>> GetReviewCommentsAsync(PullRequestKey key, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(key);
-
-        var threads = new List<ReviewThread>();
-        Uri? next = PullRequestUri(key, "/comments?per_page=100");
-        while (next is not null)
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Get, next);
-            using var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
-            var page = await ReadAsync(response, GitHubJsonContext.Default.ListReviewCommentDto, cancellationToken)
-                .ConfigureAwait(false);
-
-            threads.AddRange(page.Select(c => new ReviewThread(
-                c.Id,
-                c.Path,
-                c.Line ?? c.OriginalLine,
-                c.User?.Login ?? DeletedUser,
-                c.Body,
-                c.CreatedAt,
-                c.HtmlUrl)));
-
-            next = FindNextLink(response);
-        }
-
-        return threads;
-    }
-
     public async Task<PostedComment> PostReviewCommentAsync(NewReviewComment comment, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(comment);
 
-        var payload = new NewReviewCommentDto(comment.Body, comment.CommitSha, comment.Path, comment.Line, "RIGHT");
+        var payload = new NewReviewCommentDto(
+            comment.Body,
+            comment.CommitSha,
+            comment.Path,
+            comment.Line,
+            SideName(comment.Side),
+            comment.StartLine,
+            comment.StartLine is null ? null : SideName(comment.StartSide ?? comment.Side));
         using var request = new HttpRequestMessage(HttpMethod.Post, PullRequestUri(comment.Key, "/comments"))
         {
             Content = new StringContent(
@@ -101,7 +80,18 @@ public sealed class GitHubRestClient : IGitHubClient
                 Encoding.UTF8,
                 "application/json"),
         };
-        using var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        HttpResponseMessage response;
+        try
+        {
+            response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (GitHubApiException ex) when (ex.StatusCode == HttpStatusCode.UnprocessableEntity
+            && (ex.GitHubMessage ?? ex.Message).Contains("pending", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new PendingReviewExistsException(ex.GitHubMessage ?? ex.Message, ex);
+        }
+
+        using var _ = response;
         var posted = await ReadAsync(response, GitHubJsonContext.Default.PostedCommentDto, cancellationToken)
             .ConfigureAwait(false);
 
@@ -232,6 +222,7 @@ public sealed class GitHubRestClient : IGitHubClient
 
         var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
+        TrackRateLimit(response);
         if (response.IsSuccessStatusCode)
         {
             return response;

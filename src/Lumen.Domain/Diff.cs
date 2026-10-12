@@ -39,6 +39,10 @@ public sealed record ChangedFile(
     public bool ContainsNewLine(int line) =>
         Hunks.Any(h => h.Lines.Any(l => l.NewNumber == line));
 
+    /// <summary>Base-side line numbers that appear in the diff (removed or context); left-side comments anchor here.</summary>
+    public bool ContainsOldLine(int line) =>
+        Hunks.Any(h => h.Lines.Any(l => l.OldNumber == line));
+
     /// <summary>Head-side line numbers that were added or modified by this change.</summary>
     public IEnumerable<int> AddedLines() =>
         Hunks.SelectMany(h => h.Lines).Where(l => l.Kind == DiffLineKind.Added).Select(l => l.NewNumber!.Value);

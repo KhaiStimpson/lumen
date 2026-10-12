@@ -6,7 +6,7 @@ using D = Lumen.Domain;
 namespace Lumen.Engine.Mapping;
 
 /// <summary>Domain ↔ wire mapping. The client only ever sees these contract types.</summary>
-public static class ProtoMapper
+public static partial class ProtoMapper
 {
     public static PullRequestKey ToKey(PullRequestRef value) =>
         new(new RepositoryRef(value.Owner, value.Name), value.Number);
@@ -36,21 +36,10 @@ public static class ProtoMapper
             MergeBaseSha = snapshot.MergeBaseSha,
             UpdatedAt = Timestamp.FromDateTimeOffset(snapshot.Metadata.UpdatedAt),
             ViewerLogin = viewer,
-            ReviewThreadCount = snapshot.Threads.Count,
+            ReviewThreadCount = snapshot.Threads.Count(t => !t.IsResolved && !t.IsPendingOnly),
         };
 
-        proto.Files.AddRange(snapshot.Files.Select(f => new ChangedFileSummary
-        {
-            Path = f.Path,
-            OldPath = f.OldPath ?? "",
-            Kind = (Contracts.FileChangeKind)f.Kind,
-            Additions = f.Additions,
-            Deletions = f.Deletions,
-            IsBinary = f.IsBinary,
-            IsMechanical = f.Mechanical.IsMechanical,
-            MechanicalReason = f.Mechanical.Reason ?? "",
-            IsViewed = viewedFiles.Contains(f.Path),
-        }));
+        proto.Files.AddRange(snapshot.Files.Select(f => ToSummary(f, viewedFiles.Contains(f.Path))));
         return proto;
     }
 

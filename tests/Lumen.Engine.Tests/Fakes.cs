@@ -16,17 +16,192 @@ internal sealed class FakeGitHub : IGitHubClient
             ? Task.FromException<PullRequestInfo>(FailWith)
             : Task.FromResult(new PullRequestInfo(
                 key,
-                new PullRequestMetadata("Add invoice retrying", "sarah-chen", "open", false, "main", "feature/retry", "https://github.com/acme/billing/pull/42", null, DateTimeOffset.UtcNow),
+                new PullRequestMetadata("Add invoice retrying", Author, "open", false, "main", "feature/retry", "https://github.com/acme/billing/pull/42", null, DateTimeOffset.UtcNow),
                 WorkerScenario.BaseSha,
                 WorkerScenario.HeadSha));
 
-    public Task<IReadOnlyList<ReviewThread>> GetReviewCommentsAsync(PullRequestKey key, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<ReviewThread>>([]);
+    private readonly Lock _gate = new();
+    private int _ids;
+
+    /// <summary>Threads GitHub holds; pending ones belong to <see cref="Pending"/>.</summary>
+    public List<ReviewThread> Threads { get; } = [];
+
+    public PendingReview? Pending { get; set; }
+
+    public List<(string ReviewId, ReviewEvent Event, string Body)> Submitted { get; } = [];
+
+    public List<TimelineItem> IssueComments { get; } = [];
+
+    public List<(IReadOnlyList<InboxQuery> Queries, int Call)> InboxSearches { get; } = [];
+
+    public Func<InboxQuery, IReadOnlyList<InboxItem>> InboxResults { get; set; } = _ => [];
+
+    public Func<PullRequestKey, PullRequestDetails>? Details { get; set; }
+
+    public string Author { get; set; } = "sarah-chen";
+
+    public Task<ReviewThreadsResult> GetReviewThreadsAsync(PullRequestKey key, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            return Task.FromResult(new ReviewThreadsResult([.. Threads], Pending));
+        }
+    }
 
     public Task<PostedComment> PostReviewCommentAsync(NewReviewComment comment, CancellationToken cancellationToken)
     {
-        Posted.Add(comment);
+        lock (_gate)
+        {
+            if (Pending is not null)
+            {
+                return Task.FromException<PostedComment>(new PendingReviewExistsException());
+            }
+
+            Posted.Add(comment);
+            Threads.Add(Thread(comment, pending: false, out _));
+        }
+
         return Task.FromResult(new PostedComment(1001, "https://github.com/acme/billing/pull/42#discussion_r1001"));
+    }
+
+    private ReviewThread Thread(NewReviewComment comment, bool pending, out string commentId)
+    {
+        commentId = $"C_{++_ids}";
+        return new ReviewThread
+        {
+            Id = $"T_{_ids}",
+            Path = comment.Path,
+            Side = comment.Side,
+            Line = comment.Line,
+            StartLine = comment.StartLine,
+            OriginalLine = comment.Line,
+            CanResolve = true,
+            Comments = [new ThreadComment { Id = commentId, Author = "reviewer", Body = comment.Body, CreatedAt = DateTimeOffset.UtcNow, IsPending = pending, ReviewId = Pending?.Id }],
+        };
+    }
+
+    public Task<InboxSearchResult> SearchInboxAsync(IReadOnlyList<InboxQuery> queries, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            InboxSearches.Add((queries, InboxSearches.Count + 1));
+        }
+
+        return FailWith is not null
+            ? Task.FromException<InboxSearchResult>(FailWith)
+            : Task.FromResult(new InboxSearchResult("reviewer", queries.ToDictionary(q => q.Id, InboxResults)));
+    }
+
+    public Task<PullRequestDetails> GetPullRequestDetailsAsync(PullRequestKey key, CancellationToken cancellationToken) =>
+        Task.FromResult(Details?.Invoke(key) ?? new PullRequestDetails
+        {
+            Key = key,
+            Title = "Add invoice retrying",
+            Author = Author,
+            Body = "Retries failed invoices.",
+            HeadSha = WorkerScenario.HeadSha,
+            ViewerLogin = "reviewer",
+            Timeline = [.. IssueComments],
+            Commits = [new CommitInfo(WorkerScenario.HeadSha, "Add retry worker", "Add retry worker", "sarah-chen", DateTimeOffset.UtcNow)],
+            Checks = [new CheckRunInfo("build", CheckState.Success, "SUCCESS", null, null, "https://ci", false)],
+        });
+
+    public Task<TimelineItem> PostIssueCommentAsync(PullRequestKey key, string body, CancellationToken cancellationToken)
+    {
+        var item = new TimelineItem { Id = $"IC_{IssueComments.Count + 1}", Kind = TimelineItemKind.Comment, Author = "reviewer", Body = body, CreatedAt = DateTimeOffset.UtcNow };
+        IssueComments.Add(item);
+        return Task.FromResult(item);
+    }
+
+    public Task<ThreadComment> ReplyToThreadAsync(string threadId, string body, string? pendingReviewId, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            var index = Threads.FindIndex(t => t.Id == threadId);
+            var comment = new ThreadComment { Id = $"C_{++_ids}", Author = "reviewer", Body = body, CreatedAt = DateTimeOffset.UtcNow, IsPending = pendingReviewId is not null, ReviewId = pendingReviewId };
+            Threads[index] = Threads[index] with { Comments = [.. Threads[index].Comments, comment] };
+            if (pendingReviewId is not null && Pending is { } pending)
+            {
+                Pending = pending with { Comments = [.. pending.Comments, new PendingComment { Id = comment.Id, ThreadId = threadId, Path = Threads[index].Path, Body = body, IsReply = true }] };
+            }
+
+            return Task.FromResult(comment);
+        }
+    }
+
+    public Task SetThreadResolvedAsync(string threadId, bool resolved, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            var index = Threads.FindIndex(t => t.Id == threadId);
+            Threads[index] = Threads[index] with { IsResolved = resolved };
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<string> StartPendingReviewAsync(PullRequestKey key, string commitSha, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            if (Pending is not null)
+            {
+                return Task.FromException<string>(new InvalidOperationException("A second pending review"));
+            }
+
+            Pending = new PendingReview { Id = $"PRR_{++_ids}" };
+            return Task.FromResult(Pending.Id);
+        }
+    }
+
+    public Task<string> AddPendingThreadAsync(string reviewId, NewReviewComment comment, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            var thread = Thread(comment, pending: true, out var commentId);
+            Threads.Add(thread);
+            Pending = Pending! with
+            {
+                Comments = [.. Pending.Comments, new PendingComment { Id = commentId, ThreadId = thread.Id, Path = comment.Path, Side = comment.Side, Line = comment.Line, StartLine = comment.StartLine, Body = comment.Body }],
+            };
+            return Task.FromResult(commentId);
+        }
+    }
+
+    public Task UpdatePendingCommentAsync(string commentId, string body, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            Pending = Pending! with { Comments = [.. Pending.Comments.Select(c => c.Id == commentId ? c with { Body = body } : c)] };
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task DeletePendingCommentAsync(string commentId, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            Pending = Pending! with { Comments = [.. Pending.Comments.Where(c => c.Id != commentId)] };
+            Threads.RemoveAll(t => t.Comments.Count == 1 && t.Comments[0].Id == commentId);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<SubmittedReview> SubmitReviewAsync(string reviewId, ReviewEvent reviewEvent, string body, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            Submitted.Add((reviewId, reviewEvent, body));
+            Pending = null;
+            for (var i = 0; i < Threads.Count; i++)
+            {
+                Threads[i] = Threads[i] with { Comments = [.. Threads[i].Comments.Select(c => c with { IsPending = false })] };
+            }
+        }
+
+        return Task.FromResult(new SubmittedReview(reviewId, "https://github.com/acme/billing/pull/42#pullrequestreview-1"));
     }
 
     public ConcurrentDictionary<string, bool> Viewed { get; } = new(StringComparer.Ordinal);

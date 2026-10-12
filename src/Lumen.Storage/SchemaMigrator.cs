@@ -64,6 +64,26 @@ internal static class SchemaMigrator
         CREATE INDEX IX_Investigations_Candidate
             ON Investigations (Repository, PullRequest, HeadSha, CandidateKey, Type);
         """,
+        """
+        CREATE TABLE PullRequestVisits (
+            Repository TEXT NOT NULL,
+            PullRequest INTEGER NOT NULL,
+            LastOpenedAt TEXT NULL,
+            LastOpenedHead TEXT NULL,
+            LastReviewedAt TEXT NULL,
+            LastReviewedHead TEXT NULL,
+            PRIMARY KEY (Repository, PullRequest));
+
+        CREATE TABLE Walkthroughs (
+            Repository TEXT NOT NULL,
+            PullRequest INTEGER NOT NULL,
+            HeadSha TEXT NOT NULL,
+            Scope TEXT NOT NULL,
+            SettingsHash TEXT NOT NULL,
+            Result TEXT NOT NULL,
+            At TEXT NOT NULL,
+            PRIMARY KEY (Repository, PullRequest, HeadSha, Scope, SettingsHash));
+        """,
     ];
 
     public static int LatestVersion => Migrations.Count;

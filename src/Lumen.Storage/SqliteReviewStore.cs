@@ -8,7 +8,7 @@ using Microsoft.Data.Sqlite;
 namespace Lumen.Storage;
 
 /// <summary>SQLite-backed stores (TDD §32–§33). Opens a pooled connection per operation. Never holds credentials.</summary>
-public sealed class SqliteReviewStore : IReviewStore, IAttentionEvaluationStore, IInvestigationStore, IAsyncDisposable
+public sealed class SqliteReviewStore : IReviewStore, IAttentionEvaluationStore, IInvestigationStore, IPullRequestVisitStore, IWalkthroughStore, IAsyncDisposable
 {
     private const int BusyTimeoutMilliseconds = 5000;
 
@@ -336,6 +336,140 @@ public sealed class SqliteReviewStore : IReviewStore, IAttentionEvaluationStore,
         }
     }
 
+    public Task RecordOpenedAsync(PullRequestKey key, string headSha, DateTimeOffset at, CancellationToken cancellationToken) =>
+        UpsertVisitAsync(key, "LastOpenedAt", "LastOpenedHead", headSha, at, cancellationToken);
+
+    public Task RecordReviewedAsync(PullRequestKey key, string headSha, DateTimeOffset at, CancellationToken cancellationToken) =>
+        UpsertVisitAsync(key, "LastReviewedAt", "LastReviewedHead", headSha, at, cancellationToken);
+
+    private async Task UpsertVisitAsync(
+        PullRequestKey key,
+        string atColumn,
+        string headColumn,
+        string headSha,
+        DateTimeOffset at,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(headSha);
+
+        // Column names are constants chosen above, never input.
+        var sql = $"""
+            INSERT INTO PullRequestVisits (Repository, PullRequest, {atColumn}, {headColumn}) VALUES (@Repository, @PullRequest, @At, @Head)
+            ON CONFLICT(Repository, PullRequest) DO UPDATE SET {atColumn} = excluded.{atColumn}, {headColumn} = excluded.{headColumn};
+            """;
+        var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                    sql,
+                    new
+                    {
+                        Repository = key.Repository.FullName,
+                        PullRequest = key.Number,
+                        At = at.ToString("O", CultureInfo.InvariantCulture),
+                        Head = headSha,
+                    },
+                    cancellationToken: cancellationToken))
+                .ConfigureAwait(false);
+        }
+    }
+
+    public async Task<PullRequestVisit?> GetVisitAsync(PullRequestKey key, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var row = await connection.QuerySingleOrDefaultAsync<VisitRow>(new CommandDefinition(
+                    "SELECT * FROM PullRequestVisits WHERE Repository = @Repository AND PullRequest = @PullRequest;",
+                    new { Repository = key.Repository.FullName, PullRequest = key.Number },
+                    cancellationToken: cancellationToken))
+                .ConfigureAwait(false);
+            return row is null ? null : ToVisit(row);
+        }
+    }
+
+    public async Task<IReadOnlyDictionary<PullRequestKey, PullRequestVisit>> GetVisitsAsync(CancellationToken cancellationToken)
+    {
+        var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var rows = await connection.QueryAsync<VisitRow>(new CommandDefinition(
+                    "SELECT * FROM PullRequestVisits;",
+                    cancellationToken: cancellationToken))
+                .ConfigureAwait(false);
+            var visits = new Dictionary<PullRequestKey, PullRequestVisit>();
+            foreach (var row in rows)
+            {
+                if (ToVisit(row) is { } visit)
+                {
+                    visits[visit.Key] = visit;
+                }
+            }
+
+            return visits;
+        }
+    }
+
+    private static PullRequestVisit? ToVisit(VisitRow row)
+    {
+        var slash = row.Repository.IndexOf('/', StringComparison.Ordinal);
+        if (slash <= 0)
+        {
+            return null;
+        }
+
+        var key = new PullRequestKey(new RepositoryRef(row.Repository[..slash], row.Repository[(slash + 1)..]), (int)row.PullRequest);
+        static DateTimeOffset? Parse(string? value) =>
+            value is null ? null : DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+        return new PullRequestVisit(key, Parse(row.LastOpenedAt), row.LastOpenedHead, Parse(row.LastReviewedAt), row.LastReviewedHead);
+    }
+
+    public async Task<string?> FindWalkthroughAsync(PullRequestKey key, string headSha, string scope, string settingsHash, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            return await connection.QuerySingleOrDefaultAsync<string?>(new CommandDefinition(
+                    """
+                    SELECT Result FROM Walkthroughs
+                    WHERE Repository = @Repository AND PullRequest = @PullRequest AND HeadSha = @HeadSha AND Scope = @Scope AND SettingsHash = @SettingsHash;
+                    """,
+                    new { Repository = key.Repository.FullName, PullRequest = key.Number, HeadSha = headSha, Scope = scope, SettingsHash = settingsHash },
+                    cancellationToken: cancellationToken))
+                .ConfigureAwait(false);
+        }
+    }
+
+    public async Task SaveWalkthroughAsync(PullRequestKey key, string headSha, string scope, string settingsHash, string result, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                    """
+                    INSERT INTO Walkthroughs (Repository, PullRequest, HeadSha, Scope, SettingsHash, Result, At)
+                    VALUES (@Repository, @PullRequest, @HeadSha, @Scope, @SettingsHash, @Result, @At)
+                    ON CONFLICT(Repository, PullRequest, HeadSha, Scope, SettingsHash) DO UPDATE SET Result = excluded.Result, At = excluded.At;
+                    """,
+                    new
+                    {
+                        Repository = key.Repository.FullName,
+                        PullRequest = key.Number,
+                        HeadSha = headSha,
+                        Scope = scope,
+                        SettingsHash = settingsHash,
+                        Result = result,
+                        At = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+                    },
+                    cancellationToken: cancellationToken))
+                .ConfigureAwait(false);
+        }
+    }
+
     public ValueTask DisposeAsync()
     {
         if (_disposed)
@@ -411,6 +545,14 @@ public sealed class SqliteReviewStore : IReviewStore, IAttentionEvaluationStore,
             _initLock.Release();
         }
     }
+
+    private sealed record VisitRow(
+        string Repository,
+        long PullRequest,
+        string? LastOpenedAt,
+        string? LastOpenedHead,
+        string? LastReviewedAt,
+        string? LastReviewedHead);
 
     private sealed record EvaluationRow(
         string HeadSha,

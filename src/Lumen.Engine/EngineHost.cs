@@ -27,6 +27,9 @@ public sealed record EngineOptions
     public string DataDirectory { get; init; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lumen");
 
+    /// <summary>How often an open pull request's conversation, checks and threads are re-read while watched.</summary>
+    public TimeSpan FollowInterval { get; init; } = TimeSpan.FromSeconds(90);
+
     public static EngineOptions FromArgs(string[] args)
     {
         var options = new EngineOptions();
@@ -82,6 +85,8 @@ public static class EngineHost
         services.AddSingleton<IReviewStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
         services.AddSingleton<IAttentionEvaluationStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
         services.AddSingleton<IInvestigationStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
+        services.AddSingleton<IPullRequestVisitStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
+        services.AddSingleton<IWalkthroughStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
 
         services.AddSingleton(_ => EngineSettings.Load(options.DataDirectory));
         services.AddSingleton(sp => new EngineSettingsStore(sp.GetRequiredService<EngineSettings>(), options.DataDirectory));
@@ -95,6 +100,8 @@ public static class EngineHost
         services.AddSingleton<ReviewPointPipeline>();
         AddAgents(services, options);
         services.AddSingleton<PullRequestSessionManager>();
+        services.AddSingleton<ReviewActions>();
+        services.AddSingleton<Inbox.InboxService>();
         services.AddTransient(sp => new ConnectionsProbe(
             sp.GetRequiredService<EngineSettingsStore>(),
             options.DataDirectory,
