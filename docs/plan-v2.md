@@ -15,6 +15,40 @@ analysis produced three points, so on most pull requests there is little to guid
 v2 makes Lumen a complete replacement for GitHub's review UI and adds one headline insight feature, the **PR
 walkthrough**, powered by a fast model.
 
+## Status (2026-10-12): implemented
+
+All eight milestones are built, through the engine (gRPC contract, additive only) and the app, and covered by tests.
+The definition of done — a full review of andrew-crm#58 from the inbox to a submitted Approve, with the walkthrough
+shown, without opening github.com — is `FullReviewTests` (headless, against the fixture).
+
+| Milestone | Where it lives |
+|---|---|
+| M1 Inbox | `InboxService` (GraphQL search, unread from `PullRequestVisits`), `WatchInbox` stream, `InboxView` home screen, watched repositories in Settings → Inbox, command palette (`Ctrl+K`) |
+| M2 PR context | `GetPullRequestDetails`; Conversation (Markdown, issue comments, reviews), Commits (commit-range scope, "since my last review"), Checks tabs; head-changed banner; `FollowAsync` polling |
+| M3 Comment anywhere | Gutter `+`, drag/shift-click ranges, `DiffSide`/`start_line`, suggestions; pending review CRUD over GraphQL; "Post now" joins an existing pending review |
+| M4 Threads in the diff | `reviewThreads` (outdated/resolved, pending-only labelled), thread cards inline, reply/resolve, `N`/`Shift+N` |
+| M5 Submit a review | Review tray (`R`): pending list, summary, Comment / Approve / Request changes, `Ctrl+Enter` / `Ctrl+Shift+Enter` |
+| M6 Diff upgrades | Split view (`S`, persisted), ignore whitespace (`W`, `git diff -w`), find in diff (`Ctrl+F`), full file (`X`) |
+| M7 Fast model | `Lumen.Models`: `CloudflareWorkersAiProvider` (`@cf/zai-org/glm-5.3-flash`, OpenAI-compatible endpoint, optional AI Gateway), free credential check, daily cap, `connections set-cloudflare` |
+| M8 Walkthrough | `WalkthroughGenerator` (per-file map, groups and risks reduce), grounding, cache per head/scope/settings, streamed `walkthrough_updated` events; Walkthrough tab, risk markers, reading order (`J`/`K` over groups) |
+
+JEV is off by default (`jev.enabled`), registered only when enabled, and its switches moved under **Legacy** in
+Connections.
+
+### Deviations and notes
+
+- **Split view cards** sit in the column they belong to, with a spacer row opposite, rather than spanning both
+  columns.
+- **Fixture data** for the v2 files (`details.json`, `commits.json`, `v2-events.jsonl`, `tests/fixtures/inbox`) is
+  synthesized to match GitHub's shapes; re-record from a live PR with `LUMEN_LIVE_PR` + `LUMEN_RECORD_FIXTURE`.
+- **No ETags**: the inbox uses GraphQL search, which has no conditional requests; it polls on an interval and tracks
+  the rate limit instead.
+- **Walkthrough latency targets** (first content < 10 s, full walkthrough < 30 s on #58) are not measured live;
+  the opt-in `LUMEN_LIVE_GLM=1` and `LUMEN_LIVE_PENDING_PR` tests exist but were not run without the user's go-ahead.
+- **Enabling JEV** takes effect after an engine restart (the policy is registered at startup).
+- The engine also reads Cloudflare credentials from `LUMEN_CLOUDFLARE_ACCOUNT_ID` / `LUMEN_CLOUDFLARE_API_TOKEN`, for
+  Linux and CI where there is no credential manager.
+
 ## Decisions (2026-10-12)
 
 | Topic | Decision |
@@ -197,7 +231,10 @@ with the walkthrough shown.
 
 ## Open questions
 
-- The exact Cloudflare Workers AI model id for GLM 5.3 Flash, its context window, and whether to call it directly or
-  through AI Gateway (caching, logs, retention settings).
+Resolved in the build: the model id is `@cf/zai-org/glm-5.3-flash`; it is called directly by default, with an optional
+AI Gateway id in Cloud AI limits. The remaining questions stand:
+
+- GLM 5.3 Flash's real context window (Lumen caps each request at the max diff size) and the AI Gateway caching,
+  logs and retention settings to recommend.
 - Whether Cloudflare's data handling for Workers AI meets the bar for sending code, and how to word the opt-in.
 - Inbox polling vs. a GitHub notifications-based refresh (cheaper on rate limits; needs the `notifications` scope).
