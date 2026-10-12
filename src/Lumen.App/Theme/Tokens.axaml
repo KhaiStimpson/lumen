@@ -33,6 +33,8 @@
       <SolidColorBrush x:Key="Diff.Hunk.Text" Color="#5C6F96" />
       <SolidColorBrush x:Key="Diff.Focus.Bg" Color="#FFF6DD" />
       <SolidColorBrush x:Key="Diff.Focus.Edge" Color="#F0B429" />
+      <SolidColorBrush x:Key="Find.Match" Color="#55F5D76E" />
+      <SolidColorBrush x:Key="Find.Current" Color="#AAF0A020" />
       <SolidColorBrush x:Key="Code.LineNumber" Color="#A3A9B4" />
 
       <SolidColorBrush x:Key="Severity.High" Color="#D93F3F" />
@@ -95,6 +97,8 @@
       <SolidColorBrush x:Key="Diff.Hunk.Text" Color="#8497BD" />
       <SolidColorBrush x:Key="Diff.Focus.Bg" Color="#2A2412" />
       <SolidColorBrush x:Key="Diff.Focus.Edge" Color="#D99A1C" />
+      <SolidColorBrush x:Key="Find.Match" Color="#44E3B341" />
+      <SolidColorBrush x:Key="Find.Current" Color="#99F0A020" />
       <SolidColorBrush x:Key="Code.LineNumber" Color="#555C68" />
 
       <SolidColorBrush x:Key="Severity.High" Color="#F07178" />

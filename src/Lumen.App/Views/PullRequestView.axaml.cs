@@ -20,13 +20,11 @@ public sealed partial class PullRequestView : UserControl, IDisposable
     {
         InitializeComponent();
         Editor.CardFactory = CreateCard;
-        Editor.MarkerClicked += async (_, id) =>
-        {
-            if (_viewModel?.ReviewPoints.FirstOrDefault(p => p.Id == id) is { } point)
-            {
-                await _viewModel.SelectPointAsync(point).ConfigureAwait(true);
-            }
-        };
+        SplitEditor.CardFactory = CreateCard;
+        Editor.MarkerClicked += async (_, id) => await OnMarkerClickedAsync(id).ConfigureAwait(true);
+        SplitEditor.MarkerClicked += async (_, id) => await OnMarkerClickedAsync(id).ConfigureAwait(true);
+        Editor.LineCommentRequested += (_, request) => _viewModel?.StartLineComment(request.Side, request.Line, request.StartLine);
+        SplitEditor.LineCommentRequested += (_, request) => _viewModel?.StartLineComment(request.Side, request.Line, request.StartLine);
 
         AddHandler(KeyDownEvent, (_, e) =>
         {
@@ -61,6 +59,28 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         RightSplitter.DragCompleted += Commit;
     }
 
+    private async Task OnMarkerClickedAsync(string id)
+    {
+        if (_viewModel is null)
+        {
+            return;
+        }
+
+        if (_viewModel.ReviewPoints.FirstOrDefault(p => p.Id == id) is { } point)
+        {
+            await _viewModel.SelectPointAsync(point).ConfigureAwait(true);
+        }
+        else if (_viewModel.Walkthrough?.Risks.FirstOrDefault(r => r.MarkerId == id) is { } risk)
+        {
+            await _viewModel.SelectRiskAsync(risk).ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>The editor on screen: unified, or the head side of the split view.</summary>
+    private DiffEditor ActiveEditor => _viewModel?.IsSplitView == true ? SplitEditor.Right : Editor;
+
+    private Control? ExistingCard(string id) => _viewModel?.IsSplitView == true ? SplitEditor.CardFor(id) : Editor.CardFor(id);
+
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
@@ -68,6 +88,9 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         {
             _viewModel.NavigationRequested -= OnNavigationRequested;
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            _viewModel.DraftOpened -= OnDraftOpened;
+            _viewModel.LineRevealRequested -= OnLineRevealRequested;
+            _viewModel.FindMatchRequested -= OnFindMatchRequested;
         }
 
         _viewModel = DataContext as PullRequestViewModel;
@@ -75,6 +98,9 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         {
             _viewModel.NavigationRequested += OnNavigationRequested;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            _viewModel.DraftOpened += OnDraftOpened;
+            _viewModel.LineRevealRequested += OnLineRevealRequested;
+            _viewModel.FindMatchRequested += OnFindMatchRequested;
 
             // The session may already have arrived at a point before this view existed; catch up.
             if (_viewModel.CurrentPoint is { } current)
@@ -84,14 +110,88 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         }
     }
 
-    private ReviewCardView? CreateCard(string cardId)
+    /// <summary>Review points, threads and comment drafts each have their own card (plan v2 M3, M4).</summary>
+    private Control? CreateCard(string cardId)
     {
-        if (_viewModel?.ResolveCard(cardId) is not { } resolved)
+        if (_viewModel is null)
         {
             return null;
         }
 
-        return new ReviewCardView { DataContext = new CardContext(_viewModel, resolved.Point, resolved.IsPrimary) };
+        if (_viewModel.FindDraft(cardId) is { } draft)
+        {
+            return new DraftCardView { DataContext = new DraftCardContext(_viewModel, draft) };
+        }
+
+        if (_viewModel.FindThread(cardId) is { } thread)
+        {
+            return new ThreadCardView { DataContext = new ThreadCardContext(_viewModel, thread) };
+        }
+
+        return _viewModel.ResolveCard(cardId) is { } resolved
+            ? new ReviewCardView { DataContext = new CardContext(_viewModel, resolved.Point, resolved.IsPrimary) }
+            : null;
+    }
+
+    /// <summary>Focuses a new comment draft's composer once its card is on screen.</summary>
+    private async void OnDraftOpened(object? sender, CommentDraftViewModel draft)
+    {
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+        if (_viewModel?.IsSplitView == true)
+        {
+            await SplitEditor.RevealCardAsync(draft.Id, null).ConfigureAwait(true);
+        }
+        else
+        {
+            await Editor.RevealCardAsync(draft.Id, null).ConfigureAwait(true);
+        }
+
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+            if (ExistingCard(draft.Id) is DraftCardView card && card.IsEffectivelyVisible)
+            {
+                card.ComposerBox.Focus();
+                return;
+            }
+        }
+    }
+
+    private async void OnLineRevealRequested(object? sender, LineRevealRequest request)
+    {
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+        var motion = App.Motion;
+        if (request.CardId is { } card)
+        {
+            var found = _viewModel?.IsSplitView == true
+                ? await SplitEditor.RevealCardAsync(card, motion).ConfigureAwait(true)
+                : await Editor.RevealCardAsync(card, motion).ConfigureAwait(true);
+            if (found)
+            {
+                return;
+            }
+        }
+
+        if (_viewModel?.IsSplitView == true)
+        {
+            await SplitEditor.RevealLineAsync(request.Side, request.Line, motion).ConfigureAwait(true);
+        }
+        else
+        {
+            await Editor.RevealLineAsync(request.Side, request.Line, motion).ConfigureAwait(true);
+        }
+    }
+
+    private async void OnFindMatchRequested(object? sender, Diff.FindMatch match)
+    {
+        if (_viewModel?.IsSplitView == true)
+        {
+            await SplitEditor.RevealUnifiedLineAsync(match.DocumentLine, null).ConfigureAwait(true);
+        }
+        else
+        {
+            await Editor.RevealDocumentLineAsync(match.DocumentLine, null).ConfigureAwait(true);
+        }
     }
 
     private async void OnNavigationRequested(object? sender, NavigationRequest request)
@@ -117,15 +217,15 @@ public sealed partial class PullRequestView : UserControl, IDisposable
             // Let the editor lay out a newly loaded file before measuring where to scroll.
             await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
 
-            if (request.From is { } from && from != request.Point && Editor.CardFor(from.Id) is { } leaving)
+            if (request.From is { } from && from != request.Point && ExistingCard(from.Id) is { } leaving)
             {
                 _ = motion.ContractAsync(leaving, token);
             }
 
             var line = request.Point.Locations.FirstOrDefault(l => l.Path == _viewModel.SelectedFile?.Path)?.Line ?? request.Point.Line;
-            await Editor.RevealLineAsync(line, request.Reason == NavigationReason.Arrived ? null : motion, token).ConfigureAwait(true);
+            await ActiveEditor.RevealLineAsync(line, request.Reason == NavigationReason.Arrived ? null : motion, token).ConfigureAwait(true);
 
-            if (Editor.CardFor(request.Point.Id) is ReviewCardView arriving && request.Reason != NavigationReason.Refocus)
+            if (ExistingCard(request.Point.Id) is ReviewCardView arriving && request.Reason != NavigationReason.Refocus)
             {
                 await motion.RevealAsync(arriving.CardSurface, Motion.MotionPreset.NavigateReviewPoint, token).ConfigureAwait(true);
             }
@@ -145,7 +245,7 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         switch (e.PropertyName)
         {
             case nameof(PullRequestViewModel.Mode) when _viewModel.IsExamining:
-                var source = _viewModel.CurrentPoint is { } current && Editor.CardFor(current.Id) is ReviewCardView card && card.IsEffectivelyVisible
+                var source = _viewModel.CurrentPoint is { } current && ExistingCard(current.Id) is ReviewCardView card && card.IsEffectivelyVisible
                     ? card.CardSurface
                     : null;
                 await Examine.EnterAsync(source).ConfigureAwait(true);
@@ -169,6 +269,11 @@ public sealed partial class PullRequestView : UserControl, IDisposable
                 {
                 }
 
+                break;
+
+            case nameof(PullRequestViewModel.IsFindOpen) when _viewModel.IsFindOpen:
+                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+                this.FindControl<TextBox>("FindBox")?.Focus();
                 break;
 
             case nameof(PullRequestViewModel.SourcePreview) when _viewModel.SourcePreview is { } preview:

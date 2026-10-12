@@ -28,8 +28,12 @@ public sealed class CodeSnippet : UserControl
     public static readonly StyledProperty<string> HighlightBrushKeyProperty =
         AvaloniaProperty.Register<CodeSnippet, string>(nameof(HighlightBrushKey), "Diff.Focus.Bg");
 
+    public static readonly StyledProperty<bool> ShowLineNumbersProperty =
+        AvaloniaProperty.Register<CodeSnippet, bool>(nameof(ShowLineNumbers), true);
+
     private readonly TextEditor _editor;
     private readonly TextMate.Installation _syntax;
+    private readonly NumberMargin _numbers;
 
     public CodeSnippet()
     {
@@ -49,7 +53,8 @@ public sealed class CodeSnippet : UserControl
         _editor.Options.EnableHyperlinks = false;
         _editor.TextArea.TextView.Margin = new Thickness(8, 0, 8, 0);
         _editor.TextArea.TextView.BackgroundRenderers.Add(new HighlightRenderer(this));
-        _editor.TextArea.LeftMargins.Insert(0, new NumberMargin(this));
+        _numbers = new NumberMargin(this);
+        _editor.TextArea.LeftMargins.Insert(0, _numbers);
         _syntax = SyntaxThemes.Install(_editor, null);
         Content = _editor;
     }
@@ -78,6 +83,12 @@ public sealed class CodeSnippet : UserControl
         set => SetValue(HighlightLinesProperty, value);
     }
 
+    public bool ShowLineNumbers
+    {
+        get => GetValue(ShowLineNumbersProperty);
+        set => SetValue(ShowLineNumbersProperty, value);
+    }
+
     public string HighlightBrushKey
     {
         get => GetValue(HighlightBrushKeyProperty);
@@ -94,6 +105,10 @@ public sealed class CodeSnippet : UserControl
         else if (change.Property == PathProperty)
         {
             SyntaxThemes.SetLanguage(_syntax, Path);
+        }
+        else if (change.Property == ShowLineNumbersProperty)
+        {
+            _numbers.IsVisible = ShowLineNumbers;
         }
         else if (change.Property == HighlightLinesProperty || change.Property == StartLineProperty)
         {

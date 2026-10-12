@@ -1,0 +1,103 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             x:Class="Lumen.App.Views.WalkthroughView"
+             x:DataType="vm:PullRequestViewModel">
+  <!-- The PR walkthrough (plan v2 M8): intent, change groups in reading order, risky areas. A model's reading, never evidence. -->
+  <StackPanel Spacing="10" IsVisible="{Binding HasWalkthrough}">
+    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+      <Path Data="{StaticResource Icon.Map}" Stroke="{DynamicResource Accent}" Classes="stroke" Width="14" Height="14" VerticalAlignment="Center" />
+      <TextBlock Grid.Column="1" Classes="h3" Text="{Binding WalkthroughTitle}" VerticalAlignment="Center" />
+      <Button Grid.Column="2" Classes="ghost" Padding="6" Command="{Binding RefreshWalkthroughCommand}" ToolTip.Tip="Run the walkthrough again"
+              IsVisible="{Binding !Walkthrough.IsUnavailable, FallbackValue=False}">
+        <Path Data="{StaticResource Icon.Refresh}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="11" Height="11" />
+      </Button>
+    </Grid>
+
+    <!-- Not offered / failed: one quiet line, never a blocker -->
+    <TextBlock Name="WalkthroughDetail" Classes="caption tertiary" TextWrapping="Wrap" Text="{Binding Walkthrough.Detail, FallbackValue=''}"
+               IsVisible="{Binding Walkthrough.HasDetail, FallbackValue=False}" />
+
+    <StackPanel Orientation="Horizontal" Spacing="7" IsVisible="{Binding Walkthrough.IsRunning, FallbackValue=False}">
+      <Ellipse Width="6" Height="6" Fill="{DynamicResource Accent}" VerticalAlignment="Center" />
+      <TextBlock Classes="caption" Text="{Binding Walkthrough.ProgressLabel, FallbackValue=''}" />
+    </StackPanel>
+
+    <TextBlock Name="WalkthroughIntent" Classes="body" TextWrapping="Wrap" LineHeight="19" FontSize="12.5"
+               Text="{Binding Walkthrough.Intent, FallbackValue=''}" IsVisible="{Binding Walkthrough.HasIntent, FallbackValue=False}" />
+
+    <Border Background="{DynamicResource Severity.Medium.Soft}" CornerRadius="6" Padding="10,7"
+            IsVisible="{Binding Walkthrough.HasMismatch, FallbackValue=False}">
+      <TextBlock FontSize="12" TextWrapping="Wrap">
+        <Run Text="Description vs. diff: " FontWeight="SemiBold" Foreground="{DynamicResource Severity.Medium}" /><Run Text="{Binding Walkthrough.Mismatch, FallbackValue=''}" />
+      </TextBlock>
+    </Border>
+
+    <!-- Since last review -->
+    <Border Background="{DynamicResource Accent.Soft}" CornerRadius="6" Padding="10,7"
+            IsVisible="{Binding DeltaWalkthrough.HasIntent, FallbackValue=False}">
+      <StackPanel Spacing="2">
+        <TextBlock Classes="section" Text="SINCE YOU LAST LOOKED" />
+        <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding DeltaWalkthrough.Intent, FallbackValue=''}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Change groups in reading order -->
+    <StackPanel Spacing="2" IsVisible="{Binding Walkthrough.Groups.Count, Converter={x:Static views:Converters.IsPositive}, FallbackValue=False}">
+      <TextBlock Classes="section" Text="READING ORDER" Margin="0,4,0,2" />
+      <ItemsControl Name="WalkthroughGroups" ItemsSource="{Binding Walkthrough.Groups, FallbackValue={x:Null}}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:WalkthroughGroupViewModel">
+            <Button Classes="row" Classes.current="{Binding IsCurrent}" Margin="-8,0" Padding="10,6"
+                    Opacity="{Binding IsMechanical, Converter={x:Static views:Converters.DimIf}}"
+                    Command="{Binding $parent[views:WalkthroughView].((vm:PullRequestViewModel)DataContext).SelectGroupCommand}" CommandParameter="{Binding}">
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="9">
+                <Border Width="18" Height="18" CornerRadius="9" Background="{DynamicResource Surface.Hover}" VerticalAlignment="Top" Margin="0,1,0,0">
+                  <TextBlock Text="{Binding OrderLabel}" FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" Classes="secondary" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="1">
+                  <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <TextBlock Classes="caption" Text="{Binding Summary}" TextWrapping="Wrap" IsVisible="{Binding HasSummary}" />
+                </StackPanel>
+                <TextBlock Grid.Column="2" Classes="caption tertiary" Text="{Binding FilesLabel}" VerticalAlignment="Top" />
+              </Grid>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <!-- Risky areas: a checklist on your own PR -->
+    <StackPanel Spacing="2" IsVisible="{Binding Walkthrough.HasRisks, FallbackValue=False}">
+      <TextBlock Classes="section" Text="WORTH A CAREFUL LOOK" Margin="0,4,0,2" />
+      <ItemsControl Name="WalkthroughRisks" ItemsSource="{Binding Walkthrough.Risks, FallbackValue={x:Null}}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:RiskViewModel">
+            <Grid ColumnDefinitions="Auto,*">
+              <CheckBox Classes="viewed" VerticalAlignment="Top" Margin="0,8,2,0" IsChecked="{Binding IsChecked, Mode=OneWay}" ToolTip.Tip="Checked"
+                        IsVisible="{Binding $parent[views:WalkthroughView].((vm:PullRequestViewModel)DataContext).ViewerIsAuthor, FallbackValue=False}"
+                        Command="{Binding $parent[views:WalkthroughView].((vm:PullRequestViewModel)DataContext).ToggleRiskCheckedCommand}" CommandParameter="{Binding}" />
+              <Button Grid.Column="1" Classes="row" Margin="-8,0" Padding="10,6"
+                      Command="{Binding $parent[views:WalkthroughView].((vm:PullRequestViewModel)DataContext).SelectRiskCommand}" CommandParameter="{Binding}">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="9">
+                  <Path Data="{StaticResource Icon.Risk}" Stroke="{Binding Category, Converter={x:Static views:Converters.RiskToBrush}}" Classes="stroke"
+                        Width="12" Height="12" VerticalAlignment="Top" Margin="0,2,0,0" />
+                  <StackPanel Grid.Column="1" Spacing="1">
+                    <TextBlock Text="{Binding Reason}" FontSize="12" TextWrapping="Wrap" />
+                    <TextBlock Classes="caption tertiary">
+                      <Run Text="{Binding CategoryLabel}" /><Run Text=" · " /><Run Text="{Binding LocationLabel}" />
+                    </TextBlock>
+                  </StackPanel>
+                </Grid>
+              </Button>
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <TextBlock Classes="caption tertiary" FontSize="10.5" TextWrapping="Wrap" Text="{Binding Walkthrough.Provenance, FallbackValue=''}"
+               IsVisible="{Binding Walkthrough.HasContent, FallbackValue=False}" />
+  </StackPanel>
+</UserControl>

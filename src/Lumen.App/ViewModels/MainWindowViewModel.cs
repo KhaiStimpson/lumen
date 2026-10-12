@@ -34,6 +34,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         InboxSettings = new InboxSettingsViewModel(source);
         InboxSettings.Saved += async (_, _) => await Home.RefreshAsync().ConfigureAwait(true);
         Connections = new ConnectionsViewModel(source);
+        Palette = new CommandPaletteViewModel(PaletteSources);
         Review = new ReviewSettingsViewModel(source);
         Appearance = new AppearanceViewModel(settings, settingsPath);
         Review.Saved += (_, _) =>
@@ -101,8 +102,96 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public bool IsPullRequestOpen => PullRequest is not null;
 
-    [ObservableProperty]
-    public partial string GoToFileQuery { get; set; } = "";
+    /// <summary>Ctrl+K (plan v2 M6). Its input is the title bar's search box.</summary>
+    public CommandPaletteViewModel Palette { get; }
+
+    /// <summary>Asks the view to open a link (e.g. "Open on GitHub").</summary>
+    public event EventHandler<string>? OpenUrlRequested;
+
+    private List<PaletteItemViewModel> PaletteSources()
+    {
+        var pr = PullRequest;
+        var items = new List<PaletteItemViewModel>();
+        PaletteItemViewModel Action(string title, string shortcut, Func<Task> run, string detail = "") =>
+            new(PaletteItemKind.Action, title, detail, shortcut, run);
+        Task Do(Action action)
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        if (pr is not null)
+        {
+            foreach (var file in (pr.HasScope ? pr.ScopeFiles : pr.Files))
+            {
+                items.Add(new PaletteItemViewModel(PaletteItemKind.File, file.Name, file.Path, "", async () =>
+                {
+                    pr.ShowTab(PullRequestTab.Files);
+                    await pr.SelectFileAsync(file).ConfigureAwait(true);
+                }));
+            }
+
+            items.Add(Action("Next review point", "J", pr.NextPointAsync));
+            items.Add(Action("Previous review point", "K", pr.PreviousPointAsync));
+            items.Add(Action("Examine the current point", "Enter", () => pr.ExamineAsync(null)));
+            items.Add(Action("Next open thread", "N", pr.NextThreadAsync));
+            items.Add(Action("Previous open thread", "Shift+N", pr.PreviousThreadAsync));
+            items.Add(Action("Open the review tray", "R", () => Do(() => pr.IsTrayOpen = true)));
+            items.Add(Action("Submit review: Comment", "", pr.SubmitCommentAsync));
+            if (pr.CanApprove)
+            {
+                items.Add(Action("Submit review: Approve", "", pr.ApproveAsync));
+                items.Add(Action("Submit review: Request changes", "", pr.RequestChangesAsync));
+            }
+
+            items.Add(Action(pr.IsSplitView ? "Unified view" : "Split view (side by side)", "S", () => Do(pr.ToggleSplitView)));
+            items.Add(Action(pr.IgnoreWhitespace ? "Show whitespace changes" : "Ignore whitespace", "W", () => Do(pr.ToggleIgnoreWhitespace)));
+            if (pr.CanShowSinceLastReview)
+            {
+                items.Add(Action(pr.ShowSinceLastReview ? "Show all changes" : "Since last review", "", () => Do(() => pr.ShowSinceLastReview = !pr.ShowSinceLastReview), pr.LastReviewedLabel));
+            }
+
+            items.Add(Action(pr.ShowFullFile ? "Show only the changes" : "Show the full file", "X", () => Do(() => pr.ShowFullFile = !pr.ShowFullFile)));
+            items.Add(Action("Find in file", "Ctrl+F", () => Do(pr.OpenFind)));
+            items.Add(Action("Files", "", () => Do(() => pr.ShowTab(PullRequestTab.Files))));
+            items.Add(Action("Conversation", "", () => Do(() => pr.ShowTab(PullRequestTab.Conversation))));
+            items.Add(Action("Commits", "", () => Do(() => pr.ShowTab(PullRequestTab.Commits))));
+            items.Add(Action("Checks", "", () => Do(() => pr.ShowTab(PullRequestTab.Checks))));
+            if (pr.WalksGroups || pr.Walkthrough is { Groups.Count: > 0 })
+            {
+                items.Add(Action("Next change group", "", pr.NextGroupAsync));
+            }
+
+            items.Add(Action("Run the walkthrough again", "", pr.RefreshWalkthroughAsync));
+            if (pr.Url.Length > 0)
+            {
+                items.Add(Action("Open on GitHub", "", () => Do(() => OpenUrlRequested?.Invoke(this, pr.Url))));
+            }
+
+            items.Add(Action("Re-analyse", "", () => pr.RefreshCommand.ExecuteAsync(null)));
+            items.Add(Action("Inbox", "", () => GoHomeCommand.ExecuteAsync(null)));
+        }
+        else
+        {
+            items.Add(Action("Refresh the inbox", "", Home.RefreshAsync));
+        }
+
+        foreach (var item in Home.AllItems)
+        {
+            items.Add(new PaletteItemViewModel(PaletteItemKind.PullRequest, $"{item.NumberLabel} {item.Title}", item.Reference, "", () => OpenAsync(item.Reference)));
+        }
+
+        foreach (var recent in _settings.RecentPullRequests.Where(r => Home.AllItems.All(i => !i.Reference.Equals(r, StringComparison.OrdinalIgnoreCase))))
+        {
+            items.Add(new PaletteItemViewModel(PaletteItemKind.PullRequest, recent, "Recent", "", () => OpenAsync(recent)));
+        }
+
+        items.Add(Action("Connections", "", OpenConnectionsAsync));
+        items.Add(Action("Settings: Inbox", "", () => OpenSettingsAsync(SettingsSection.Inbox)));
+        items.Add(Action("Settings: Review", "", OpenReviewSettingsAsync));
+        items.Add(Action("Toggle light / dark", "", () => Do(ToggleTheme)));
+        return items;
+    }
 
     public async Task OpenAsync(string reference)
     {
@@ -129,6 +218,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Name = key.Repository.Name,
             Number = key.Number,
         });
+        pullRequest.IsSplitView = _settings.SplitView;
+        pullRequest.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PullRequestViewModel.IsSplitView) && _settings.SplitView != pullRequest.IsSplitView)
+            {
+                _settings.SplitView = pullRequest.IsSplitView;
+                _settings.Save(_settingsPath);
+            }
+        };
         Current = pullRequest;
         pullRequest.Start();
     }
@@ -149,6 +247,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [RelayCommand]
     private Task OpenReviewSettingsAsync() => OpenSettingsAsync(SettingsSection.Review);
+
+    [RelayCommand]
+    private void OpenPalette() => Palette.Open();
 
     /// <summary>Opens on <paramref name="section"/>; review settings load for the open pull request's repository.</summary>
     public Task OpenSettingsAsync(SettingsSection section)
@@ -188,11 +289,4 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Appearance.Theme = app.ActualThemeVariant == ThemeVariant.Dark ? ThemeChoice.Light : ThemeChoice.Dark;
     }
 
-    partial void OnGoToFileQueryChanged(string value)
-    {
-        if (PullRequest is { } pr)
-        {
-            pr.FileFilter = value;
-        }
-    }
 }

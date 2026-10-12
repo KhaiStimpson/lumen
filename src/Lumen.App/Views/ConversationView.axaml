@@ -1,0 +1,111 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             xmlns:md="using:Lumen.App.Markdown"
+             x:Class="Lumen.App.Views.ConversationView"
+             x:DataType="vm:PullRequestViewModel">
+  <!-- Conversation (plan v2 M2): the description, the timeline, review threads, and a composer for a top-level comment. -->
+  <ScrollViewer Name="ConversationScroll">
+    <StackPanel Margin="22,16,22,24" Spacing="16" MaxWidth="860" HorizontalAlignment="Left">
+      <!-- Description -->
+      <Border Classes="card" Padding="16,14">
+        <StackPanel Spacing="8">
+          <TextBlock FontSize="12">
+            <Run Text="{Binding Author}" FontWeight="SemiBold" /><Run Text=" opened this pull request" Foreground="{DynamicResource Text.Secondary}" />
+          </TextBlock>
+          <md:MarkdownView Name="Description" Markdown="{Binding Description}" IsVisible="{Binding HasDescription}" />
+          <TextBlock Classes="caption tertiary" Text="No description provided." IsVisible="{Binding !HasDescription}" />
+        </StackPanel>
+      </Border>
+
+      <!-- Review threads: each links into the Files tab at its location -->
+      <StackPanel Spacing="6" IsVisible="{Binding Threads.Count, Converter={x:Static views:Converters.IsPositive}}">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="h3" Text="Review threads" />
+          <TextBlock Grid.Column="1" Classes="caption" Text="{Binding ThreadsLabel}" />
+        </Grid>
+        <ItemsControl Name="ThreadLinks" ItemsSource="{Binding Threads}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ThreadViewModel">
+              <Button Classes="row" Margin="-8,0" Padding="10,7" Opacity="{Binding IsResolved, Converter={x:Static views:Converters.DimIf}}"
+                      Command="{Binding $parent[views:ConversationView].((vm:PullRequestViewModel)DataContext).GoToThreadCommand}" CommandParameter="{Binding}">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                  <Path Data="{StaticResource Icon.Comment}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="12" Height="12" VerticalAlignment="Top" Margin="0,3,0,0" />
+                  <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock FontSize="12.5" TextTrimming="CharacterEllipsis">
+                      <Run Text="{Binding FirstAuthor}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Summary}" />
+                    </TextBlock>
+                    <TextBlock Classes="caption tertiary" Text="{Binding LocationLabel}" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+                    <TextBlock Classes="caption tertiary" Text="{Binding ReplyCountLabel}" />
+                    <Border Classes="pill" IsVisible="{Binding StatusLabel, Converter={x:Static views:Converters.NotEmpty}}"><TextBlock Text="{Binding StatusLabel}" /></Border>
+                  </StackPanel>
+                </Grid>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <!-- Timeline -->
+      <ItemsControl Name="Timeline" ItemsSource="{Binding Timeline}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:TimelineItemViewModel">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" Margin="0,0,0,12">
+              <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource Surface.Hover}" VerticalAlignment="Top">
+                <TextBlock Text="{Binding Initial}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" Classes="secondary" />
+              </Border>
+              <Border Grid.Column="1" Classes="card" Padding="14,10">
+                <StackPanel Spacing="6">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock FontSize="12">
+                      <Run Text="{Binding Author}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding ActionLabel}" Foreground="{DynamicResource Text.Secondary}" />
+                      <Run Text=" · " Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding AgeLabel}" Foreground="{DynamicResource Text.Tertiary}" />
+                    </TextBlock>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                      <TextBlock Classes="caption tertiary" Text="{Binding CommentCountLabel}" VerticalAlignment="Center" />
+                      <Border Classes="pill" IsVisible="{Binding VerdictKind, Converter={x:Static views:Converters.NotEmpty}}"
+                              Classes.open="{Binding VerdictKind, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=approved}"
+                              Classes.High="{Binding VerdictKind, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=changes}">
+                        <TextBlock Text="{Binding ActionLabel}" />
+                      </Border>
+                    </StackPanel>
+                  </Grid>
+                  <md:MarkdownView Markdown="{Binding Body}" IsVisible="{Binding HasBody}" />
+                </StackPanel>
+              </Border>
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- New top-level comment -->
+      <Border Classes="card" Padding="14,12">
+        <StackPanel Spacing="8">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="h3" Text="Add a comment" VerticalAlignment="Center" />
+            <Border Grid.Column="1" Classes="segmented">
+              <StackPanel Orientation="Horizontal" Spacing="2">
+                <RadioButton Classes="segment" GroupName="IssueComment" Content="Write" IsChecked="{Binding !IsIssueCommentPreview}" />
+                <RadioButton Classes="segment" GroupName="IssueComment" Content="Preview" IsChecked="{Binding IsIssueCommentPreview}" />
+              </StackPanel>
+            </Border>
+          </Grid>
+          <TextBox Name="IssueComment" Classes="composer issue" Text="{Binding IssueCommentDraft}" AcceptsReturn="True" TextWrapping="Wrap"
+                   MinHeight="80" MaxHeight="260" FontSize="12.5" PlaceholderText="Leave a comment on the pull request (Markdown)"
+                   IsVisible="{Binding !IsIssueCommentPreview}" />
+          <md:MarkdownView Markdown="{Binding IssueCommentDraft}" IsVisible="{Binding IsIssueCommentPreview}" MinHeight="40" />
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="caption" VerticalAlignment="Center" TextWrapping="Wrap"
+                       Text="{Binding IssueCommentError, TargetNullValue='Posts to the conversation at once (Ctrl+Enter).'}" />
+            <Button Name="PostIssueComment" Grid.Column="1" Classes="primary" Command="{Binding PostIssueCommentCommand}">
+              <TextBlock Text="Comment" Foreground="{DynamicResource Accent.OnAccent}" />
+            </Button>
+          </Grid>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

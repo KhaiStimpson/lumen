@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using Lumen.App.ViewModels;
+using Avalonia.Controls.Primitives;
 
 namespace Lumen.App.Views;
 
@@ -46,6 +47,38 @@ public sealed partial class MainWindow : Window
             }
         };
 
+        // "Open on GitHub" from the palette.
+        DataContextChanged += (_, _) =>
+        {
+            if (ViewModel is { } vm)
+            {
+                vm.OpenUrlRequested += async (_, url) =>
+                {
+                    if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                    {
+                        await Launcher.LaunchUriAsync(uri).ConfigureAwait(true);
+                    }
+                };
+            }
+        };
+
+        // The palette closes when its box loses focus (after a click on an item has run).
+        AddHandler(LostFocusEvent, (_, e) =>
+        {
+            if (e.Source is TextBox { Name: "GoToFile" } && ViewModel is { } vm)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(
+                    () =>
+                    {
+                        if (FocusManager?.GetFocusedElement() is not TextBox { Name: "GoToFile" } && !IsWithinPalette())
+                        {
+                            vm.Palette.IsOpen = false;
+                        }
+                    },
+                    Avalonia.Threading.DispatcherPriority.Background);
+            }
+        }, RoutingStrategies.Bubble);
+
         // A click outside the card closes it.
         SettingsHost.PointerPressed += (_, e) =>
         {
@@ -58,7 +91,11 @@ public sealed partial class MainWindow : Window
 
     private MainWindowViewModel? ViewModel => DataContext as MainWindowViewModel;
 
-    /// <summary>Keyboard-first review (TDD §29).</summary>
+    private bool IsWithinPalette() =>
+        FocusManager?.GetFocusedElement() is Visual focused && this.FindControl<Avalonia.Controls.Primitives.Popup>("PalettePopup")?.Child is { } child
+        && (focused == child || child.IsVisualAncestorOf(focused));
+
+    /// <summary>Keyboard-first review (TDD §29, plan v2: every new action has a key).</summary>
     private async void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
         // The Settings card is modal: Escape closes it, and review shortcuts stay with the view underneath.
@@ -74,44 +111,71 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (ViewModel?.PullRequest is not { } pr)
+        if (ViewModel is not { } vm)
         {
             return;
         }
 
-        var typing = FocusManager?.GetFocusedElement() is TextBox;
-        var point = pr.CurrentPoint;
-
+        var focused = FocusManager?.GetFocusedElement() as TextBox;
         if (e.Key == Key.K && e.KeyModifiers == KeyModifiers.Control)
         {
-            this.FindControl<TextBox>("GoToFile")?.Focus();
+            OpenPalette();
             e.Handled = true;
             return;
         }
 
-        if (typing)
+        // The palette's box: arrows pick, Enter runs, Escape leaves.
+        if (focused?.Name == "GoToFile")
         {
-            if (e.Key == Key.Escape)
+            e.Handled = true;
+            switch (e.Key)
             {
-                if (point is { IsComposing: true })
-                {
-                    pr.CancelComment(point);
-                }
-
-                if (FocusManager?.GetFocusedElement() is TextBox { Name: "GoToFile" } box)
-                {
-                    box.Text = "";
-                }
-
-                Focus();
-                e.Handled = true;
+                case Key.Down:
+                    vm.Palette.Move(+1);
+                    break;
+                case Key.Up:
+                    vm.Palette.Move(-1);
+                    break;
+                case Key.Enter:
+                    Focus();
+                    await vm.Palette.RunCommand.ExecuteAsync(null).ConfigureAwait(true);
+                    break;
+                case Key.Escape:
+                    vm.Palette.Close();
+                    focused.Text = "";
+                    Focus();
+                    break;
+                default:
+                    e.Handled = false;
+                    break;
             }
-            else if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.Control && point is { IsComposing: true })
-            {
-                e.Handled = true;
-                await pr.PostCommentAsync(point).ConfigureAwait(true);
-            }
 
+            return;
+        }
+
+        if (vm.PullRequest is not { } pr)
+        {
+            return;
+        }
+
+        if (e.Key == Key.F && e.KeyModifiers == KeyModifiers.Control)
+        {
+            pr.ShowTab(ViewModels.PullRequestTab.Files);
+            pr.OpenFind();
+            e.Handled = true;
+            return;
+        }
+
+        if (focused is not null)
+        {
+            e.Handled = await OnTypingKeyAsync(pr, focused, e).ConfigureAwait(true);
+            return;
+        }
+
+        if (e.KeyModifiers == KeyModifiers.Shift && e.Key == Key.N)
+        {
+            e.Handled = true;
+            await pr.PreviousThreadAsync().ConfigureAwait(true);
             return;
         }
 
@@ -132,8 +196,14 @@ public sealed partial class MainWindow : Window
             case Key.Enter:
                 await pr.ExamineAsync(null).ConfigureAwait(true);
                 break;
+            case Key.Escape when pr.IsFindOpen:
+                pr.CloseFind();
+                break;
             case Key.Escape when pr.IsExamining:
                 pr.CloseExamine();
+                break;
+            case Key.Escape when pr.IsTrayOpen:
+                pr.IsTrayOpen = false;
                 break;
             case Key.D:
                 await pr.DismissAsync(null).ConfigureAwait(true);
@@ -149,16 +219,130 @@ public sealed partial class MainWindow : Window
                 await pr.ShowEvidenceAsync(null).ConfigureAwait(true);
                 break;
             case Key.F:
-                this.FindControl<TextBox>("GoToFile")?.Focus();
+                OpenPalette();
                 break;
             case Key.X:
                 pr.ShowFullFile = !pr.ShowFullFile;
+                break;
+            case Key.N:
+                await pr.NextThreadAsync().ConfigureAwait(true);
+                break;
+            case Key.R:
+                pr.ToggleTray();
+                if (pr.IsTrayOpen)
+                {
+                    FocusNamed("ReviewSummary");
+                }
+
+                break;
+            case Key.S:
+                pr.ToggleSplitView();
+                break;
+            case Key.W:
+                pr.ToggleIgnoreWhitespace();
                 break;
             default:
                 e.Handled = false;
                 break;
         }
     }
+
+    /// <summary>
+    /// In a text box only Ctrl+Enter, Ctrl+Shift+Enter and Escape mean anything, and what they mean depends on the box:
+    /// a review point's or line's comment adds to the review (Ctrl+Enter) or posts at once (Ctrl+Shift+Enter); a
+    /// reply or a conversation comment posts; Escape cancels and hands the keyboard back.
+    /// </summary>
+    private async Task<bool> OnTypingKeyAsync(ViewModels.PullRequestViewModel pr, TextBox box, KeyEventArgs e)
+    {
+        var context = box.FindAncestorOfType<UserControl>()?.DataContext;
+        var ctrlEnter = e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.Control;
+        var ctrlShiftEnter = e.Key == Key.Enter && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift);
+
+        if (box.Name == "FindBox")
+        {
+            switch (e.Key)
+            {
+                case Key.Enter when e.KeyModifiers == KeyModifiers.Shift:
+                    pr.FindPrevious();
+                    return true;
+                case Key.Enter:
+                    pr.FindNext();
+                    return true;
+                case Key.Escape:
+                    pr.CloseFind();
+                    Focus();
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        if (e.Key == Key.Escape)
+        {
+            switch (context)
+            {
+                case DraftCardContext draft:
+                    pr.CancelDraft(draft.Draft);
+                    break;
+                case ThreadCardContext thread:
+                    ViewModels.PullRequestViewModel.CancelReply(thread.Thread);
+                    break;
+                case CardContext or ViewModels.PullRequestViewModel when box.Name is not ("IssueComment" or "ReviewSummary")
+                                                                    && pr.CurrentPoint is { IsComposing: true } current:
+                    pr.CancelComment(current);
+                    break;
+            }
+
+            Focus();
+            return true;
+        }
+
+        if (!ctrlEnter && !ctrlShiftEnter)
+        {
+            return false;
+        }
+
+        switch (context)
+        {
+            case DraftCardContext draft:
+                await (ctrlShiftEnter ? pr.PostDraftNowAsync(draft.Draft) : pr.AddDraftToReviewAsync(draft.Draft)).ConfigureAwait(true);
+                return true;
+            case ThreadCardContext thread:
+                await pr.ReplyAsync(thread.Thread).ConfigureAwait(true);
+                return true;
+        }
+
+        if (box.Name == "IssueComment")
+        {
+            await pr.PostIssueCommentAsync().ConfigureAwait(true);
+            return true;
+        }
+
+        if (box.Name == "ReviewSummary")
+        {
+            await pr.SubmitCommentAsync().ConfigureAwait(true);
+            return true;
+        }
+
+        if (pr.CurrentPoint is { IsComposing: true } point)
+        {
+            await (ctrlShiftEnter ? pr.PostCommentAsync(point) : pr.AddPointCommentToReviewAsync(point)).ConfigureAwait(true);
+            return true;
+        }
+
+        return false;
+    }
+
+    private void OpenPalette()
+    {
+        ViewModel?.Palette.Open();
+        this.FindControl<TextBox>("GoToFile")?.Focus();
+    }
+
+    private void FocusNamed(string name) =>
+        Avalonia.Threading.Dispatcher.UIThread.Post(
+            () => this.GetVisualDescendants().OfType<TextBox>().FirstOrDefault(t => t.Name == name && t.IsEffectivelyVisible)?.Focus(),
+            Avalonia.Threading.DispatcherPriority.Background);
 
     private void FocusComposer() =>
         Avalonia.Threading.Dispatcher.UIThread.Post(

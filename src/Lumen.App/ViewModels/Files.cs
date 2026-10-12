@@ -36,6 +36,15 @@ public sealed partial class FileEntryViewModel(ChangedFileSummary file) : Observ
 
     public bool HasReviewPoints => ReviewPointCount > 0;
 
+    /// <summary>Unresolved review threads on this file (plan v2 M4).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasThreads), nameof(ThreadCountLabel))]
+    public partial int ThreadCount { get; set; }
+
+    public bool HasThreads => ThreadCount > 0;
+
+    public string ThreadCountLabel => ThreadCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
     /// <summary>GitHub's per-file "Viewed" checkbox: ticked by the reviewer, never by merely opening the file.</summary>
     [ObservableProperty]
     public partial bool IsViewed { get; set; } = file.IsViewed;

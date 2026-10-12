@@ -37,13 +37,45 @@
                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
       </StackPanel>
 
-      <Panel Grid.Column="3" Width="340" Margin="0,0,12,0" VerticalAlignment="Center" IsVisible="{Binding IsPullRequestOpen}">
-        <TextBox Name="GoToFile" Classes="search" Watermark="Go to file…" Text="{Binding GoToFileQuery}" />
+      <!-- Command palette (Ctrl+K, TDD §30): go to file, go to pull request, actions with their shortcuts -->
+      <Panel Name="PalettePanel" Grid.Column="3" Width="380" Margin="0,0,12,0" VerticalAlignment="Center">
+        <TextBox Name="GoToFile" Classes="search" PlaceholderText="Go to file, pull request or command…" Text="{Binding Palette.Query}" />
         <Path Data="{StaticResource Icon.Search}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke"
               Width="12" Height="12" HorizontalAlignment="Left" Margin="11,0,0,0" IsHitTestVisible="False" />
         <Border Classes="kbd" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" IsHitTestVisible="False">
           <TextBlock Text="Ctrl K" />
         </Border>
+        <Popup Name="PalettePopup" PlacementTarget="GoToFile" Placement="BottomEdgeAlignedLeft" VerticalOffset="6"
+               IsOpen="{Binding Palette.IsOpen}" IsLightDismissEnabled="False" WindowManagerAddShadowHint="False">
+          <Border Classes="card" Width="520" MaxHeight="440" BoxShadow="0 12 40 0 #2A000000" Padding="6">
+            <Grid RowDefinitions="Auto,*">
+              <TextBlock Classes="caption tertiary" Text="{Binding Palette.Hint}" Margin="10,4,10,6" />
+              <ScrollViewer Grid.Row="1">
+                <ItemsControl Name="PaletteItems" ItemsSource="{Binding Palette.Items}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PaletteItemViewModel">
+                      <Button Classes="row" Classes.current="{Binding IsSelected}" Padding="10,6"
+                              Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Palette.RunCommand, FallbackValue={x:Null}}"
+                              CommandParameter="{Binding}">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                          <StackPanel Spacing="1">
+                            <TextBlock Text="{Binding Title}" FontSize="12.5" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Classes="caption tertiary" Text="{Binding Detail}" TextTrimming="CharacterEllipsis"
+                                       IsVisible="{Binding Detail, Converter={x:Static views:Converters.NotEmpty}}" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="1" Classes="caption tertiary" Text="{Binding KindLabel}" VerticalAlignment="Center" />
+                          <Border Grid.Column="2" Classes="kbd" VerticalAlignment="Center" IsVisible="{Binding HasShortcut}">
+                            <TextBlock Text="{Binding Shortcut}" />
+                          </Border>
+                        </Grid>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Grid>
+          </Border>
+        </Popup>
       </Panel>
 
       <Button Name="SettingsButton" Grid.Column="4" Classes="ghost" Padding="7" Margin="0,0,2,0"
