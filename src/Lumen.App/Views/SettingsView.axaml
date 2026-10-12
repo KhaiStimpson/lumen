@@ -23,6 +23,9 @@
           <Button Name="NavConnections" Classes="row nav" Content="Connections"
                   Classes.current="{Binding Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Connections}"
                   Command="{Binding ShowSectionCommand}" CommandParameter="{x:Static vm:SettingsSection.Connections}" />
+          <Button Name="NavInbox" Classes="row nav" Content="Inbox"
+                  Classes.current="{Binding Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Inbox}"
+                  Command="{Binding ShowSectionCommand}" CommandParameter="{x:Static vm:SettingsSection.Inbox}" />
           <Button Name="NavReview" Classes="row nav" Content="Review"
                   Classes.current="{Binding Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Review}"
                   Command="{Binding ShowSectionCommand}" CommandParameter="{x:Static vm:SettingsSection.Review}" />
@@ -50,6 +53,8 @@
             </StackPanel>
             <views:ConnectionsView DataContext="{Binding Connections}" />
           </StackPanel>
+          <views:InboxSettingsView DataContext="{Binding InboxSettings}"
+                                   IsVisible="{Binding $parent[views:SettingsView].((vm:MainWindowViewModel)DataContext).Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Inbox, FallbackValue=False}" />
           <views:ReviewSettingsView DataContext="{Binding Review}"
                                     IsVisible="{Binding $parent[views:SettingsView].((vm:MainWindowViewModel)DataContext).Section, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Review, FallbackValue=False}" />
           <views:FilesSettingsView DataContext="{Binding Review}"

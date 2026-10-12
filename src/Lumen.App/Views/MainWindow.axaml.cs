@@ -37,6 +37,15 @@ public sealed partial class MainWindow : Window
             }
         };
 
+        // Back in the foreground: the inbox refreshes (plan v2 M1: polled, and on focus).
+        Activated += async (_, _) =>
+        {
+            if (ViewModel is { } vm)
+            {
+                await vm.OnActivatedAsync().ConfigureAwait(true);
+            }
+        };
+
         // A click outside the card closes it.
         SettingsHost.PointerPressed += (_, e) =>
         {

@@ -1,0 +1,116 @@
+{
+ "pullRequest": {
+  "owner": "KhaiStimpson",
+  "name": "andrew-crm",
+  "number": 58
+ },
+ "title": "Contact data enrichment: external data into fields, AI context, and signals",
+ "author": "KhaiStimpson",
+ "state": "open",
+ "baseRef": "dev",
+ "headRef": "claude/contact-enrichment",
+ "headSha": "2baaca76d26ccd0b73159e1e9c11a97dc73c360d",
+ "mergeability": "MERGEABILITY_MERGEABLE",
+ "mergeState": "BLOCKED",
+ "labels": [
+  {
+   "name": "enhancement",
+   "color": "a2eeef"
+  },
+  {
+   "name": "needs review",
+   "color": "fbca04"
+  }
+ ],
+ "reviewers": [
+  {
+   "login": "andrew-reviewer",
+   "isRequested": true
+  },
+  {
+   "login": "sam-ops",
+   "verdict": "REVIEW_VERDICT_COMMENTED",
+   "hasVerdict": true
+  }
+ ],
+ "timeline": [
+  {
+   "id": "IC_1",
+   "kind": "TIMELINE_ITEM_KIND_COMMENT",
+   "author": "sam-ops",
+   "body": "Heads up: the **ABR GUID** needs to be in Key Vault before this ships. Is `Enrichment:AbrGuid` read anywhere at startup?",
+   "createdAt": "2026-07-19T09:12:00Z",
+   "url": "https://github.com/KhaiStimpson/andrew-crm/pull/58#issuecomment-1"
+  },
+  {
+   "id": "PRR_1",
+   "kind": "TIMELINE_ITEM_KIND_REVIEW",
+   "author": "sam-ops",
+   "body": "A couple of questions on the scheduler \u2014 see inline.",
+   "createdAt": "2026-07-19T11:40:00Z",
+   "url": "https://github.com/KhaiStimpson/andrew-crm/pull/58#pullrequestreview-1",
+   "verdict": "REVIEW_VERDICT_COMMENTED",
+   "reviewCommentCount": 2
+  },
+  {
+   "id": "IC_2",
+   "kind": "TIMELINE_ITEM_KIND_COMMENT",
+   "author": "KhaiStimpson",
+   "body": "Yes \u2014 it's optional; providers stay inert without it:\n\n```csharp\nif (string.IsNullOrWhiteSpace(guid)) return EnrichmentResult.Empty;\n```",
+   "createdAt": "2026-07-19T12:05:00Z",
+   "url": "https://github.com/KhaiStimpson/andrew-crm/pull/58#issuecomment-2"
+  }
+ ],
+ "commits": [
+  {
+   "sha": "9f1e2d3c4b5a69788796a5b4c3d2e1f00a1b2c3d",
+   "headline": "Design brief: contact data enrichment",
+   "message": "Design brief: contact data enrichment",
+   "author": "KhaiStimpson",
+   "authoredAt": "2026-07-18T22:10:00Z"
+  },
+  {
+   "sha": "4c8e1a7b2d9f3e6a5b0c7d8e9f1a2b3c4d5e6f70",
+   "headline": "Enrichment providers, ingestion pipeline and migrations",
+   "message": "Enrichment providers, ingestion pipeline and migrations\n\nAdds the IEnrichmentProvider seam, five providers and the ingestion service.",
+   "author": "KhaiStimpson",
+   "authoredAt": "2026-07-19T03:36:00Z"
+  },
+  {
+   "sha": "2baaca76d26ccd0b73159e1e9c11a97dc73c360d",
+   "headline": "Signals, scheduler and settings UI",
+   "message": "Signals, scheduler and settings UI",
+   "author": "KhaiStimpson",
+   "authoredAt": "2026-07-20T03:39:00Z"
+  }
+ ],
+ "checks": [
+  {
+   "name": "build",
+   "state": "CHECK_STATE_SUCCESS",
+   "detail": "SUCCESS",
+   "startedAt": "2026-07-20T03:40:00Z",
+   "completedAt": "2026-07-20T03:44:12Z",
+   "url": "https://github.com/KhaiStimpson/andrew-crm/actions/runs/1"
+  },
+  {
+   "name": "test",
+   "state": "CHECK_STATE_FAILURE",
+   "detail": "FAILURE",
+   "startedAt": "2026-07-20T03:40:00Z",
+   "completedAt": "2026-07-20T03:47:31Z",
+   "url": "https://github.com/KhaiStimpson/andrew-crm/actions/runs/2"
+  },
+  {
+   "name": "codeql",
+   "state": "CHECK_STATE_PENDING",
+   "detail": "IN_PROGRESS",
+   "startedAt": "2026-07-20T03:40:00Z",
+   "url": "https://github.com/KhaiStimpson/andrew-crm/actions/runs/3"
+  }
+ ],
+ "viewerLogin": "KhaiStimpson",
+ "lastReviewedSha": "4c8e1a7b2d9f3e6a5b0c7d8e9f1a2b3c4d5e6f70",
+ "url": "https://github.com/KhaiStimpson/andrew-crm/pull/58",
+ "createdAt": "2026-07-18T22:12:00Z"
+}

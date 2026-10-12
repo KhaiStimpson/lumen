@@ -49,6 +49,24 @@ public static class Converters
         _ => "Border.Strong",
     });
 
+    /// <summary>Check state ("success", "failure", "pending") → status dot. The tooltip and label carry it too.</summary>
+    public static readonly IValueConverter CheckToBrush = new ResourceConverter(state => state switch
+    {
+        "success" or "Success" => "Marker.Verified",
+        "failure" or "Failure" => "Severity.High",
+        "pending" or "Pending" => "Severity.Medium",
+        _ => "Border.Strong",
+    });
+
+    /// <summary>Walkthrough risk category → marker brush.</summary>
+    public static readonly IValueConverter RiskToBrush = new ResourceConverter(category => category switch
+    {
+        "Security" or "Concurrency" => "Marker.Correctness",
+        "BehaviourChange" => "Marker.Behaviour",
+        "MissingTests" => "Marker.Architecture",
+        _ => "Severity.Medium",
+    });
+
     public static readonly IValueConverter StrengthToWidth =
         new FuncValueConverter<double, double>(strength => Math.Round(strength * 56));
 

@@ -40,8 +40,8 @@ internal sealed class GrpcLikeReviewSource(FixtureReviewSource inner) : IReviewS
         }
     }
 
-    public Task<FileDiff> GetFileDiffAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken) =>
-        inner.GetFileDiffAsync(pullRequest, path, cancellationToken);
+    public Task<FileDiff> GetFileDiffAsync(GetFileDiffRequest request, CancellationToken cancellationToken) =>
+        inner.GetFileDiffAsync(request, cancellationToken);
 
     public Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken) =>
         inner.GetSourceFileAsync(pullRequest, path, cancellationToken);
@@ -74,6 +74,52 @@ internal sealed class GrpcLikeReviewSource(FixtureReviewSource inner) : IReviewS
 
     public Task<ReviewSettingsReply> UpdateReviewSettingsAsync(UpdateReviewSettingsRequest request, CancellationToken cancellationToken) =>
         inner.UpdateReviewSettingsAsync(request, cancellationToken);
+
+    public Task<Inbox> ListInboxAsync(bool refresh, CancellationToken cancellationToken) => inner.ListInboxAsync(refresh, cancellationToken);
+
+    public IAsyncEnumerable<Inbox> WatchInboxAsync(CancellationToken cancellationToken) => inner.WatchInboxAsync(cancellationToken);
+
+    public Task<InboxSettings> GetInboxSettingsAsync(CancellationToken cancellationToken) => inner.GetInboxSettingsAsync(cancellationToken);
+
+    public Task<InboxSettings> UpdateInboxSettingsAsync(InboxSettings settings, CancellationToken cancellationToken) =>
+        inner.UpdateInboxSettingsAsync(settings, cancellationToken);
+
+    public Task<PullRequestDetails> GetPullRequestDetailsAsync(PullRequestRef pullRequest, bool refresh, CancellationToken cancellationToken) =>
+        inner.GetPullRequestDetailsAsync(pullRequest, refresh, cancellationToken);
+
+    public Task<DiffRange> GetDiffRangeAsync(GetDiffRangeRequest request, CancellationToken cancellationToken) => inner.GetDiffRangeAsync(request, cancellationToken);
+
+    public Task<TimelineItem> PostIssueCommentAsync(PullRequestRef pullRequest, string body, CancellationToken cancellationToken) =>
+        inner.PostIssueCommentAsync(pullRequest, body, cancellationToken);
+
+    public Task<ReviewThread> ReplyToThreadAsync(PullRequestRef pullRequest, string threadId, string body, CancellationToken cancellationToken) =>
+        inner.ReplyToThreadAsync(pullRequest, threadId, body, cancellationToken);
+
+    public Task<ReviewThread> SetThreadResolvedAsync(PullRequestRef pullRequest, string threadId, bool resolved, CancellationToken cancellationToken) =>
+        inner.SetThreadResolvedAsync(pullRequest, threadId, resolved, cancellationToken);
+
+    public Task<PendingReview> GetPendingReviewAsync(PullRequestRef pullRequest, CancellationToken cancellationToken) =>
+        inner.GetPendingReviewAsync(pullRequest, cancellationToken);
+
+    public Task<PendingReview> AddPendingCommentAsync(AddPendingCommentRequest request, CancellationToken cancellationToken) =>
+        inner.AddPendingCommentAsync(request, cancellationToken);
+
+    public Task<PendingReview> UpdatePendingCommentAsync(PullRequestRef pullRequest, string commentId, string body, CancellationToken cancellationToken) =>
+        inner.UpdatePendingCommentAsync(pullRequest, commentId, body, cancellationToken);
+
+    public Task<PendingReview> DeletePendingCommentAsync(PullRequestRef pullRequest, string commentId, CancellationToken cancellationToken) =>
+        inner.DeletePendingCommentAsync(pullRequest, commentId, cancellationToken);
+
+    public Task<SubmitReviewReply> SubmitReviewAsync(SubmitReviewRequest request, CancellationToken cancellationToken) =>
+        inner.SubmitReviewAsync(request, cancellationToken);
+
+    public Task<Connections> SetCloudflareCredentialsAsync(string accountId, string apiToken, CancellationToken cancellationToken) =>
+        inner.SetCloudflareCredentialsAsync(accountId, apiToken, cancellationToken);
+
+    public Task<Connections> RemoveCloudflareCredentialsAsync(CancellationToken cancellationToken) => inner.RemoveCloudflareCredentialsAsync(cancellationToken);
+
+    public Task StartWalkthroughAsync(StartWalkthroughRequest request, CancellationToken cancellationToken) =>
+        inner.StartWalkthroughAsync(request, cancellationToken);
 
     public ValueTask DisposeAsync() => inner.DisposeAsync();
 }
