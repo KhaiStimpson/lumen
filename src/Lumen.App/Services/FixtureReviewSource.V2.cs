@@ -122,7 +122,7 @@ public sealed partial class FixtureReviewSource
         }
     }
 
-    private ThreadsUpdated ThreadsEvent() => new() { Threads = { _threads.Where(t => !t.Comments.All(c => c.IsPending)).Select(t => t.Clone()) } };
+    private ThreadsUpdated ThreadsEvent() => new() { Threads = { _threads.Select(t => t.Clone()) } };
 
     // ---------------------------------------------------------------- Inbox
 
@@ -281,7 +281,7 @@ public sealed partial class FixtureReviewSource
             OriginalStartLine = startLine,
             OriginalCommitSha = _details.HeadSha,
             CanReply = true,
-            CanResolve = true,
+            CanResolve = !pending,
             Comments =
             {
                 new ThreadComment
@@ -299,11 +299,7 @@ public sealed partial class FixtureReviewSource
             _threads.Add(thread);
         }
 
-        if (!pending)
-        {
-            Broadcast(new PullRequestEvent { ThreadsUpdated = ThreadsEvent() });
-        }
-
+        Broadcast(new PullRequestEvent { ThreadsUpdated = ThreadsEvent() });
         return thread;
     }
 
@@ -468,9 +464,14 @@ public sealed partial class FixtureReviewSource
         }
 
         SubmittedReviews.Add(request.Clone());
-        foreach (var comment in _threads.SelectMany(t => t.Comments))
+        foreach (var thread in _threads)
         {
-            comment.IsPending = false;
+            foreach (var comment in thread.Comments)
+            {
+                comment.IsPending = false;
+            }
+
+            thread.CanResolve = !thread.IsResolved;
         }
 
         _details.Timeline.Add(new TimelineItem

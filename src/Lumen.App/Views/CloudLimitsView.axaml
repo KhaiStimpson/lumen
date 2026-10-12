@@ -8,8 +8,53 @@
     <StackPanel Spacing="2">
       <TextBlock Classes="h3" Text="Cloud AI limits" />
       <TextBlock Classes="caption secondary" TextWrapping="Wrap"
-                 Text="What JEV and investigations may use. Each change applies to the next call." />
+                 Text="What the walkthrough, investigations and JEV may use. Each change applies to the next call." />
     </StackPanel>
+
+    <StackPanel Spacing="12" IsEnabled="{Binding IsLoaded}">
+      <TextBlock Classes="section" Text="WALKTHROUGH (FAST MODEL)" />
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="Model" />
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="A Workers AI model id. Saved when you leave the box." />
+        </StackPanel>
+        <TextBox Name="FastModelInput" Grid.Column="1" Width="240" MinHeight="32" VerticalAlignment="Center" VerticalContentAlignment="Center" FontFamily="{StaticResource CodeFont}" FontSize="12"
+                 Text="{Binding FastModelInput, UpdateSourceTrigger=LostFocus}" />
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="AI Gateway" />
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="Optional gateway id, for caching, logs and retention settings. Empty calls Workers AI directly." />
+        </StackPanel>
+        <TextBox Name="FastModelGatewayInput" Grid.Column="1" Width="240" MinHeight="32" VerticalAlignment="Center" VerticalContentAlignment="Center" FontFamily="{StaticResource CodeFont}" FontSize="12"
+                 Text="{Binding FastModelGatewayInput, UpdateSourceTrigger=LostFocus}" PlaceholderText="none" />
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto,28" ColumnSpacing="12">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="Time allowed per request" />
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="A slow answer is skipped; the review never waits on it." />
+        </StackPanel>
+        <NumericUpDown Name="FastModelTimeoutSeconds" Grid.Column="1" Classes="stepper" Value="{Binding FastModelTimeoutSeconds}" Minimum="5" Maximum="120" Increment="5" FormatString="0" />
+        <TextBlock Grid.Column="2" Classes="caption tertiary" Text="s" VerticalAlignment="Center" />
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto,28" ColumnSpacing="12">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="Largest diff sent" />
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="Beyond this, files are described by path and size only." />
+        </StackPanel>
+        <NumericUpDown Name="FastModelMaxDiffKb" Grid.Column="1" Classes="stepper" Value="{Binding FastModelMaxDiffKb}" Minimum="16" Maximum="4096" Increment="64" FormatString="0" />
+        <TextBlock Grid.Column="2" Classes="caption tertiary" Text="KB" VerticalAlignment="Center" />
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto,28" ColumnSpacing="12">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="body" Text="Requests per day" />
+          <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="A cap on fast-model requests across all pull requests." />
+        </StackPanel>
+        <NumericUpDown Name="FastModelDailyCap" Grid.Column="1" Classes="stepper" Value="{Binding FastModelDailyCap}" Minimum="0" Maximum="100000" Increment="50" FormatString="0" />
+      </Grid>
+    </StackPanel>
+
+    <Border Classes="divider" />
 
     <StackPanel Spacing="12" IsEnabled="{Binding IsLoaded}">
       <TextBlock Classes="section" Text="JEV" />

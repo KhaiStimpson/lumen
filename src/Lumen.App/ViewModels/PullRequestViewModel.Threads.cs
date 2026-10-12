@@ -60,7 +60,11 @@ public sealed partial class ThreadViewModel : ObservableObject
 
     public bool IsOutdated => Model.IsOutdated;
 
-    public bool IsOpen => !Model.IsResolved;
+    /// <summary>Part of the viewer's pending review: a draft only they can see until the review is submitted.</summary>
+    public bool IsPendingOnly => Model.Comments.Count > 0 && Model.Comments.All(c => c.IsPending);
+
+    /// <summary>Unresolved and visible to others (a pending draft isn't a conversation yet).</summary>
+    public bool IsOpen => !Model.IsResolved && !IsPendingOnly;
 
     public bool CanResolve => Model.CanResolve && !Model.IsResolved;
 
@@ -68,7 +72,7 @@ public sealed partial class ThreadViewModel : ObservableObject
 
     public bool CanReply => Model.CanReply;
 
-    public string StatusLabel => (IsResolved, IsOutdated) switch
+    public string StatusLabel => IsPendingOnly ? "Pending" : (IsResolved, IsOutdated) switch
     {
         (true, true) => "Resolved · outdated",
         (true, false) => "Resolved",

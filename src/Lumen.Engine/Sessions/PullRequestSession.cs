@@ -117,7 +117,8 @@ public sealed class PullRequestSession : IDisposable
 
         if (threadsChanged)
         {
-            Publish(new PullRequestEvent { ThreadsUpdated = Mapping.ProtoMapper.ToProto(state.Threads.Where(t => !t.IsPendingOnly)) });
+            // The viewer's own pending threads are included: they show inline, marked pending, as on github.com.
+            Publish(new PullRequestEvent { ThreadsUpdated = Mapping.ProtoMapper.ToProto(state.Threads) });
         }
 
         if (pendingChanged)

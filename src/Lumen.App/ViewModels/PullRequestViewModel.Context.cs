@@ -44,7 +44,9 @@ public sealed partial class PullRequestViewModel
 
     public bool HasDetails => Details is not null;
 
-    public string Description => Details?.Body ?? "";
+    public string Description => Details?.Body is { Length: > 0 } body ? body : _snapshotBody;
+
+    private string _snapshotBody = "";
 
     public bool HasDescription => Description.Trim().Length > 0;
 

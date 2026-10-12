@@ -105,7 +105,7 @@ public static partial class MarkdownParser
                 var checks = new List<bool?>();
                 for (; i < lines.Length; i++)
                 {
-                    if (ListItem().Match(lines[i]) is { Success: true } item)
+                    if (ListItem().Match(lines[i]) is { Success: true } item && char.IsDigit(item.Groups[2].Value[0]) == ordered)
                     {
                         var text = item.Groups[3].Value;
                         bool? check = null;
