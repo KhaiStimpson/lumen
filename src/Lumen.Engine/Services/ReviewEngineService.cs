@@ -16,6 +16,7 @@ public sealed partial class ReviewEngineService(
     ReviewSettingsStore reviewSettings,
     Inbox.InboxService inbox,
     ReviewActions actions,
+    Walkthroughs.WalkthroughCoordinator walkthroughs,
     TimeProvider time) : ReviewEngine.ReviewEngineBase
 {
     private static readonly string Version =
@@ -442,6 +443,45 @@ public sealed partial class ReviewEngineService(
         };
         var (review, head) = await Run(() => actions.SubmitAsync(session, reviewEvent, request.Body, context.CancellationToken)).ConfigureAwait(false);
         return new SubmitReviewReply { Url = review.Url, HeadSha = head };
+    }
+
+    // ---------------------------------------------------------------- v2: fast model and walkthrough (M7, M8)
+
+    public override async Task<Connections> SetCloudflareCredentials(SetCloudflareCredentialsRequest request, ServerCallContext context)
+    {
+        try
+        {
+            connections.SetCloudflareCredentials(request.AccountId, request.ApiToken);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
+        }
+        catch (PlatformNotSupportedException ex)
+        {
+            throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message));
+        }
+
+        return await connections.GetAsync(context.CancellationToken).ConfigureAwait(false);
+    }
+
+    public override async Task<Connections> RemoveCloudflareCredentials(RemoveCloudflareCredentialsRequest request, ServerCallContext context)
+    {
+        connections.RemoveCloudflareCredentials();
+        return await connections.GetAsync(context.CancellationToken).ConfigureAwait(false);
+    }
+
+    public override Task<StartWalkthroughReply> StartWalkthrough(StartWalkthroughRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        if (session.Snapshot is null)
+        {
+            throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pull request is still loading."));
+        }
+
+        var since = request.Since is { FromSha.Length: > 0 } range ? range.FromSha : null;
+        walkthroughs.Start(session, since, request.Refresh);
+        return Task.FromResult(new StartWalkthroughReply());
     }
 
     private static NewReviewComment NewComment(

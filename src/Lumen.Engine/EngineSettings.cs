@@ -6,8 +6,11 @@ namespace Lumen.Engine;
 
 public sealed record JevSettings
 {
-    /// <summary>Takes effect only once an OpenRouter key is stored; the key itself lives in the credential store.</summary>
-    public bool Enabled { get; init; } = true;
+    /// <summary>
+    /// Legacy (plan v2): JEV is kept but off by default, and only takes part in analysis when this is on at engine
+    /// start and an OpenRouter key is stored. The rule-based policy is the floor either way.
+    /// </summary>
+    public bool Enabled { get; init; }
 
     public string Model { get; init; } = "typesafe/jev-1.13";
 
