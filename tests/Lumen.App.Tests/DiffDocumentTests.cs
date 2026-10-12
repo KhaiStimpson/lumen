@@ -112,9 +112,15 @@ public sealed class DiffDocumentTests
         Assert.Equal(new DiffRow(DiffRowKind.Removed, 2, 0), code[1]);
 
         // Between the hunks the old side is one line behind (one removed, two added); after the last it stays so.
-        Assert.Equal(new DiffRow(DiffRowKind.Context, 4, 5), code.Single(r => r.NewNumber == 5));
-        Assert.Equal(new DiffRow(DiffRowKind.Context, 9, 10), code.Single(r => r.NewNumber == 10));
-        Assert.Equal(new DiffRow(DiffRowKind.Context, 13, 14), code.Single(r => r.NewNumber == 14));
+        Assert.Equal(new DiffRow(DiffRowKind.Context, 4, 5, IsOutsideDiff: true), code.Single(r => r.NewNumber == 5));
+        Assert.Equal(new DiffRow(DiffRowKind.Context, 9, 10, IsOutsideDiff: true), code.Single(r => r.NewNumber == 10));
+        Assert.Equal(new DiffRow(DiffRowKind.Context, 13, 14, IsOutsideDiff: true), code.Single(r => r.NewNumber == 14));
+
+        // Only diff lines take comments, even when the whole file is shown (plan v2 M3).
+        Assert.Null(DiffDocument.CommentTarget(code.Single(r => r.NewNumber == 5)));
+        Assert.Equal((LineSide.Right, 4), DiffDocument.CommentTarget(code.Single(r => r.NewNumber == 4)));
+        Assert.False(doc.Contains(LineSide.Right, 5));
+        Assert.True(doc.Contains(LineSide.Right, 11));
 
         var lines = doc.Text.Split('\n');
         Assert.Equal(doc.Rows.Count, lines.Length);
@@ -124,6 +130,29 @@ public sealed class DiffDocumentTests
         // Cards can now sit under lines outside the hunks.
         Assert.Equal(doc.DocumentLineForNewLine(7) + 1, doc.CardLine("p2"));
         Assert.Equal(doc.DocumentLineForNewLine(3) + 1, doc.CardLine("p1"));
+    }
+
+    [Fact]
+    public void CommentTargetsAreOnTheSideOfTheLine()
+    {
+        var doc = DiffDocument.Build(Sample(), NoCards);
+
+        Assert.Equal((LineSide.Left, 2), DiffDocument.CommentTarget(doc.Rows.Single(r => r.Kind == DiffRowKind.Removed)));
+        Assert.Equal((LineSide.Right, 2), DiffDocument.CommentTarget(doc.Rows.First(r => r.Kind == DiffRowKind.Added)));
+        Assert.Null(DiffDocument.CommentTarget(doc.Rows[0]));
+        Assert.True(doc.Contains(LineSide.Left, 2));
+        Assert.True(doc.Contains(LineSide.Left, 1));
+        Assert.False(doc.Contains(LineSide.Left, 5));
+        Assert.Equal(doc.DocumentLineForOldLine(2), doc.DocumentLineFor(LineSide.Left, 2));
+    }
+
+    [Fact]
+    public void BaseSideAndTopOfFileAnchors()
+    {
+        var doc = DiffDocument.Build(Sample(), [new CardAnchor("old", LineSide.Left, 2), new CardAnchor("top", LineSide.Right, 0)]);
+
+        Assert.Equal(1, doc.CardLine("top"));
+        Assert.Equal(doc.DocumentLineForOldLine(2) + 1, doc.CardLine("old"));
     }
 
     [Fact]
@@ -138,8 +167,8 @@ public sealed class DiffDocumentTests
 
         Assert.Equal(
             [
-                new DiffRow(DiffRowKind.Context, 1, 1), new DiffRow(DiffRowKind.Context, 2, 2),
-                new DiffRow(DiffRowKind.Removed, 3, 0), new DiffRow(DiffRowKind.Context, 4, 3),
+                new DiffRow(DiffRowKind.Context, 1, 1, IsOutsideDiff: true), new DiffRow(DiffRowKind.Context, 2, 2, IsOutsideDiff: true),
+                new DiffRow(DiffRowKind.Removed, 3, 0), new DiffRow(DiffRowKind.Context, 4, 3, IsOutsideDiff: true),
             ],
             doc.Rows);
         Assert.Equal("one\ntwo\ngone\nthree", doc.Text);

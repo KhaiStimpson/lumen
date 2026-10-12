@@ -17,7 +17,8 @@ public enum DiffRowKind
     Filler,
 }
 
-public sealed record DiffRow(DiffRowKind Kind, int OldNumber, int NewNumber, string? CardId = null);
+/// <param name="IsOutsideDiff">Full file view: an unchanged line between hunks. GitHub can't attach comments there.</param>
+public sealed record DiffRow(DiffRowKind Kind, int OldNumber, int NewNumber, string? CardId = null, bool IsOutsideDiff = false);
 
 /// <summary>Which side of the diff a line number refers to. Right is the head; Left is the base (deleted lines).</summary>
 public enum LineSide
@@ -113,8 +114,8 @@ public sealed class DiffDocument
     /// <summary>The line on <paramref name="side"/> is in the diff (comments may only attach there).</summary>
     public bool Contains(LineSide side, int line) =>
         side == LineSide.Left
-            ? _oldLineToDocumentLine.TryGetValue(line, out var documentLine) && RowAt(documentLine)!.Kind != DiffRowKind.Added
-            : _newLineToDocumentLine.ContainsKey(line);
+            ? _oldLineToDocumentLine.TryGetValue(line, out var documentLine) && RowAt(documentLine) is { Kind: not DiffRowKind.Added, IsOutsideDiff: false }
+            : _newLineToDocumentLine.TryGetValue(line, out var newDocumentLine) && RowAt(newDocumentLine) is { IsOutsideDiff: false };
 
     /// <summary>
     /// The side and line a document row offers for a comment: a removed line is on the base side, anything else with a
@@ -122,6 +123,7 @@ public sealed class DiffDocument
     /// </summary>
     public static (LineSide Side, int Line)? CommentTarget(DiffRow? row) => row switch
     {
+        { IsOutsideDiff: true } => null,
         { Kind: DiffRowKind.Removed, OldNumber: > 0 } => (LineSide.Left, row.OldNumber),
         { Kind: DiffRowKind.Added or DiffRowKind.Context, NewNumber: > 0 } => (LineSide.Right, row.NewNumber),
         _ => null,
@@ -170,9 +172,9 @@ public sealed class DiffDocument
             }
         }
 
-        void AppendCode(DiffRowKind kind, int oldNumber, int newNumber, string content)
+        void AppendCode(DiffRowKind kind, int oldNumber, int newNumber, string content, bool outsideDiff = false)
         {
-            Append(new DiffRow(kind, oldNumber, newNumber), content.Replace('\t', ' '));
+            Append(new DiffRow(kind, oldNumber, newNumber, IsOutsideDiff: outsideDiff), content.Replace('\t', ' '));
 
             // A base-side card sits under the removed (or unchanged) line it was written on.
             if (oldNumber > 0 && kind != DiffRowKind.Added && cardsByOldLine.Remove(oldNumber, out var oldIds))
@@ -208,7 +210,7 @@ public sealed class DiffDocument
                 var gapEnd = newNumbers.Count > 0 ? newNumbers.Min() - 1 : hunk.NewStart;
                 for (; nextNew <= gapEnd; nextNew++)
                 {
-                    AppendCode(DiffRowKind.Context, nextNew + delta, nextNew, head[nextNew - 1]);
+                    AppendCode(DiffRowKind.Context, nextNew + delta, nextNew, head[nextNew - 1], outsideDiff: true);
                 }
             }
             else
@@ -238,7 +240,7 @@ public sealed class DiffDocument
         {
             for (; nextNew <= head.Length; nextNew++)
             {
-                AppendCode(DiffRowKind.Context, nextNew + delta, nextNew, head[nextNew - 1]);
+                AppendCode(DiffRowKind.Context, nextNew + delta, nextNew, head[nextNew - 1], outsideDiff: true);
             }
         }
 
