@@ -5,6 +5,8 @@ namespace Lumen.App.Tests;
 
 public sealed class DiffDocumentTests
 {
+    private static readonly CardAnchor[] NoCards = [];
+
     private static FileDiff Sample()
     {
         var first = new DiffHunk { Header = "@@ -1,3 +1,4 @@ class Foo" };
@@ -77,7 +79,7 @@ public sealed class DiffDocumentTests
     [Fact]
     public void DocumentLineForNewLineFallsForwardToNextShownLine()
     {
-        var doc = DiffDocument.Build(Sample(), []);
+        var doc = DiffDocument.Build(Sample(), NoCards);
 
         Assert.Equal(2, doc.DocumentLineForNewLine(1));
         Assert.Equal(4, doc.DocumentLineForNewLine(2));
@@ -132,7 +134,7 @@ public sealed class DiffDocumentTests
         var diff = new FileDiff { Path = "a.txt" };
         diff.Hunks.Add(hunk);
 
-        var doc = DiffDocument.Build(diff, [], "one\ntwo\nthree");
+        var doc = DiffDocument.Build(diff, NoCards, "one\ntwo\nthree");
 
         Assert.Equal(
             [
@@ -146,9 +148,9 @@ public sealed class DiffDocumentTests
     [Fact]
     public void FullFileFallsBackToHunksWhenHeadTextIsTooShort()
     {
-        var doc = DiffDocument.Build(Sample(), [], "a\nB");
+        var doc = DiffDocument.Build(Sample(), NoCards, "a\nB");
 
-        Assert.Equal(DiffDocument.Build(Sample(), []).Text, doc.Text);
+        Assert.Equal(DiffDocument.Build(Sample(), NoCards).Text, doc.Text);
         Assert.Equal(DiffRowKind.HunkHeader, doc.Rows[0].Kind);
     }
 

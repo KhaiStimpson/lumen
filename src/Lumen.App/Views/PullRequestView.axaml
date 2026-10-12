@@ -34,14 +34,49 @@
               </TextBlock>
             </StackPanel>
             <TextBlock Classes="caption tertiary" Text="{Binding BranchLabel}" TextTrimming="CharacterEllipsis" />
+            <StackPanel Orientation="Horizontal" Spacing="7" IsVisible="{Binding MergeabilityLabel, Converter={x:Static views:Converters.NotEmpty}}" Margin="0,2,0,0">
+              <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{Binding MergeabilityKind, Converter={x:Static views:Converters.CheckToBrush}}" />
+              <TextBlock Name="Mergeability" Classes="caption" Text="{Binding MergeabilityLabel}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <ItemsControl Name="Labels" ItemsSource="{Binding Labels}" IsVisible="{Binding Labels.Count, Converter={x:Static views:Converters.IsPositive}}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel ItemSpacing="4" LineSpacing="4" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:LabelViewModel">
+                  <Border CornerRadius="{StaticResource Radius.Pill}" Padding="7,1" BorderThickness="1" BorderBrush="{Binding Color}">
+                    <TextBlock Text="{Binding Name}" FontSize="10.5" FontWeight="Medium" />
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <ItemsControl Name="Reviewers" ItemsSource="{Binding Reviewers}" IsVisible="{Binding Reviewers.Count, Converter={x:Static views:Converters.IsPositive}}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ReviewerViewModel">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="7" Margin="0,2">
+                    <Border Width="16" Height="16" CornerRadius="8" Background="{DynamicResource Surface.Hover}">
+                      <TextBlock Text="{Binding Initial}" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Grid.Column="1" Classes="caption" Text="{Binding Login}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Classes="caption tertiary" Text="{Binding StateLabel}" VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
           </StackPanel>
 
           <Border Grid.Row="1" Classes="divider" />
 
-          <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="18,14,18,8">
-            <TextBlock Classes="h3" Text="Files changed" />
-            <TextBlock Grid.Column="1" Classes="caption" Text="{Binding ViewedSummary}" />
-          </Grid>
+          <StackPanel Grid.Row="2" Margin="18,14,18,8" Spacing="6">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="h3" Text="Files changed" />
+              <TextBlock Grid.Column="1" Classes="caption" Text="{Binding ViewedSummary}" />
+            </Grid>
+            <ToggleButton Name="GroupOrder" Classes="ghost chip" IsChecked="{Binding GroupOrder}" IsVisible="{Binding CanUseGroupOrder}"
+                          HorizontalAlignment="Left" Padding="8,2" ToolTip.Tip="Order files by the walkthrough's reading order">
+              <TextBlock Text="Reading order" FontSize="11.5" />
+            </ToggleButton>
+          </StackPanel>
 
           <TreeView Grid.Row="3" Name="FileTree" ItemsSource="{Binding Tree}" SelectedItem="{Binding SelectedNode}"
                     Margin="6,0,6,0" Background="Transparent">
@@ -58,7 +93,7 @@
             </TreeView.Styles>
             <TreeView.ItemTemplate>
               <TreeDataTemplate DataType="vm:FileTreeNode" ItemsSource="{Binding Children}">
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,3,6,3">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,3,6,3">
                   <Path Data="{StaticResource Icon.Folder}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke"
                         Width="12" Height="12" Margin="0,0,8,0" IsVisible="{Binding IsFolder}" />
                   <CheckBox Classes="viewed" IsVisible="{Binding !IsFolder}"
@@ -70,7 +105,12 @@
                   <Path Grid.Column="2" Data="{StaticResource Icon.Deviation}" Fill="{DynamicResource Marker.Deviation}"
                         Width="10" Height="10" Stretch="Uniform" Margin="6,0,6,0"
                         IsVisible="{Binding File.HasReviewPoints, FallbackValue=False}" />
-                  <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" IsVisible="{Binding !IsFolder}">
+                  <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="3" Margin="0,0,6,0" VerticalAlignment="Center"
+                              IsVisible="{Binding File.HasThreads, FallbackValue=False}" ToolTip.Tip="Open review threads">
+                    <Path Data="{StaticResource Icon.Comment}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="10" Height="10" />
+                    <TextBlock Classes="caption" FontSize="11" Text="{Binding File.ThreadCountLabel, FallbackValue=''}" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" IsVisible="{Binding !IsFolder}">
                     <TextBlock Classes="added" Text="{Binding File.AdditionsLabel, FallbackValue=''}" />
                     <TextBlock Classes="removed" Text="{Binding File.DeletionsLabel, FallbackValue=''}" />
                   </StackPanel>
@@ -110,8 +150,46 @@
 
       <!-- ===================== Center: code ===================== -->
       <Grid Grid.Column="2" Name="Center" RowDefinitions="Auto,Auto,*" IsVisible="{Binding !IsExamining}">
+        <!-- Tabs: Files (the review), Conversation, Commits, Checks (plan v2 M2) -->
+        <Grid ColumnDefinitions="*,Auto" Margin="18,10,18,0">
+          <StackPanel Orientation="Horizontal" Spacing="2">
+            <RadioButton Name="TabFiles" Classes="tab" GroupName="PrTab" Content="Files"
+                         IsChecked="{Binding Tab, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Files}" />
+            <RadioButton Name="TabConversation" Classes="tab" GroupName="PrTab" Content="{Binding ConversationLabel}"
+                         IsChecked="{Binding Tab, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Conversation}" />
+            <RadioButton Name="TabCommits" Classes="tab" GroupName="PrTab" Content="{Binding CommitsLabel}"
+                         IsChecked="{Binding Tab, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Commits}" />
+            <RadioButton Name="TabChecks" Classes="tab" GroupName="PrTab"
+                         IsChecked="{Binding Tab, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Checks}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{Binding ChecksSummaryKind, Converter={x:Static views:Converters.CheckToBrush}}"
+                         IsVisible="{Binding ChecksSummaryKind, Converter={x:Static views:Converters.NotEmpty}}" />
+                <TextBlock Text="{Binding ChecksLabel}" />
+              </StackPanel>
+            </RadioButton>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+            <Ellipse Width="6" Height="6" Fill="{DynamicResource Accent}" IsVisible="{Binding IsAnalysing}" Name="AnalysingDot" VerticalAlignment="Center" />
+            <TextBlock Classes="caption tertiary" Text="{Binding Status}" MaxWidth="340" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          </StackPanel>
+        </Grid>
+
+        <!-- New commits were pushed while open -->
+        <Border Name="NewHeadBanner" Grid.Row="1" Background="{DynamicResource Accent.Soft}" CornerRadius="{StaticResource Radius.Card}"
+                Margin="16,8,16,0" Padding="14,8,8,8" IsVisible="{Binding NewHeadLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding NewHeadLabel}" />
+            <Button Grid.Column="1" Classes="primary" Content="Reload" Command="{Binding RefreshCommand}" />
+          </Grid>
+        </Border>
+
+        <views:ConversationView Grid.Row="2" Name="ConversationTab" IsVisible="{Binding IsConversationTab}" />
+        <views:CommitsView Grid.Row="2" Name="CommitsTab" IsVisible="{Binding IsCommitsTab}" />
+        <views:ChecksView Grid.Row="2" Name="ChecksTab" IsVisible="{Binding IsChecksTab}" />
+
+        <Grid Grid.Row="2" Name="FilesTab" RowDefinitions="Auto,Auto,Auto,*" IsVisible="{Binding IsFilesTab}">
         <!-- Guided review header -->
-        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="22,14,22,10">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="22,12,22,8">
           <Grid ColumnDefinitions="Auto,Auto,Auto" ClipToBounds="True">
             <TextBlock Classes="h2" Text="{Binding SelectedFile.Name, FallbackValue='Loading…'}" TextTrimming="CharacterEllipsis" />
             <Border Grid.Column="1" Classes="pill" Margin="10,0,8,0" VerticalAlignment="Center"
@@ -147,9 +225,22 @@
               <Path Data="{StaticResource Icon.ChevronRight}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="12" Height="12" />
             </Button>
           </StackPanel>
-          <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="7" HorizontalAlignment="Right" Margin="0,4,2,0">
-            <Ellipse Width="6" Height="6" Fill="{DynamicResource Accent}" IsVisible="{Binding IsAnalysing}" Name="AnalysingDot" VerticalAlignment="Center" />
-            <TextBlock Classes="caption tertiary" Text="{Binding Status}" MaxWidth="340" TextTrimming="CharacterEllipsis" />
+          <!-- Scope and view options -->
+          <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" Margin="0,6,2,0">
+            <ToggleButton Name="SinceLastReview" Classes="ghost chip" IsChecked="{Binding ShowSinceLastReview}" IsEnabled="{Binding CanShowSinceLastReview}"
+                          ToolTip.Tip="{Binding LastReviewedLabel}" Padding="8,2">
+              <TextBlock Text="Since last review" FontSize="11.5" />
+            </ToggleButton>
+            <ToggleButton Name="IgnoreWhitespace" Classes="ghost chip" IsChecked="{Binding IgnoreWhitespace}" Padding="8,2"
+                          ToolTip.Tip="Hide whitespace-only changes (W)">
+              <TextBlock Text="Ignore whitespace" FontSize="11.5" />
+            </ToggleButton>
+            <ToggleButton Name="SplitView" Classes="ghost chip" IsChecked="{Binding IsSplitView}" Padding="8,2" ToolTip.Tip="Side by side (S)">
+              <StackPanel Orientation="Horizontal" Spacing="5">
+                <Path Data="{StaticResource Icon.Split}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="11" Height="11" VerticalAlignment="Center" />
+                <TextBlock Text="Split" FontSize="11.5" />
+              </StackPanel>
+            </ToggleButton>
           </StackPanel>
         </Grid>
 
@@ -163,9 +254,46 @@
           </Grid>
         </Border>
 
-        <Border Grid.Row="2" Classes="card" Margin="16,0,16,16" ClipToBounds="True">
+        <StackPanel Grid.Row="2" Spacing="8" Margin="16,0,16,8">
+          <!-- Limited to a commit, a range, or since last review -->
+          <Border Name="ScopeBanner" Background="{DynamicResource Surface.Selected}" CornerRadius="{StaticResource Radius.Card}" Padding="14,7,8,7"
+                  IsVisible="{Binding HasScope}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+              <Path Data="{StaticResource Icon.Commit}" Stroke="{DynamicResource Accent}" Classes="stroke" Width="13" Height="13" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" Spacing="1">
+                <TextBlock FontSize="12" FontWeight="Medium" Text="{Binding ScopeLabel}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="caption" Text="{Binding ScopeNote}" IsVisible="{Binding ScopeNote, Converter={x:Static ObjectConverters.IsNotNull}}" TextWrapping="Wrap" />
+              </StackPanel>
+              <Button Grid.Column="2" Classes="link" Content="Show all changes" Command="{Binding ClearScopeCommand}" />
+            </Grid>
+          </Border>
+
+          <!-- Find in file (Ctrl+F) -->
+          <Border Name="FindBar" Classes="card" Padding="8,5" IsVisible="{Binding IsFindOpen}">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+              <Path Data="{StaticResource Icon.Search}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="12" Height="12" VerticalAlignment="Center" Margin="4,0" />
+              <TextBox Name="FindBox" Classes="find" Grid.Column="1" Text="{Binding FindQuery}" PlaceholderText="Find in this file" MinHeight="28"
+                       VerticalContentAlignment="Center" BorderThickness="0" Background="Transparent" />
+              <TextBlock Name="FindStatus" Grid.Column="2" Classes="caption" Text="{Binding FindStatus}" VerticalAlignment="Center" />
+              <Button Grid.Column="3" Classes="ghost" Padding="6" Command="{Binding FindPreviousCommand}" ToolTip.Tip="Previous (Shift+Enter)">
+                <Path Data="{StaticResource Icon.ChevronLeft}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="10" Height="10" />
+              </Button>
+              <Button Grid.Column="4" Classes="ghost" Padding="6" Command="{Binding FindNextCommand}" ToolTip.Tip="Next (Enter)">
+                <Path Data="{StaticResource Icon.ChevronRight}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="10" Height="10" />
+              </Button>
+              <Button Grid.Column="5" Classes="ghost" Padding="6" Command="{Binding CloseFindCommand}" ToolTip.Tip="Close (Esc)">
+                <Path Data="{StaticResource Icon.Close}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="10" Height="10" />
+              </Button>
+            </Grid>
+          </Border>
+        </StackPanel>
+
+        <Border Grid.Row="3" Classes="card" Margin="16,0,16,16" ClipToBounds="True">
           <Panel>
-            <diff:DiffEditor Name="Editor" Diff="{Binding CurrentDiff}" Markers="{Binding Markers}" FocusRange="{Binding FocusRange}" />
+            <diff:DiffEditor Name="Editor" Diff="{Binding CurrentDiff}" Markers="{Binding Markers}" FocusRange="{Binding FocusRange}"
+                             FindMatches="{Binding FindMatches}" CurrentFindMatch="{Binding CurrentFindMatch}" IsVisible="{Binding !IsSplitView}" />
+            <diff:SplitDiffView Name="SplitEditor" Diff="{Binding CurrentDiff}" Markers="{Binding Markers}" FocusRange="{Binding FocusRange}"
+                                FindMatches="{Binding FindMatches}" CurrentFindMatch="{Binding CurrentFindMatch}" IsVisible="{Binding IsSplitView}" />
             <!-- Mechanical file without a diff in the fixture, or still loading -->
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="6"
                         IsVisible="{Binding CurrentDiff.IsEmpty, FallbackValue=True}">
@@ -176,7 +304,7 @@
           </Panel>
         </Border>
 
-        <!-- Error banner -->
+          <!-- Error banner -->
         <Border Grid.Row="1" Margin="32" VerticalAlignment="Top" Classes="card" Padding="16,12"
                 BorderBrush="{DynamicResource Severity.High}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}">
           <StackPanel Spacing="4">
@@ -186,15 +314,19 @@
             <Button Classes="subtle" Content="Retry" Command="{Binding RefreshCommand}" HorizontalAlignment="Left" Margin="0,6,0,0" />
           </StackPanel>
         </Border>
+        </Grid>
       </Grid>
 
       <!-- ===================== Right: review focus / precedent / patterns ===================== -->
       <Border Grid.Column="4" Name="RightPane" Classes="pane" BorderThickness="1,1,0,0" CornerRadius="10,0,0,0" IsVisible="{Binding !IsExamining}">
+        <Grid RowDefinitions="*,Auto">
         <ScrollViewer>
           <StackPanel Margin="18,18,18,18" Spacing="22">
+            <views:WalkthroughView Name="Walkthrough" />
+
             <StackPanel Spacing="8">
               <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Classes="h3" Text="Review focus" />
+                <TextBlock Classes="h3" Text="Review points" />
                 <TextBlock Grid.Column="1" Classes="caption" Text="{Binding ReviewFocusLabel}" />
               </Grid>
               <TextBlock Classes="caption tertiary" TextWrapping="Wrap" IsVisible="{Binding IsAnalysing}"
@@ -299,10 +431,21 @@
                 <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
                   <Border Classes="kbd"><TextBlock Text="X" /></Border><TextBlock Classes="caption" Text="full file" />
                 </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
+                  <Border Classes="kbd"><TextBlock Text="N" /></Border><TextBlock Classes="caption" Text="next thread" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
+                  <Border Classes="kbd"><TextBlock Text="R" /></Border><TextBlock Classes="caption" Text="review" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
+                  <Border Classes="kbd"><TextBlock Text="Ctrl K" /></Border><TextBlock Classes="caption" Text="commands" />
+                </StackPanel>
               </WrapPanel>
             </StackPanel>
           </StackPanel>
         </ScrollViewer>
+        <views:ReviewTrayView Grid.Row="1" Name="ReviewTray" />
+        </Grid>
       </Border>
 
       <!-- ===================== Examine mode: replaces center + right ===================== -->

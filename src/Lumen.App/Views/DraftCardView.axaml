@@ -1,0 +1,64 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:md="using:Lumen.App.Markdown"
+             x:Class="Lumen.App.Views.DraftCardView"
+             x:DataType="vm:DraftCardContext"
+             FontFamily="{StaticResource UiFont}">
+  <!-- Comment anywhere (plan v2 M3): Ctrl+Enter adds to the review, Ctrl+Shift+Enter posts at once, Esc cancels. -->
+  <Border Name="Card" Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Accent}" BorderThickness="1"
+          CornerRadius="{StaticResource Radius.Card}" Padding="14,10,14,12">
+    <StackPanel Spacing="8">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+        <Path Data="{StaticResource Icon.Comment}" Stroke="{DynamicResource Accent}" Classes="stroke" Width="13" Height="13" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center">
+          <Run Text="Comment on " /><Run Text="{Binding Draft.RangeLabel}" />
+        </TextBlock>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+          <Button Name="SuggestChange" Classes="ghost" Padding="8,3" IsVisible="{Binding Draft.CanSuggest}"
+                  Command="{Binding PullRequest.SuggestChangeCommand}" CommandParameter="{Binding Draft}"
+                  ToolTip.Tip="Insert a suggestion block with these lines">
+            <TextBlock Text="Suggest change" FontSize="12" />
+          </Button>
+          <Border Classes="segmented">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+              <RadioButton Classes="segment" Content="Write" IsChecked="{Binding !Draft.IsPreview, Mode=OneWay}"
+                           Command="{Binding PullRequest.TogglePreviewCommand}" CommandParameter="{Binding Draft}" IsEnabled="{Binding Draft.IsPreview}" />
+              <RadioButton Name="PreviewTab" Classes="segment" Content="Preview" IsChecked="{Binding Draft.IsPreview, Mode=OneWay}"
+                           Command="{Binding PullRequest.TogglePreviewCommand}" CommandParameter="{Binding Draft}" IsEnabled="{Binding !Draft.IsPreview}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Grid>
+
+      <TextBox Name="Composer" Classes="composer" Text="{Binding Draft.Body}" AcceptsReturn="True" TextWrapping="Wrap"
+               MinHeight="84" MaxHeight="260" FontSize="12.5" PlaceholderText="Leave a comment (Markdown)"
+               IsVisible="{Binding !Draft.IsPreview}" />
+      <Border Padding="2,4" IsVisible="{Binding Draft.IsPreview}" MinHeight="40">
+        <md:MarkdownView Markdown="{Binding Draft.Body}" SuggestionBase="{Binding Draft.SuggestionBase}" Path="{Binding Draft.Path}" />
+      </Border>
+
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="caption" VerticalAlignment="Center" TextWrapping="Wrap"
+                   Text="{Binding Draft.Error, TargetNullValue='Nothing is sent until you choose.'}" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <Button Classes="ghost" Content="Cancel" Command="{Binding PullRequest.CancelDraftCommand}" CommandParameter="{Binding Draft}" />
+          <Button Name="PostNow" Classes="subtle" Command="{Binding PullRequest.PostDraftNowCommand}" CommandParameter="{Binding Draft}"
+                  IsEnabled="{Binding !Draft.IsBusy}" ToolTip.Tip="Post this comment on its own, now (Ctrl+Shift+Enter)">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <TextBlock Text="Post now" />
+              <TextBlock Text="Ctrl ⇧ ↵" FontSize="10.5" Opacity="0.7" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Name="AddToReview" Classes="primary" Command="{Binding PullRequest.AddDraftToReviewCommand}" CommandParameter="{Binding Draft}"
+                  IsEnabled="{Binding !Draft.IsBusy}" ToolTip.Tip="Add to your pending review (Ctrl+Enter)">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <TextBlock Text="Add to review" Foreground="{DynamicResource Accent.OnAccent}" />
+              <TextBlock Text="Ctrl ↵" FontSize="10.5" Opacity="0.75" Foreground="{DynamicResource Accent.OnAccent}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>

@@ -1,0 +1,93 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             xmlns:md="using:Lumen.App.Markdown"
+             xmlns:diff="using:Lumen.App.Diff"
+             x:Class="Lumen.App.Views.ThreadCardView"
+             x:DataType="vm:ThreadCardContext"
+             FontFamily="{StaticResource UiFont}">
+  <!-- A review thread from GitHub, under its line (plan v2 M4). Resolved threads start collapsed. -->
+  <Border Name="Card" Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Border.Strong}" BorderThickness="1"
+          Classes.current="{Binding Thread.IsCurrent}" CornerRadius="{StaticResource Radius.Card}" ClipToBounds="True">
+    <Border.Styles>
+      <Style Selector="Border#Card.current">
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+      </Style>
+    </Border.Styles>
+    <StackPanel>
+      <!-- Header: always visible -->
+      <Button Name="ToggleThread" Classes="row" Padding="12,8" CornerRadius="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+              Command="{Binding PullRequest.ToggleThreadCommand}" CommandParameter="{Binding Thread}">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+          <Path Data="{StaticResource Icon.Comment}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="13" Height="13" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+            <Run Text="{Binding Thread.FirstAuthor}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Thread.Summary}" Foreground="{DynamicResource Text.Secondary}" />
+          </TextBlock>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <TextBlock Classes="caption tertiary" Text="{Binding Thread.ReplyCountLabel}" VerticalAlignment="Center" />
+            <Border Classes="pill" IsVisible="{Binding Thread.IsOutdated}"><TextBlock Text="Outdated" /></Border>
+            <Border Classes="pill open" IsVisible="{Binding Thread.IsResolved}"><TextBlock Text="Resolved" /></Border>
+            <Path Data="{StaticResource Icon.ChevronDown}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="10" Height="10"
+                  IsVisible="{Binding Thread.IsCollapsed}" />
+          </StackPanel>
+        </Grid>
+      </Button>
+
+      <StackPanel IsVisible="{Binding !Thread.IsCollapsed}">
+        <!-- Outdated: the code it was written on -->
+        <Border IsVisible="{Binding Thread.IsOutdated}" Margin="12,0,12,6" CornerRadius="6" Background="{DynamicResource Surface.Sunken}" Padding="0,4">
+          <diff:CodeSnippet Code="{Binding Thread.Model.DiffHunk}" Path="{Binding Thread.Path}" ShowLineNumbers="False" MaxHeight="140" />
+        </Border>
+
+        <ItemsControl ItemsSource="{Binding Thread.Comments}" Margin="0,0,0,2">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ThreadCommentViewModel">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="12,6,14,8">
+                <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource Surface.Hover}" VerticalAlignment="Top">
+                  <TextBlock Text="{Binding Initial}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" Classes="secondary" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="4">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding Author}" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Classes="caption tertiary" Text="{Binding AgeLabel}" VerticalAlignment="Center" />
+                    <Border Classes="pill Medium" IsVisible="{Binding IsPending}"><TextBlock Text="Pending" /></Border>
+                  </StackPanel>
+                  <md:MarkdownView Markdown="{Binding Body}" SuggestionBase="{Binding SuggestionBase}"
+                                   Path="{Binding $parent[views:ThreadCardView].((vm:ThreadCardContext)DataContext).Thread.Path, FallbackValue=''}" />
+                </StackPanel>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Reply -->
+        <StackPanel Spacing="8" Margin="44,0,14,12" IsVisible="{Binding Thread.IsReplying}">
+          <TextBox Name="ReplyBox" Classes="composer reply" Text="{Binding Thread.ReplyDraft}" AcceptsReturn="True" TextWrapping="Wrap"
+                   MinHeight="64" MaxHeight="220" FontSize="12.5" PlaceholderText="Reply (Markdown)" />
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="caption" VerticalAlignment="Center" TextWrapping="Wrap"
+                       Text="{Binding Thread.Error, TargetNullValue='Ctrl+Enter replies. With a pending review, it joins the review.'}" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+              <Button Classes="ghost" Content="Cancel" Command="{Binding PullRequest.CancelReplyCommand}" CommandParameter="{Binding Thread}" />
+              <Button Name="SendReply" Classes="primary" Command="{Binding PullRequest.ReplyCommand}" CommandParameter="{Binding Thread}" IsEnabled="{Binding !Thread.IsBusy}">
+                <TextBlock Text="Reply" Foreground="{DynamicResource Accent.OnAccent}" />
+              </Button>
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+
+        <WrapPanel Margin="44,0,14,12" IsVisible="{Binding !Thread.IsReplying}">
+          <Button Name="StartReply" Classes="subtle" Margin="0,0,8,0" Content="Reply" IsVisible="{Binding Thread.CanReply}"
+                  Command="{Binding PullRequest.StartReplyCommand}" CommandParameter="{Binding Thread}" />
+          <Button Name="Resolve" Classes="ghost" Margin="0,0,8,0" Content="Resolve conversation" IsVisible="{Binding Thread.CanResolve}"
+                  Command="{Binding PullRequest.ResolveCommand}" CommandParameter="{Binding Thread}" IsEnabled="{Binding !Thread.IsBusy}" />
+          <Button Name="Unresolve" Classes="ghost" Content="Unresolve" IsVisible="{Binding Thread.CanUnresolve}"
+                  Command="{Binding PullRequest.UnresolveCommand}" CommandParameter="{Binding Thread}" IsEnabled="{Binding !Thread.IsBusy}" />
+          <TextBlock Classes="caption" Foreground="{DynamicResource Severity.High}" Text="{Binding Thread.Error}" VerticalAlignment="Center"
+                     IsVisible="{Binding Thread.Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </WrapPanel>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

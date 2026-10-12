@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             x:Class="Lumen.App.Views.ReviewTrayView"
+             x:DataType="vm:PullRequestViewModel">
+  <!-- The review tray (plan v2 M5, R): pending comments, the summary, and Comment / Approve / Request changes. -->
+  <Border Name="Tray" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0" Background="{DynamicResource Surface.Pane}">
+    <StackPanel>
+      <Button Name="TrayToggle" Classes="row" Padding="18,10" CornerRadius="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+              Command="{Binding ToggleTrayCommand}" ToolTip.Tip="Your review (R)">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+          <Path Data="{StaticResource Icon.Tray}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="14" Height="14" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Classes="h3" Text="{Binding TrayLabel}" VerticalAlignment="Center" />
+          <Border Grid.Column="2" Classes="kbd" VerticalAlignment="Center"><TextBlock Text="R" /></Border>
+        </Grid>
+      </Button>
+
+      <StackPanel Spacing="10" Margin="18,0,18,16" IsVisible="{Binding IsTrayOpen}">
+        <TextBlock Classes="caption tertiary" TextWrapping="Wrap" IsVisible="{Binding !PendingComments.Count}"
+                   Text="No pending comments. Comments added with Ctrl+Enter collect here until you submit." />
+        <ScrollViewer MaxHeight="240" IsVisible="{Binding PendingComments.Count, Converter={x:Static views:Converters.IsPositive}}">
+          <ItemsControl Name="PendingList" ItemsSource="{Binding PendingComments}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:PendingCommentViewModel">
+                <Border Classes="card" Padding="10,8" Margin="0,0,0,6">
+                  <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <Button Classes="link" Content="{Binding LocationLabel}" HorizontalAlignment="Left"
+                              Command="{Binding $parent[views:ReviewTrayView].((vm:PullRequestViewModel)DataContext).JumpToPendingCommand}" CommandParameter="{Binding}" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" IsVisible="{Binding !IsEditing}">
+                        <Button Classes="ghost" Padding="6,2" Content="Edit"
+                                Command="{Binding $parent[views:ReviewTrayView].((vm:PullRequestViewModel)DataContext).EditPendingCommand}" CommandParameter="{Binding}" />
+                        <Button Classes="ghost" Padding="6,2" Content="Delete" IsEnabled="{Binding !IsBusy}"
+                                Command="{Binding $parent[views:ReviewTrayView].((vm:PullRequestViewModel)DataContext).DeletePendingCommand}" CommandParameter="{Binding}" />
+                      </StackPanel>
+                    </Grid>
+                    <TextBlock Text="{Binding Body}" FontSize="12" TextWrapping="Wrap" MaxLines="4" TextTrimming="WordEllipsis" IsVisible="{Binding !IsEditing}" />
+                    <StackPanel Spacing="6" IsVisible="{Binding IsEditing}">
+                      <TextBox Classes="composer pending" Text="{Binding EditBody}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" MaxHeight="160" FontSize="12" />
+                      <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                        <Button Classes="ghost" Content="Cancel"
+                                Command="{Binding $parent[views:ReviewTrayView].((vm:PullRequestViewModel)DataContext).CancelEditPendingCommand}" CommandParameter="{Binding}" />
+                        <Button Classes="subtle" Content="Save"
+                                Command="{Binding $parent[views:ReviewTrayView].((vm:PullRequestViewModel)DataContext).SavePendingCommand}" CommandParameter="{Binding}" />
+                      </StackPanel>
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+
+        <TextBox Name="ReviewSummary" Classes="composer summary" Text="{Binding ReviewSummary}" AcceptsReturn="True" TextWrapping="Wrap"
+                 MinHeight="64" MaxHeight="180" FontSize="12.5" PlaceholderText="Summary (optional for Approve)" />
+        <TextBlock Classes="caption" Foreground="{DynamicResource Severity.High}" TextWrapping="Wrap" Text="{Binding SubmitError}"
+                   IsVisible="{Binding SubmitError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="{Binding ApproveHint}" IsVisible="{Binding ViewerIsAuthor}" />
+        <WrapPanel>
+          <Button Name="SubmitComment" Classes="subtle" Margin="0,0,8,6" Content="Comment" Command="{Binding SubmitCommentCommand}" />
+          <Button Name="Approve" Classes="primary" Margin="0,0,8,6" Command="{Binding ApproveCommand}" IsEnabled="{Binding CanApprove}">
+            <TextBlock Text="Approve" Foreground="{DynamicResource Accent.OnAccent}" />
+          </Button>
+          <Button Name="RequestChanges" Classes="subtle" Margin="0,0,0,6" Content="Request changes" Command="{Binding RequestChangesCommand}"
+                  IsEnabled="{Binding CanApprove}" />
+        </WrapPanel>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

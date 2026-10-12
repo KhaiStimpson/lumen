@@ -16,6 +16,9 @@ namespace Lumen.App.Diff;
 /// <summary>A review marker in the gutter. Shape encodes the kind so colour is never the only signal.</summary>
 public sealed record GutterMarker(string Id, int NewLine, string Kind, bool IsCurrent, bool IsResolved, bool IsNew);
 
+/// <summary>The reader asked to comment on a line, or on <see cref="StartLine"/>..<see cref="Line"/> (plan v2 M3).</summary>
+public sealed record LineCommentRequest(LineSide Side, int Line, int? StartLine);
+
 /// <summary>
 /// Read-only unified diff built on AvaloniaEdit (TDD §27): virtualised, syntax highlighted, selectable, with a
 /// custom gutter, diff backgrounds, a focus range and inline review cards hosted on placeholder lines.
@@ -33,6 +36,20 @@ public sealed class DiffEditor : UserControl
 
     public static readonly StyledProperty<bool> ShowCardsProperty =
         AvaloniaProperty.Register<DiffEditor, bool>(nameof(ShowCards), true);
+
+    /// <summary>Split view: which side's line numbers this editor's gutter shows (null shows both).</summary>
+    public static readonly StyledProperty<LineSide?> NumberSideProperty =
+        AvaloniaProperty.Register<DiffEditor, LineSide?>(nameof(NumberSide));
+
+    /// <summary>Show the gutter's "+" so any diff line can be commented on (off for read-only views).</summary>
+    public static readonly StyledProperty<bool> AllowCommentsProperty =
+        AvaloniaProperty.Register<DiffEditor, bool>(nameof(AllowComments), true);
+
+    public static readonly StyledProperty<IReadOnlyList<FindMatch>> FindMatchesProperty =
+        AvaloniaProperty.Register<DiffEditor, IReadOnlyList<FindMatch>>(nameof(FindMatches), []);
+
+    public static readonly StyledProperty<FindMatch?> CurrentFindMatchProperty =
+        AvaloniaProperty.Register<DiffEditor, FindMatch?>(nameof(CurrentFindMatch));
 
     private readonly TextEditor _editor;
     private readonly DiffBackgroundRenderer _background;
@@ -65,6 +82,7 @@ public sealed class DiffEditor : UserControl
         var view = _editor.TextArea.TextView;
         _background = new DiffBackgroundRenderer(this);
         view.BackgroundRenderers.Add(_background);
+        view.BackgroundRenderers.Add(new FindRenderer(this));
         view.LineTransformers.Add(new HunkHeaderColorizer(this));
         _cards = new ReviewCardGenerator(this);
         view.ElementGenerators.Add(_cards);
@@ -72,9 +90,11 @@ public sealed class DiffEditor : UserControl
         _gutter = new DiffGutterMargin(this);
         _editor.TextArea.LeftMargins.Insert(0, _gutter);
         _gutter.MarkerClicked += id => MarkerClicked?.Invoke(this, id);
+        _gutter.CommentRequested += request => LineCommentRequested?.Invoke(this, request);
 
         _syntax = SyntaxThemes.Install(_editor, null);
         Content = _editor;
+        view.ScrollOffsetChanged += (_, _) => Scrolled?.Invoke(this, _editor.VerticalOffset);
 
         view.SizeChanged += (_, _) =>
         {
@@ -85,6 +105,66 @@ public sealed class DiffEditor : UserControl
     }
 
     public event EventHandler<string>? MarkerClicked;
+
+    public event EventHandler<LineCommentRequest>? LineCommentRequested;
+
+    public LineSide? NumberSide
+    {
+        get => GetValue(NumberSideProperty);
+        set => SetValue(NumberSideProperty, value);
+    }
+
+    public bool AllowComments
+    {
+        get => GetValue(AllowCommentsProperty);
+        set => SetValue(AllowCommentsProperty, value);
+    }
+
+    public IReadOnlyList<FindMatch> FindMatches
+    {
+        get => GetValue(FindMatchesProperty);
+        set => SetValue(FindMatchesProperty, value);
+    }
+
+    public FindMatch? CurrentFindMatch
+    {
+        get => GetValue(CurrentFindMatchProperty);
+        set => SetValue(CurrentFindMatchProperty, value);
+    }
+
+    /// <summary>Document lines being selected in the gutter for a range comment.</summary>
+    internal (int Start, int End)? GutterSelection { get; set; }
+
+    /// <summary>The scroll position, so a side-by-side partner can follow.</summary>
+    public double VerticalOffset => _editor.VerticalOffset;
+
+    public event EventHandler<double>? Scrolled;
+
+    /// <summary>Follows a partner editor's scroll (split view).</summary>
+    public void ScrollTo(double offset)
+    {
+        if (Math.Abs(offset - _editor.VerticalOffset) > 0.5)
+        {
+            SetVerticalOffset(offset);
+        }
+    }
+
+    /// <summary>Scrolls to a card (a thread, a draft) if this document has it.</summary>
+    public Task<bool> RevealCardAsync(string cardId, IMotionService? motion)
+    {
+        if (Diff?.CardLine(cardId) is not { } line)
+        {
+            return Task.FromResult(false);
+        }
+
+        return RevealDocumentLineAsync(Math.Max(1, line - 1), motion).ContinueWith(_ => true, TaskScheduler.FromCurrentSynchronizationContext());
+    }
+
+    /// <summary>Scrolls to a line on either side of the diff.</summary>
+    public Task RevealLineAsync(LineSide side, int line, IMotionService? motion) =>
+        side == LineSide.Left && Diff?.DocumentLineForOldLine(line) is { } documentLine
+            ? RevealDocumentLineAsync(documentLine, motion)
+            : RevealLineAsync(line, motion);
 
     public DiffDocument? Diff
     {
@@ -146,7 +226,12 @@ public sealed class DiffEditor : UserControl
             ApplyPendingReveal();
             RestoreAnchor(anchor);
         }
-        else if (change.Property == MarkersProperty || change.Property == FocusRangeProperty || change.Property == ShowCardsProperty)
+        else if (change.Property == NumberSideProperty)
+        {
+            _gutter.InvalidateMeasure();
+        }
+        else if (change.Property == MarkersProperty || change.Property == FocusRangeProperty || change.Property == ShowCardsProperty
+            || change.Property == FindMatchesProperty || change.Property == CurrentFindMatchProperty || change.Property == AllowCommentsProperty)
         {
             _gutter.InvalidateVisual();
             TextView.Redraw();
@@ -310,10 +395,17 @@ public sealed class DiffEditor : UserControl
                     DiffRowKind.Added => added,
                     DiffRowKind.Removed => removed,
                     DiffRowKind.HunkHeader => hunk,
+                    DiffRowKind.Filler => owner.Brush("Surface.Sunken"),
                     _ => null,
                 };
 
-                if (range is { } r && row.NewNumber >= r.Start && row.NewNumber <= r.End)
+                var lineNumber = line.FirstDocumentLine.LineNumber;
+                if (owner.GutterSelection is { } selection && lineNumber >= selection.Start && lineNumber <= selection.End && row.Kind != DiffRowKind.Card)
+                {
+                    drawingContext.FillRectangle(focus, rect);
+                    drawingContext.FillRectangle(owner.Brush("Accent"), new Rect(-textView.HorizontalOffset - 12, y, 3, line.Height));
+                }
+                else if (range is { } r && row.NewNumber >= r.Start && row.NewNumber <= r.End)
                 {
                     drawingContext.FillRectangle(focus, rect);
                     drawingContext.FillRectangle(edge, new Rect(-textView.HorizontalOffset - 12, y, 3, line.Height));
@@ -321,6 +413,42 @@ public sealed class DiffEditor : UserControl
                 else if (brush is not null)
                 {
                     drawingContext.FillRectangle(brush, rect);
+                }
+            }
+        }
+    }
+
+    /// <summary>Find in file (Ctrl+F): every match tinted, the current one stronger (plan v2 M6).</summary>
+    private sealed class FindRenderer(DiffEditor owner) : IBackgroundRenderer
+    {
+        public KnownLayer Layer => KnownLayer.Selection;
+
+        public void Draw(TextView textView, DrawingContext drawingContext)
+        {
+            if (owner.FindMatches is not { Count: > 0 } matches || textView.Document is not { } document || !textView.VisualLinesValid)
+            {
+                return;
+            }
+
+            var first = textView.VisualLines[0].FirstDocumentLine.LineNumber;
+            var last = textView.VisualLines[^1].LastDocumentLine.LineNumber;
+            var hit = owner.Brush("Find.Match");
+            var current = owner.Brush("Find.Current");
+            foreach (var match in matches)
+            {
+                if (match.DocumentLine < first || match.DocumentLine > last || match.DocumentLine > document.LineCount)
+                {
+                    continue;
+                }
+
+                var line = document.GetLineByNumber(match.DocumentLine);
+                var start = line.Offset + Math.Min(match.Column, line.Length);
+                var length = Math.Min(match.Length, line.EndOffset - start);
+                var builder = new BackgroundGeometryBuilder { CornerRadius = 2 };
+                builder.AddSegment(textView, new TextSegment { StartOffset = start, Length = length });
+                if (builder.CreateGeometry() is { } geometry)
+                {
+                    drawingContext.DrawGeometry(match == owner.CurrentFindMatch ? current : hit, null, geometry);
                 }
             }
         }
@@ -362,6 +490,12 @@ internal sealed class DiffGutterMargin : AbstractMargin
 
     public event Action<string>? MarkerClicked;
 
+    public event Action<LineCommentRequest>? CommentRequested;
+
+    private int? _hoverLine;
+    private (LineSide Side, int Line, int DocumentLine)? _pressed;
+    private (LineSide Side, int Line, int DocumentLine)? _lastTarget;
+
     private double DigitWidth => Measure("0").Width;
 
     private int Digits
@@ -375,8 +509,10 @@ internal sealed class DiffGutterMargin : AbstractMargin
 
     private double ColumnWidth => (Digits * DigitWidth) + 14;
 
+    private int Columns => _owner.NumberSide is null ? 2 : 1;
+
     protected override Size MeasureOverride(Size availableSize) =>
-        new(MarkerWidth + (ColumnWidth * 2) + 18, 0);
+        new(MarkerWidth + (ColumnWidth * Columns) + 18, 0);
 
     protected override void OnTextViewChanged(TextView? oldTextView, TextView? newTextView)
     {
@@ -442,28 +578,38 @@ internal sealed class DiffGutterMargin : AbstractMargin
 
             var textHeight = Measure("0").Height;
             var textY = y + ((Math.Min(line.Height, view.DefaultLineHeight) - textHeight) / 2);
-            if (row.OldNumber > 0)
+            var side = _owner.NumberSide;
+            if (row.OldNumber > 0 && side != LineSide.Right)
             {
                 DrawRight(context, row.OldNumber.ToString(CultureInfo.InvariantCulture), MarkerWidth + ColumnWidth - 6, textY, numberBrush);
             }
 
-            if (row.NewNumber > 0)
+            if (row.NewNumber > 0 && side != LineSide.Left)
             {
-                DrawRight(context, row.NewNumber.ToString(CultureInfo.InvariantCulture), MarkerWidth + (ColumnWidth * 2) - 6, textY, numberBrush);
+                DrawRight(context, row.NewNumber.ToString(CultureInfo.InvariantCulture), MarkerWidth + (ColumnWidth * Columns) - 6, textY, numberBrush);
             }
 
             if (row.Kind is DiffRowKind.Added or DiffRowKind.Removed)
             {
                 var sign = Text(row.Kind == DiffRowKind.Added ? "+" : "−", row.Kind == DiffRowKind.Added ? addedSign : removedSign);
-                context.DrawText(sign, new Point(MarkerWidth + (ColumnWidth * 2) + 4, textY));
+                context.DrawText(sign, new Point(MarkerWidth + (ColumnWidth * Columns) + 4, textY));
             }
 
+            var centerY = y + (Math.Min(line.Height, view.DefaultLineHeight) / 2);
+            var hasMarker = false;
             if (row.NewNumber > 0)
             {
                 foreach (var marker in markers[row.NewNumber])
                 {
-                    DrawMarker(context, marker, y + (Math.Min(line.Height, view.DefaultLineHeight) / 2));
+                    DrawMarker(context, marker, centerY);
+                    hasMarker = true;
                 }
+            }
+
+            // "+" on the hovered line: click to comment, drag or shift-click for a range (plan v2 M3).
+            if (!hasMarker && _owner.AllowComments && _hoverLine == line.FirstDocumentLine.LineNumber && DiffDocument.CommentTarget(row) is not null)
+            {
+                DrawPlus(context, centerY);
             }
         }
 
@@ -474,8 +620,24 @@ internal sealed class DiffGutterMargin : AbstractMargin
         }
     }
 
+    private void DrawPlus(DrawingContext context, double centerY)
+    {
+        var size = 14.0;
+        var rect = new Rect((MarkerWidth - size) / 2, centerY - (size / 2), size, size);
+        context.DrawRectangle(_owner.Brush("Accent"), null, rect, 3, 3);
+        var pen = new Pen(_owner.Brush("Accent.OnAccent"), 1.6, lineCap: PenLineCap.Round);
+        context.DrawLine(pen, new Point(rect.Center.X, rect.Top + 3.5), new Point(rect.Center.X, rect.Bottom - 3.5));
+        context.DrawLine(pen, new Point(rect.Left + 3.5, rect.Center.Y), new Point(rect.Right - 3.5, rect.Center.Y));
+    }
+
     private void DrawMarker(DrawingContext context, GutterMarker marker, double centerY)
     {
+        if (marker.Kind == "Risk")
+        {
+            DrawRisk(context, marker, centerY);
+            return;
+        }
+
         var key = marker.IsResolved ? "Marker.Verified" : marker.Kind switch
         {
             "CorrectnessRisk" or "SecurityRisk" => "Marker.Correctness",
@@ -520,27 +682,123 @@ internal sealed class DiffGutterMargin : AbstractMargin
         }
     }
 
+    /// <summary>A walkthrough risky area: a hollow diamond, ticked once checked off. Never a review finding's shape.</summary>
+    private void DrawRisk(DrawingContext context, GutterMarker marker, double centerY)
+    {
+        var brush = _owner.Brush(marker.IsResolved ? "Marker.Verified" : "Severity.Medium");
+        var size = marker.IsCurrent ? 12.0 : 10.0;
+        var center = new Point(MarkerWidth / 2, centerY);
+        var geometry = marker.IsResolved ? Check(center, size) : (Geometry)Diamond(center, size);
+        context.DrawGeometry(null, new Pen(brush, marker.IsCurrent ? 2.2 : 1.6, lineCap: PenLineCap.Round), geometry);
+    }
+
+    private (int DocumentLine, DiffRow Row)? RowUnder(Point position)
+    {
+        var view = TextView;
+        if (view is null || _owner.Diff is null || !view.VisualLinesValid)
+        {
+            return null;
+        }
+
+        var visualLine = view.GetVisualLineFromVisualTop(position.Y + view.VerticalOffset);
+        return visualLine is not null && _owner.RowAt(visualLine.FirstDocumentLine.LineNumber) is { } row
+            ? (visualLine.FirstDocumentLine.LineNumber, row)
+            : null;
+    }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        var under = RowUnder(e.GetPosition(this));
+        var hover = under?.DocumentLine;
+        if (hover != _hoverLine)
+        {
+            _hoverLine = hover;
+            InvalidateVisual();
+        }
+
+        // Dragging from a line selects a range on the same side.
+        if (_pressed is { } start && under is { } current && DiffDocument.CommentTarget(current.Row) is { } target && target.Side == start.Side)
+        {
+            var selection = (Math.Min(start.DocumentLine, current.DocumentLine), Math.Max(start.DocumentLine, current.DocumentLine));
+            if (_owner.GutterSelection != selection)
+            {
+                _owner.GutterSelection = selection;
+                _owner.TextView.InvalidateLayer(KnownLayer.Background);
+            }
+        }
+    }
+
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        _hoverLine = null;
+        InvalidateVisual();
+    }
+
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-        var view = TextView;
-        if (view is null || _owner.Diff is null)
+        if (RowUnder(e.GetPosition(this)) is not { } under)
         {
             return;
         }
 
-        var position = e.GetPosition(this);
-        var visualLine = view.GetVisualLineFromVisualTop(position.Y + view.VerticalOffset);
-        if (visualLine is null || _owner.RowAt(visualLine.FirstDocumentLine.LineNumber) is not { NewNumber: > 0 } row)
-        {
-            return;
-        }
-
-        if (_owner.Markers.FirstOrDefault(m => m.NewLine == row.NewNumber) is { } marker)
+        var row = under.Row;
+        if (row.NewNumber > 0 && _owner.Markers.FirstOrDefault(m => m.NewLine == row.NewNumber) is { } marker && e.GetPosition(this).X <= MarkerWidth)
         {
             MarkerClicked?.Invoke(marker.Id);
             e.Handled = true;
+            return;
         }
+
+        if (row.NewNumber > 0 && _owner.Markers.FirstOrDefault(m => m.NewLine == row.NewNumber) is { } lineMarker && !_owner.AllowComments)
+        {
+            MarkerClicked?.Invoke(lineMarker.Id);
+            e.Handled = true;
+            return;
+        }
+
+        if (!_owner.AllowComments || DiffDocument.CommentTarget(row) is not { } target)
+        {
+            return;
+        }
+
+        // Shift-click extends from the last line clicked, on the same side.
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && _lastTarget is { } previous && previous.Side == target.Side)
+        {
+            _owner.GutterSelection = null;
+            _owner.TextView.InvalidateLayer(KnownLayer.Background);
+            CommentRequested?.Invoke(new LineCommentRequest(target.Side, target.Line, previous.Line));
+            e.Handled = true;
+            return;
+        }
+
+        _pressed = (target.Side, target.Line, under.DocumentLine);
+        _owner.GutterSelection = (under.DocumentLine, under.DocumentLine);
+        _owner.TextView.InvalidateLayer(KnownLayer.Background);
+        e.Pointer.Capture(this);
+        e.Handled = true;
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        if (_pressed is not { } start)
+        {
+            return;
+        }
+
+        _pressed = null;
+        e.Pointer.Capture(null);
+        var end = RowUnder(e.GetPosition(this)) is { } under && DiffDocument.CommentTarget(under.Row) is { } target && target.Side == start.Side
+            ? target.Line
+            : start.Line;
+        _owner.GutterSelection = null;
+        _owner.TextView.InvalidateLayer(KnownLayer.Background);
+        _lastTarget = (start.Side, end, start.DocumentLine);
+        CommentRequested?.Invoke(new LineCommentRequest(start.Side, end, end == start.Line ? null : start.Line));
+        e.Handled = true;
     }
 
     private FormattedText Text(string text, IBrush brush) =>
