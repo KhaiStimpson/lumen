@@ -35,10 +35,10 @@ internal sealed class AppSession : IAsyncDisposable
     public string SettingsPath { get; }
 
     /// <param name="viewer">Open as someone other than the author (the fixture's viewer is the author).</param>
-    public static async Task<AppSession> OpenAsync(string? viewer = null, AppSettings? settings = null)
+    public static async Task<AppSession> OpenAsync(string? viewer = null, AppSettings? settings = null, string? fixtureDirectory = null)
     {
         var settingsPath = Path.Combine(Path.GetTempPath(), "lumen-app-tests", $"{Guid.NewGuid():N}.json");
-        var source = new FixtureReviewSource(Fixture.DirectoryPath, viewerLogin: viewer);
+        var source = new FixtureReviewSource(fixtureDirectory ?? Fixture.DirectoryPath, viewerLogin: viewer);
         var viewModel = new MainWindowViewModel(source, settings ?? new AppSettings(), settingsPath);
         var window = new MainWindow { DataContext = viewModel };
         window.Show();

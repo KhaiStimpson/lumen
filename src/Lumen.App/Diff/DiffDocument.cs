@@ -36,6 +36,12 @@ public sealed record CardAnchor(string Id, LineSide Side, int Line);
 /// <summary>A find-in-file hit: document line (1-based), column and length.</summary>
 public sealed record FindMatch(int DocumentLine, int Column, int Length);
 
+/// <summary>
+/// A run of changed rows (document lines <see cref="StartLine"/>..<see cref="EndLine"/>, 1-based). Cards inside the run
+/// don't split it. <see cref="Fillers"/> counts split-view rows where the other side has the line.
+/// </summary>
+public sealed record DiffChange(int StartLine, int EndLine, int Added, int Removed, int Fillers);
+
 /// <summary>A diff laid out side by side; the maps take a unified document line to each side's line.</summary>
 public sealed record SplitDocument(DiffDocument Left, DiffDocument Right, IReadOnlyList<int> LeftLines, IReadOnlyList<int> RightLines);
 
@@ -56,6 +62,7 @@ public sealed class DiffDocument
         Path = path;
         Text = text;
         Rows = rows;
+        Changes = FindChanges(rows);
         for (var i = 0; i < rows.Count; i++)
         {
             if (rows[i].NewNumber > 0)
@@ -87,6 +94,9 @@ public sealed class DiffDocument
     public int Deletions => Rows.Count(r => r.Kind == DiffRowKind.Removed);
 
     public bool IsEmpty => Rows.Count == 0;
+
+    /// <summary>Each run of added, removed (or, split, filler) rows, top to bottom: what the ruler and [ / ] step through.</summary>
+    public IReadOnlyList<DiffChange> Changes { get; }
 
     public DiffRow? RowAt(int documentLine) =>
         documentLine >= 1 && documentLine <= Rows.Count ? Rows[documentLine - 1] : null;
@@ -350,6 +360,45 @@ public sealed class DiffDocument
             Build(Path, right.Select(x => x.Row).ToList(), right.Select(x => x.Text)),
             leftMap,
             rightMap);
+    }
+
+    private static List<DiffChange> FindChanges(IReadOnlyList<DiffRow> rows)
+    {
+        var changes = new List<DiffChange>();
+        int start = 0, end = 0, added = 0, removed = 0, fillers = 0;
+        void Flush()
+        {
+            if (start > 0)
+            {
+                changes.Add(new DiffChange(start, end, added, removed, fillers));
+            }
+
+            start = end = added = removed = fillers = 0;
+        }
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var kind = rows[i].Kind;
+            if (kind is DiffRowKind.Added or DiffRowKind.Removed or DiffRowKind.Filler)
+            {
+                if (start == 0)
+                {
+                    start = i + 1;
+                }
+
+                end = i + 1;
+                added += kind == DiffRowKind.Added ? 1 : 0;
+                removed += kind == DiffRowKind.Removed ? 1 : 0;
+                fillers += kind == DiffRowKind.Filler ? 1 : 0;
+            }
+            else if (kind != DiffRowKind.Card)
+            {
+                Flush();
+            }
+        }
+
+        Flush();
+        return changes;
     }
 
     private static DiffDocument Build(string path, IReadOnlyList<DiffRow> rows, IEnumerable<string> text) =>

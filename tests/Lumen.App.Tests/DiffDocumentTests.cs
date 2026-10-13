@@ -193,4 +193,27 @@ public sealed class DiffDocumentTests
         Assert.Null(doc.CardLine("p"));
         Assert.Null(doc.DocumentLineForNewLine(1));
     }
+
+    [Fact]
+    public void GroupsEachRunOfChangedRowsAndKeepsCardsInsideTheRun()
+    {
+        var doc = DiffDocument.Build(Sample(), [("p1", 2)]);
+
+        // HunkHeader, Context, Removed, Added, Card, Added, Context, HunkHeader, Context, Context
+        var change = Assert.Single(doc.Changes);
+        Assert.Equal(new DiffChange(3, 6, Added: 2, Removed: 1, Fillers: 0), change);
+
+        var split = doc.Split();
+        Assert.Equal(new DiffChange(3, 5, Added: 0, Removed: 1, Fillers: 1), Assert.Single(split.Left.Changes));
+        Assert.Equal(2, Assert.Single(split.Right.Changes).Added);
+    }
+
+    [Fact]
+    public void AFileWithoutHunksHasNoChanges()
+    {
+        var doc = DiffDocument.Build(new FileDiff { Path = "src/Moved.cs" }, NoCards, "class Moved\n{\n}\n");
+
+        Assert.Equal(3, doc.Rows.Count);
+        Assert.Empty(doc.Changes);
+    }
 }

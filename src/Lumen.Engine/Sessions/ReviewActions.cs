@@ -95,8 +95,10 @@ public sealed partial class ReviewActions(
             return cached;
         }
 
-        var diff = await checkout.GetRangeDiffAsync(checkout.MergeBaseSha, checkout.HeadSha, true, path, ct).ConfigureAwait(false);
+        // A renamed file needs both paths: limited to the new one, git can't see the rename and reports a whole new file.
         var original = session.Snapshot?.FindFile(path);
+        string[] paths = original?.OldPath is { Length: > 0 } oldPath && oldPath != path ? [oldPath, path] : [path];
+        var diff = await checkout.GetRangeDiffAsync(checkout.MergeBaseSha, checkout.HeadSha, true, paths, ct).ConfigureAwait(false);
         var file = ChangedFiles.FromUnifiedDiff(diff, reviewSettings.Resolve(session.Key.Repository).MechanicalPaths).FirstOrDefault(f => f.Path == path)
             ?? (original is null ? null : original with { Hunks = [], Additions = 0, Deletions = 0 });
         if (file is not null)

@@ -227,6 +227,12 @@ public sealed partial class MainWindow : Window
             case Key.N:
                 await pr.NextThreadAsync().ConfigureAwait(true);
                 break;
+            case Key.OemCloseBrackets:
+                pr.NextChange();
+                break;
+            case Key.OemOpenBrackets:
+                pr.PreviousChange();
+                break;
             case Key.R:
                 pr.ToggleTray();
                 if (pr.IsTrayOpen)

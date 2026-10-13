@@ -117,6 +117,7 @@ src/Lumen.Engine/bin/Debug/net10.0/Lumen.Engine.exe connections
 | `C` | Comment on the current point (`Ctrl+Enter` adds to the review, `Ctrl+Shift+Enter` posts now) |
 | Gutter `+`, drag or shift-click | Comment on a line or a range of lines ("Suggest change" pre-fills a suggestion) |
 | `N` / `Shift+N` | Next / previous review thread |
+| `]` / `[` | Next / previous change in the file, then on into the next / previous file |
 | `R` | Review tray: pending comments, summary, Comment / Approve / Request changes |
 | `S` | Split / unified diff |
 | `W` | Ignore whitespace |
@@ -124,6 +125,10 @@ src/Lumen.Engine/bin/Debug/net10.0/Lumen.Engine.exe connections
 | `Ctrl+F` | Find in diff (`Enter` / `Shift+Enter` next / previous) |
 | `P` / `E` | Show precedent / evidence |
 | `Ctrl+K`, `F` | Command palette: files, pull requests, actions |
+
+The diff's scrollbar is a map of the file: removed lines on the left, added lines on the right, review points, threads,
+drafts and find matches on top. Click a mark to jump to it; hover it to see its lines. A file that was only moved or
+renamed shows the path change ("Moved without changes") instead of a diff; a rename with edits shows just the edits.
 
 With a walkthrough's reading order on, `J` / `K` step through its groups. Posting anything always requires an explicit
 click or key; nothing is sent to GitHub otherwise, and a review stays pending until you submit it.

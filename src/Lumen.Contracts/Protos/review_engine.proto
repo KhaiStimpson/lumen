@@ -173,6 +173,8 @@ message ChangedFileSummary {
   string mechanical_reason = 8;
   // The viewer ticked "Viewed" on GitHub and the file has not changed since.
   bool is_viewed = 9;
+  // Renamed files: git's similarity index, 0-100 (100 when only the path changed).
+  int32 similarity = 10;
 }
 
 message PullRequestSnapshot {

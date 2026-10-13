@@ -194,6 +194,7 @@ public static partial class ProtoMapper
         IsMechanical = f.Mechanical.IsMechanical,
         MechanicalReason = f.Mechanical.Reason ?? "",
         IsViewed = viewed,
+        Similarity = f.Similarity ?? 0,
     };
 }
 

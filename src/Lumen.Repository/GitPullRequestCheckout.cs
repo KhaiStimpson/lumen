@@ -51,7 +51,7 @@ internal sealed class GitPullRequestCheckout : IPullRequestCheckout
         return result.StandardOutput;
     }
 
-    public async Task<string> GetRangeDiffAsync(string fromSha, string toSha, bool ignoreWhitespace, string? path, CancellationToken cancellationToken)
+    public async Task<string> GetRangeDiffAsync(string fromSha, string toSha, bool ignoreWhitespace, IReadOnlyList<string>? paths, CancellationToken cancellationToken)
     {
         ValidateSha(fromSha);
         ValidateSha(toSha);
@@ -67,9 +67,9 @@ internal sealed class GitPullRequestCheckout : IPullRequestCheckout
         }
 
         args.AddRange([fromSha, toSha, "--"]);
-        if (path is not null)
+        if (paths is not null)
         {
-            args.Add(NormalizeRelative(path));
+            args.AddRange(paths.Select(NormalizeRelative));
         }
 
         var result = await git.RunAsync(gitDir, args, cancellationToken, env).ConfigureAwait(false);

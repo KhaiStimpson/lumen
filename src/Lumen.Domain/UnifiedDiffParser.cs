@@ -13,6 +13,9 @@ public static partial class UnifiedDiffParser
         bool IsBinary,
         IReadOnlyList<DiffHunk> Hunks)
     {
+        /// <summary>Git's similarity index for a rename (100 when only the path changed).</summary>
+        public int? Similarity { get; init; }
+
         public int Additions => Hunks.Sum(h => h.Lines.Count(l => l.Kind == DiffLineKind.Added));
 
         public int Deletions => Hunks.Sum(h => h.Lines.Count(l => l.Kind == DiffLineKind.Removed));
@@ -123,6 +126,11 @@ public static partial class UnifiedDiffParser
         {
             file.Path = line["rename to ".Length..];
         }
+        else if (line.StartsWith("similarity index ", StringComparison.Ordinal)
+                 && int.TryParse(line["similarity index ".Length..].TrimEnd('%'), NumberStyles.None, CultureInfo.InvariantCulture, out var similarity))
+        {
+            file.Similarity = similarity;
+        }
         else if (line.StartsWith("Binary files ", StringComparison.Ordinal) || line.StartsWith("GIT binary patch", StringComparison.Ordinal))
         {
             file.IsBinary = true;
@@ -200,6 +208,8 @@ public static partial class UnifiedDiffParser
 
         public bool IsBinary { get; set; }
 
+        public int? Similarity { get; set; }
+
         public List<DiffHunk> Hunks { get; } = [];
 
         public ParsedFile Build() => new(
@@ -207,7 +217,10 @@ public static partial class UnifiedDiffParser
             Kind is FileChangeKind.Renamed or FileChangeKind.Deleted ? OldPath : null,
             Kind,
             IsBinary,
-            Hunks);
+            Hunks)
+        {
+            Similarity = Kind == FileChangeKind.Renamed ? Similarity : null,
+        };
     }
 
     private sealed class HunkBuilder

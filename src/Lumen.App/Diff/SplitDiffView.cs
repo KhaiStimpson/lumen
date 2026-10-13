@@ -25,7 +25,7 @@ public sealed class SplitDiffView : UserControl
     public static readonly StyledProperty<FindMatch?> CurrentFindMatchProperty =
         AvaloniaProperty.Register<SplitDiffView, FindMatch?>(nameof(CurrentFindMatch));
 
-    private readonly DiffEditor _left = new() { NumberSide = LineSide.Left, Name = "SplitLeft" };
+    private readonly DiffEditor _left = new() { NumberSide = LineSide.Left, Name = "SplitLeft", ShowRuler = false };
     private readonly DiffEditor _right = new() { NumberSide = LineSide.Right, Name = "SplitRight" };
     private readonly Dictionary<string, double> _heights = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Border> _spacers = new(StringComparer.Ordinal);

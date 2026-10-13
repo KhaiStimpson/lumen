@@ -136,6 +136,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             items.Add(Action("Examine the current point", "Enter", () => pr.ExamineAsync(null)));
             items.Add(Action("Next open thread", "N", pr.NextThreadAsync));
             items.Add(Action("Previous open thread", "Shift+N", pr.PreviousThreadAsync));
+            items.Add(Action("Next change", "]", () => Do(pr.NextChange)));
+            items.Add(Action("Previous change", "[", () => Do(pr.PreviousChange)));
             items.Add(Action("Open the review tray", "R", () => Do(() => pr.IsTrayOpen = true)));
             items.Add(Action("Submit review: Comment", "", pr.SubmitCommentAsync));
             if (pr.CanApprove)

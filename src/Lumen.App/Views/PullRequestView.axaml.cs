@@ -25,6 +25,8 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         SplitEditor.MarkerClicked += async (_, id) => await OnMarkerClickedAsync(id).ConfigureAwait(true);
         Editor.LineCommentRequested += (_, request) => _viewModel?.StartLineComment(request.Side, request.Line, request.StartLine);
         SplitEditor.LineCommentRequested += (_, request) => _viewModel?.StartLineComment(request.Side, request.Line, request.StartLine);
+        Editor.CurrentChangeChanged += (_, index) => _viewModel?.SetCurrentChange(index);
+        SplitEditor.Right.CurrentChangeChanged += (_, index) => _viewModel?.SetCurrentChange(index);
 
         AddHandler(KeyDownEvent, (_, e) =>
         {
@@ -91,6 +93,7 @@ public sealed partial class PullRequestView : UserControl, IDisposable
             _viewModel.DraftOpened -= OnDraftOpened;
             _viewModel.LineRevealRequested -= OnLineRevealRequested;
             _viewModel.FindMatchRequested -= OnFindMatchRequested;
+            _viewModel.ChangeStepRequested -= OnChangeStepRequested;
         }
 
         _viewModel = DataContext as PullRequestViewModel;
@@ -101,6 +104,7 @@ public sealed partial class PullRequestView : UserControl, IDisposable
             _viewModel.DraftOpened += OnDraftOpened;
             _viewModel.LineRevealRequested += OnLineRevealRequested;
             _viewModel.FindMatchRequested += OnFindMatchRequested;
+            _viewModel.ChangeStepRequested += OnChangeStepRequested;
 
             // The session may already have arrived at a point before this view existed; catch up.
             if (_viewModel.CurrentPoint is { } current)
@@ -179,6 +183,28 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         else
         {
             await Editor.RevealLineAsync(request.Side, request.Line, motion).ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>[ and ]: the next or previous change in this file, then on into the next or previous file.</summary>
+    private async void OnChangeStepRequested(object? sender, int direction)
+    {
+        if (_viewModel is null || ActiveEditor.StepChange(direction, App.Motion))
+        {
+            return;
+        }
+
+        if (!await _viewModel.StepFileAsync(direction).ConfigureAwait(true))
+        {
+            return;
+        }
+
+        // Let the new file lay out, then land on its first change (or its last, going backwards).
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+        if (ActiveEditor.Diff is { Changes.Count: > 0 } diff)
+        {
+            var index = direction > 0 ? 0 : diff.Changes.Count - 1;
+            ActiveEditor.JumpTo(diff.Changes[index].StartLine, index);
         }
     }
 

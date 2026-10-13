@@ -35,6 +35,9 @@ public sealed record ChangedFile(
     MechanicalClassification Mechanical,
     IReadOnlyList<DiffHunk> Hunks)
 {
+    /// <summary>Git's similarity index (0–100) for a rename; null for anything else.</summary>
+    public int? Similarity { get; init; }
+
     /// <summary>Head-side line numbers that appear in the diff (added or context); comments may only anchor here.</summary>
     public bool ContainsNewLine(int line) =>
         Hunks.Any(h => h.Lines.Any(l => l.NewNumber == line));

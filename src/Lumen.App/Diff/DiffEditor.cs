@@ -51,11 +51,16 @@ public sealed class DiffEditor : UserControl
     public static readonly StyledProperty<FindMatch?> CurrentFindMatchProperty =
         AvaloniaProperty.Register<DiffEditor, FindMatch?>(nameof(CurrentFindMatch));
 
+    /// <summary>Show the overview ruler (off for the base side of the split view, which follows the head side).</summary>
+    public static readonly StyledProperty<bool> ShowRulerProperty =
+        AvaloniaProperty.Register<DiffEditor, bool>(nameof(ShowRuler), true);
+
     private readonly TextEditor _editor;
     private readonly DiffBackgroundRenderer _background;
     private readonly DiffGutterMargin _gutter;
     private readonly ReviewCardGenerator _cards;
     private readonly TextMate.Installation _syntax;
+    private readonly DiffOverviewRuler _ruler;
     private CancellationTokenSource? _scroll;
     private int? _pendingNewLine;
 
@@ -67,7 +72,8 @@ public sealed class DiffEditor : UserControl
             ShowLineNumbers = false,
             WordWrap = false,
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+            // The overview ruler is the vertical scrollbar.
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Hidden,
             Background = Brushes.Transparent,
             Padding = new Thickness(0, 4, 0, 24),
         };
@@ -93,8 +99,20 @@ public sealed class DiffEditor : UserControl
         _gutter.CommentRequested += request => LineCommentRequested?.Invoke(this, request);
 
         _syntax = SyntaxThemes.Install(_editor, null);
-        Content = _editor;
-        view.ScrollOffsetChanged += (_, _) => Scrolled?.Invoke(this, _editor.VerticalOffset);
+        _ruler = new DiffOverviewRuler(this);
+        var layout = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        layout.Children.Add(_editor);
+        Grid.SetColumn(_ruler, 1);
+        layout.Children.Add(_ruler);
+        Content = layout;
+        view.ScrollOffsetChanged += (_, _) =>
+        {
+            Scrolled?.Invoke(this, _editor.VerticalOffset);
+            _ruler.InvalidateVisual();
+        };
+
+        // Card heights settle as they render, which moves everything below them on the map.
+        view.VisualLinesChanged += (_, _) => _ruler.InvalidateVisual();
 
         view.SizeChanged += (_, _) =>
         {
@@ -107,6 +125,18 @@ public sealed class DiffEditor : UserControl
     public event EventHandler<string>? MarkerClicked;
 
     public event EventHandler<LineCommentRequest>? LineCommentRequested;
+
+    /// <summary>The change navigated to (index into <see cref="DiffDocument.Changes"/>, -1 for none) moved.</summary>
+    public event EventHandler<int>? CurrentChangeChanged;
+
+    public bool ShowRuler
+    {
+        get => GetValue(ShowRulerProperty);
+        set => SetValue(ShowRulerProperty, value);
+    }
+
+    /// <summary>The change last stepped or jumped to, or -1.</summary>
+    public int CurrentChange => _ruler.CurrentChange;
 
     public LineSide? NumberSide
     {
@@ -212,8 +242,12 @@ public sealed class DiffEditor : UserControl
         if (change.Property == DiffProperty)
         {
             var diff = Diff;
-            var anchor = change.OldValue is DiffDocument old && old.Path == diff?.Path ? TopAnchor() : null;
+            var samePath = change.OldValue is DiffDocument old && old.Path == diff?.Path;
+            var anchor = samePath ? TopAnchor() : null;
             _cards.Reset();
+
+            // Re-rendering the same file (cards, full-file toggle) keeps the runs, so the reader stays on their change.
+            SetCurrentChange(samePath && CurrentChange < (diff?.Changes.Count ?? 0) ? CurrentChange : -1);
             _editor.Document = new TextDocument(diff?.Text ?? "");
             SyntaxThemes.SetLanguage(_syntax, diff?.Path);
             SetVerticalOffset(0);
@@ -230,12 +264,87 @@ public sealed class DiffEditor : UserControl
         {
             _gutter.InvalidateMeasure();
         }
+        else if (change.Property == ShowRulerProperty)
+        {
+            _ruler.IsVisible = ShowRuler;
+        }
         else if (change.Property == MarkersProperty || change.Property == FocusRangeProperty || change.Property == ShowCardsProperty
             || change.Property == FindMatchesProperty || change.Property == CurrentFindMatchProperty || change.Property == AllowCommentsProperty)
         {
             _gutter.InvalidateVisual();
+            _ruler.InvalidateVisual();
             TextView.Redraw();
         }
+    }
+
+    /// <summary>
+    /// Moves to the next (+1) or previous (-1) change: after the one last stepped to, or else after what's at the top
+    /// of the view. False when there is none that way (the caller may move to another file).
+    /// </summary>
+    public bool StepChange(int direction, IMotionService? motion)
+    {
+        if (Diff is not { Changes.Count: > 0 } diff)
+        {
+            return false;
+        }
+
+        // Not stepping yet (or scrolled away): next is the first change below the top of the view, previous the last
+        // one above the reading line, where a revealed change lands a fifth of the way down.
+        TextView.EnsureVisualLines();
+        var offset = _editor.VerticalOffset;
+        var top = offset <= 0 ? 0 : TextView.GetDocumentLineByVisualTop(offset)?.LineNumber ?? 0;
+        var reading = TextView.GetDocumentLineByVisualTop(offset + (TextView.Bounds.Height * 0.22))?.LineNumber ?? 1;
+        var current = CurrentChange >= 0 && CurrentChange < diff.Changes.Count && IsOnScreen(diff.Changes[CurrentChange]) ? CurrentChange : -1;
+        var target = direction > 0
+            ? current >= 0 ? current + 1 : IndexWhere(diff.Changes, c => c.StartLine > top, first: true)
+            : current >= 0 ? current - 1 : IndexWhere(diff.Changes, c => c.StartLine < reading, first: false);
+
+        if (target < 0 || target >= diff.Changes.Count)
+        {
+            return false;
+        }
+
+        JumpTo(diff.Changes[target].StartLine, target, motion);
+        return true;
+    }
+
+    /// <summary>Reveals a document line (the ruler's marks); <paramref name="change"/> is the change it starts, or -1.</summary>
+    public void JumpTo(int documentLine, int change, IMotionService? motion = null)
+    {
+        SetCurrentChange(change);
+        _ = RevealDocumentLineAsync(documentLine, motion ?? App.Motion);
+    }
+
+    private void SetCurrentChange(int change)
+    {
+        if (_ruler.CurrentChange == change)
+        {
+            return;
+        }
+
+        _ruler.CurrentChange = change;
+        _ruler.InvalidateVisual();
+        CurrentChangeChanged?.Invoke(this, change);
+    }
+
+    private bool IsOnScreen(DiffChange change)
+    {
+        var top = TextView.GetVisualTopByDocumentLine(change.StartLine);
+        return top >= _editor.VerticalOffset - 1 && top <= _editor.VerticalOffset + TextView.Bounds.Height;
+    }
+
+    private static int IndexWhere(IReadOnlyList<DiffChange> changes, Func<DiffChange, bool> predicate, bool first)
+    {
+        for (var k = 0; k < changes.Count; k++)
+        {
+            var i = first ? k : changes.Count - 1 - k;
+            if (predicate(changes[i]))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     /// <summary>
@@ -638,14 +747,7 @@ internal sealed class DiffGutterMargin : AbstractMargin
             return;
         }
 
-        var key = marker.IsResolved ? "Marker.Verified" : marker.Kind switch
-        {
-            "CorrectnessRisk" or "SecurityRisk" => "Marker.Correctness",
-            "BehaviourChange" => "Marker.Behaviour",
-            "ArchitectureDrift" => "Marker.Architecture",
-            _ => "Marker.Deviation",
-        };
-        var brush = _owner.Brush(key);
+        var brush = _owner.Brush(MarkerBrushKey(marker));
         var size = marker.IsCurrent ? 11.0 : 9.0;
         var center = new Point(MarkerWidth / 2, centerY);
 
@@ -664,14 +766,7 @@ internal sealed class DiffGutterMargin : AbstractMargin
                 context.DrawEllipse(brush, null, center, halo / 2, halo / 2);
             }
         }
-        Geometry geometry = marker.IsResolved ? Check(center, size) : marker.Kind switch
-        {
-            "CorrectnessRisk" or "SecurityRisk" => (Geometry)Octagon(center, size),
-            "BehaviourChange" => new EllipseGeometry(new Rect(center.X - (size / 2), center.Y - (size / 2), size, size)),
-            "ArchitectureDrift" => Diamond(center, size),
-            _ => Triangle(center, size),
-        };
-
+        var geometry = MarkerGeometry(marker, center, size);
         if (marker.IsResolved)
         {
             context.DrawGeometry(null, new Pen(brush, 1.8, lineCap: PenLineCap.Round), geometry);
@@ -683,14 +778,40 @@ internal sealed class DiffGutterMargin : AbstractMargin
     }
 
     /// <summary>A walkthrough risky area: a hollow diamond, ticked once checked off. Never a review finding's shape.</summary>
-    private void DrawRisk(DrawingContext context, GutterMarker marker, double centerY)
+    private void DrawRisk(DrawingContext context, GutterMarker marker, double centerY) =>
+        DrawMarkerShape(context, _owner, marker, new Point(MarkerWidth / 2, centerY), marker.IsCurrent ? 12.0 : 10.0);
+
+    /// <summary>A marker's shape without the arrival animation (the overview ruler draws these small).</summary>
+    internal static void DrawMarkerShape(DrawingContext context, DiffEditor owner, GutterMarker marker, Point center, double size)
     {
-        var brush = _owner.Brush(marker.IsResolved ? "Marker.Verified" : "Severity.Medium");
-        var size = marker.IsCurrent ? 12.0 : 10.0;
-        var center = new Point(MarkerWidth / 2, centerY);
-        var geometry = marker.IsResolved ? Check(center, size) : (Geometry)Diamond(center, size);
-        context.DrawGeometry(null, new Pen(brush, marker.IsCurrent ? 2.2 : 1.6, lineCap: PenLineCap.Round), geometry);
+        var brush = owner.Brush(MarkerBrushKey(marker));
+        var geometry = MarkerGeometry(marker, center, size);
+        if (marker.IsResolved || marker.Kind == "Risk")
+        {
+            context.DrawGeometry(null, new Pen(brush, marker.IsCurrent && marker.Kind == "Risk" ? 2.2 : 1.6, lineCap: PenLineCap.Round), geometry);
+        }
+        else
+        {
+            context.DrawGeometry(brush, null, geometry);
+        }
     }
+
+    private static string MarkerBrushKey(GutterMarker marker) => marker.IsResolved ? "Marker.Verified" : marker.Kind switch
+    {
+        "Risk" => "Severity.Medium",
+        "CorrectnessRisk" or "SecurityRisk" => "Marker.Correctness",
+        "BehaviourChange" => "Marker.Behaviour",
+        "ArchitectureDrift" => "Marker.Architecture",
+        _ => "Marker.Deviation",
+    };
+
+    private static Geometry MarkerGeometry(GutterMarker marker, Point center, double size) => marker.IsResolved ? Check(center, size) : marker.Kind switch
+    {
+        "CorrectnessRisk" or "SecurityRisk" => Octagon(center, size),
+        "BehaviourChange" => new EllipseGeometry(new Rect(center.X - (size / 2), center.Y - (size / 2), size, size)),
+        "ArchitectureDrift" or "Risk" => Diamond(center, size),
+        _ => Triangle(center, size),
+    };
 
     private (int DocumentLine, DiffRow Row)? RowUnder(Point position)
     {

@@ -158,6 +158,7 @@ public sealed class UnifiedDiffParserTests
         Assert.Equal("src/New.cs", file.Path);
         Assert.Equal("src/Old.cs", file.OldPath);
         Assert.Equal(FileChangeKind.Renamed, file.Kind);
+        Assert.Equal(100, file.Similarity);
         Assert.Empty(file.Hunks);
     }
 
@@ -181,6 +182,7 @@ public sealed class UnifiedDiffParserTests
         Assert.Equal("src/Sub/New.cs", file.Path);
         Assert.Equal("src/Old.cs", file.OldPath);
         Assert.Equal(FileChangeKind.Renamed, file.Kind);
+        Assert.Equal(90, file.Similarity);
         Assert.Equal((1, 1), (file.Additions, file.Deletions));
     }
 

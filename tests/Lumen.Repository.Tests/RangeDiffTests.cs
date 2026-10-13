@@ -26,7 +26,7 @@ public sealed class RangeDiffTests : IAsyncLifetime
         Assert.DoesNotContain("Added.cs", diff, StringComparison.Ordinal);
         Assert.True(await checkout.IsAncestorAsync(reviewed, head, CancellationToken.None));
 
-        var onlyWidget = await checkout.GetRangeDiffAsync(checkout.MergeBaseSha, head, false, "src/Widget.cs", CancellationToken.None);
+        var onlyWidget = await checkout.GetRangeDiffAsync(checkout.MergeBaseSha, head, false, ["src/Widget.cs"], CancellationToken.None);
         Assert.DoesNotContain("Added.cs", onlyWidget, StringComparison.Ordinal);
         Assert.Contains("+    int Size => 3;", onlyWidget, StringComparison.Ordinal);
     }
@@ -60,10 +60,35 @@ public sealed class RangeDiffTests : IAsyncLifetime
 
         Assert.True(await checkout.EnsureCommitAsync(reviewed, CancellationToken.None));
         Assert.False(await checkout.IsAncestorAsync(reviewed, rewritten, CancellationToken.None));
-        var diff = await checkout.GetRangeDiffAsync(reviewed, rewritten, false, "src/Widget.cs", CancellationToken.None);
+        var diff = await checkout.GetRangeDiffAsync(reviewed, rewritten, false, ["src/Widget.cs"], CancellationToken.None);
         Assert.Contains("-    int Size => 2;\n+    int Size => 5;", diff, StringComparison.Ordinal);
 
         Assert.False(await checkout.EnsureCommitAsync(new string('e', 40), CancellationToken.None));
         await Assert.ThrowsAsync<ArgumentException>(() => checkout.GetRangeDiffAsync("HEAD~1", rewritten, false, null, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ARenamedFileStaysARenameOnlyWhenBothPathsAreGiven()
+    {
+        // A new commit moves Widget.cs into a folder untouched.
+        var reviewed = remote.HeadSha;
+        await remote.RunAsync("checkout", "-q", "--detach", $"refs/pull/{TestRemote.PullNumber}/head");
+        Directory.CreateDirectory(Path.Combine(remote.RepoPath, "src", "Parts"));
+        await remote.RunAsync("mv", "src/Widget.cs", "src/Parts/Widget.cs");
+        await remote.RunAsync("commit", "-q", "-m", "move the widget");
+        var head = (await remote.RunAsync("rev-parse", "HEAD")).StandardOutput.Trim();
+        await remote.RunAsync("update-ref", $"refs/pull/{TestRemote.PullNumber}/head", head);
+        await remote.RunAsync("checkout", "-q", "main");
+        var checkout = await new GitRepositoryWorkspace(remote.Options()).CheckoutAsync(TestRemote.Key, remote.BaseSha, head, null, CancellationToken.None);
+
+        // Limited to the new path git can't see where the file came from, so the whole file looks added.
+        var newPathOnly = await checkout.GetRangeDiffAsync(reviewed, head, true, ["src/Parts/Widget.cs"], CancellationToken.None);
+        Assert.Contains("new file mode", newPathOnly, StringComparison.Ordinal);
+
+        var bothPaths = await checkout.GetRangeDiffAsync(reviewed, head, true, ["src/Widget.cs", "src/Parts/Widget.cs"], CancellationToken.None);
+        Assert.Contains("similarity index 100%", bothPaths, StringComparison.Ordinal);
+        Assert.Contains("rename from src/Widget.cs", bothPaths, StringComparison.Ordinal);
+        Assert.Contains("rename to src/Parts/Widget.cs", bothPaths, StringComparison.Ordinal);
+        Assert.DoesNotContain("new file mode", bothPaths, StringComparison.Ordinal);
     }
 }

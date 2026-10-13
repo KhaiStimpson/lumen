@@ -36,6 +36,8 @@
       <SolidColorBrush x:Key="Find.Match" Color="#55F5D76E" />
       <SolidColorBrush x:Key="Find.Current" Color="#AAF0A020" />
       <SolidColorBrush x:Key="Code.LineNumber" Color="#A3A9B4" />
+      <SolidColorBrush x:Key="Ruler.Thumb" Color="#1C171A1F" />
+      <SolidColorBrush x:Key="Ruler.ThumbEdge" Color="#52171A1F" />
 
       <SolidColorBrush x:Key="Severity.High" Color="#D93F3F" />
       <SolidColorBrush x:Key="Severity.High.Soft" Color="#FCEBEB" />
@@ -100,6 +102,8 @@
       <SolidColorBrush x:Key="Find.Match" Color="#44E3B341" />
       <SolidColorBrush x:Key="Find.Current" Color="#99F0A020" />
       <SolidColorBrush x:Key="Code.LineNumber" Color="#555C68" />
+      <SolidColorBrush x:Key="Ruler.Thumb" Color="#1FE8EAED" />
+      <SolidColorBrush x:Key="Ruler.ThumbEdge" Color="#55E8EAED" />
 
       <SolidColorBrush x:Key="Severity.High" Color="#F07178" />
       <SolidColorBrush x:Key="Severity.High.Soft" Color="#341A1D" />
@@ -150,6 +154,7 @@
   <StreamGeometry x:Key="Icon.ChevronLeft">M10,3 L5,8 L10,13</StreamGeometry>
   <StreamGeometry x:Key="Icon.ChevronRight">M6,3 L11,8 L6,13</StreamGeometry>
   <StreamGeometry x:Key="Icon.ChevronDown">M3,6 L8,11 L13,6</StreamGeometry>
+  <StreamGeometry x:Key="Icon.ChevronUp">M3,10 L8,5 L13,10</StreamGeometry>
   <StreamGeometry x:Key="Icon.Close">M3.5,3.5 L12.5,12.5 M12.5,3.5 L3.5,12.5</StreamGeometry>
   <StreamGeometry x:Key="Icon.Back">M13,8 L3,8 M7.5,3.5 L3,8 L7.5,12.5</StreamGeometry>
   <StreamGeometry x:Key="Icon.Search">M7,2 A5,5 0 1 1 6.99,2 Z M10.6,10.6 L14,14</StreamGeometry>

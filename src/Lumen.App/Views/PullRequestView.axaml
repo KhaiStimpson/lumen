@@ -100,8 +100,13 @@
                             IsChecked="{Binding File.IsViewed, Mode=OneWay, FallbackValue=False}"
                             Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).ToggleViewedCommand}"
                             CommandParameter="{Binding File}" ToolTip.Tip="Viewed" />
-                  <TextBlock Grid.Column="1" Classes="name" Classes.viewed="{Binding File.IsViewed, FallbackValue=False}"
-                             Text="{Binding Name}" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Classes="name" Classes.viewed="{Binding File.IsViewed, FallbackValue=False}"
+                               Text="{Binding Name}" FontSize="12.5" TextTrimming="CharacterEllipsis" />
+                    <!-- Renamed or moved: where it came from -->
+                    <TextBlock Classes="caption tertiary" FontSize="11" Text="{Binding File.RenamedFromLabel, FallbackValue=''}" TextTrimming="CharacterEllipsis"
+                               IsVisible="{Binding File.IsRenamed, FallbackValue=False}" ToolTip.Tip="{Binding File.Model.OldPath, FallbackValue=''}" />
+                  </StackPanel>
                   <Path Grid.Column="2" Data="{StaticResource Icon.Deviation}" Fill="{DynamicResource Marker.Deviation}"
                         Width="10" Height="10" Stretch="Uniform" Margin="6,0,6,0"
                         IsVisible="{Binding File.HasReviewPoints, FallbackValue=False}" />
@@ -110,10 +115,15 @@
                     <Path Data="{StaticResource Icon.Comment}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="10" Height="10" />
                     <TextBlock Classes="caption" FontSize="11" Text="{Binding File.ThreadCountLabel, FallbackValue=''}" />
                   </StackPanel>
-                  <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" IsVisible="{Binding !IsFolder}">
+                  <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"
+                              IsVisible="{Binding File.ShowCounts, FallbackValue=False}">
                     <TextBlock Classes="added" Text="{Binding File.AdditionsLabel, FallbackValue=''}" />
                     <TextBlock Classes="removed" Text="{Binding File.DeletionsLabel, FallbackValue=''}" />
                   </StackPanel>
+                  <Border Grid.Column="4" Classes="pill" VerticalAlignment="Center" IsVisible="{Binding File.IsPureRename, FallbackValue=False}"
+                          ToolTip.Tip="Moved without changes">
+                    <TextBlock Text="moved" FontSize="10.5" />
+                  </Border>
                 </Grid>
               </TreeDataTemplate>
             </TreeView.ItemTemplate>
@@ -192,16 +202,27 @@
         <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="22,12,22,8">
           <Grid ColumnDefinitions="Auto,Auto,Auto" ClipToBounds="True">
             <TextBlock Classes="h2" Text="{Binding SelectedFile.Name, FallbackValue='Loading…'}" TextTrimming="CharacterEllipsis" />
-            <Border Grid.Column="1" Classes="pill" Margin="10,0,8,0" VerticalAlignment="Center"
-                    IsVisible="{Binding SelectedFile, Converter={x:Static ObjectConverters.IsNotNull}}">
-              <TextBlock Text="{Binding SelectedFile.KindLabel, FallbackValue=''}" />
-            </Border>
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="10,0,8,0" VerticalAlignment="Center">
+              <Border Classes="pill" IsVisible="{Binding SelectedFile, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Text="{Binding SelectedFile.KindLabel, FallbackValue=''}" />
+              </Border>
+              <Border Name="SimilarityPill" Classes="pill" IsVisible="{Binding SelectedFile.HasSimilarity, FallbackValue=False}"
+                      ToolTip.Tip="How much of the content git found unchanged across the rename">
+                <TextBlock Text="{Binding SelectedFile.SimilarityLabel, FallbackValue=''}" />
+              </Border>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"
+                        IsVisible="{Binding SelectedFile.ShowCounts, FallbackValue=True}">
               <TextBlock Classes="added" Text="{Binding SelectedFile.AdditionsLabel, FallbackValue=''}" />
               <TextBlock Classes="removed" Text="{Binding SelectedFile.DeletionsLabel, FallbackValue=''}" />
             </StackPanel>
           </Grid>
-          <TextBlock Grid.Row="1" Classes="caption tertiary" Margin="0,3,0,0" Text="{Binding SelectedFile.Directory, FallbackValue=''}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Grid.Row="1" Classes="caption tertiary" Margin="0,3,0,0" Text="{Binding SelectedFile.Directory, FallbackValue=''}" TextTrimming="CharacterEllipsis"
+                     IsVisible="{Binding !SelectedFile.IsRenamed, FallbackValue=True}" />
+          <!-- A rename, git style: shared/{old → new}/shared, with the part that changed marked. Runs touch: whitespace between them would show. -->
+          <TextBlock Name="RenamePath" Grid.Row="1" Classes="caption" Margin="0,3,0,0" FontFamily="{StaticResource CodeFont}" FontSize="11.5"
+                     TextTrimming="CharacterEllipsis" IsVisible="{Binding SelectedFile.IsRenamed, FallbackValue=False}"
+                     ToolTip.Tip="{Binding SelectedFile.Model.OldPath, StringFormat='Renamed from {0}', FallbackValue=''}"><Run Text="{Binding SelectedFile.PathChange.Head, FallbackValue=''}" Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding SelectedFile.PathChange.OldMiddle, FallbackValue=''}" Foreground="{DynamicResource Diff.Removed.Sign}" Background="{DynamicResource Diff.Removed.Bg}" TextDecorations="Strikethrough" /><Run Text=" → " Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding SelectedFile.PathChange.NewMiddle, FallbackValue=''}" Foreground="{DynamicResource Diff.Added.Sign}" Background="{DynamicResource Diff.Added.Bg}" FontWeight="Medium" /><Run Text="{Binding SelectedFile.PathChange.Tail, FallbackValue=''}" Foreground="{DynamicResource Text.Tertiary}" /></TextBlock>
 
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="16,0,0,0">
             <!-- Only the hunks, or the whole file with the changes in place (X toggles) -->
@@ -227,6 +248,17 @@
           </StackPanel>
           <!-- Scope and view options -->
           <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" Margin="0,6,2,0">
+            <!-- Step through this file's changes ([ and ]); the ruler beside the diff shows where they are -->
+            <StackPanel Name="ChangeNav" Orientation="Horizontal" Spacing="2" Margin="0,0,8,0" VerticalAlignment="Center" IsVisible="{Binding HasChanges}">
+              <Button Classes="ghost" Padding="5" Command="{Binding PreviousChangeCommand}" ToolTip.Tip="Previous change ([)">
+                <Path Data="{StaticResource Icon.ChevronUp}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="10" Height="10" />
+              </Button>
+              <TextBlock Name="ChangePosition" Classes="caption" FontSize="11.5" MinWidth="78" TextAlignment="Center" VerticalAlignment="Center"
+                         Text="{Binding ChangePositionLabel}" />
+              <Button Classes="ghost" Padding="5" Command="{Binding NextChangeCommand}" ToolTip.Tip="Next change (])">
+                <Path Data="{StaticResource Icon.ChevronDown}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="10" Height="10" />
+              </Button>
+            </StackPanel>
             <ToggleButton Name="SinceLastReview" Classes="ghost chip" IsChecked="{Binding ShowSinceLastReview}" IsEnabled="{Binding CanShowSinceLastReview}"
                           ToolTip.Tip="{Binding LastReviewedLabel}" Padding="8,2">
               <TextBlock Text="Since last review" FontSize="11.5" />
@@ -297,9 +329,18 @@
             <!-- Mechanical file without a diff in the fixture, or still loading -->
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="6"
                         IsVisible="{Binding CurrentDiff.IsEmpty, FallbackValue=True}">
-              <TextBlock Classes="h3" HorizontalAlignment="Center"
-                         Text="{Binding SelectedFile.MechanicalReason, FallbackValue='Loading…', TargetNullValue='No textual changes'}" />
-              <TextBlock Classes="caption" HorizontalAlignment="Center" Text="Nothing to review line by line." />
+              <StackPanel Spacing="6" IsVisible="{Binding !SelectedFile.IsPureRename, FallbackValue=True}">
+                <TextBlock Classes="h3" HorizontalAlignment="Center"
+                           Text="{Binding SelectedFile.MechanicalReason, FallbackValue='Loading…', TargetNullValue='No textual changes'}" />
+                <TextBlock Classes="caption" HorizontalAlignment="Center" Text="Nothing to review line by line." />
+              </StackPanel>
+              <!-- Renamed or moved with the content untouched -->
+              <StackPanel Name="MovedNotice" Spacing="6" IsVisible="{Binding SelectedFile.IsPureRename, FallbackValue=False}">
+                <TextBlock Classes="h3" HorizontalAlignment="Center" Text="Moved without changes" />
+                <TextBlock Classes="caption" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="480"
+                           Text="{Binding SelectedFile.Model.OldPath, StringFormat='Same content as {0}.', FallbackValue=''}" />
+                <Button Classes="link" HorizontalAlignment="Center" Content="Show file" Command="{Binding ShowWholeFileCommand}" />
+              </StackPanel>
             </StackPanel>
           </Panel>
         </Border>

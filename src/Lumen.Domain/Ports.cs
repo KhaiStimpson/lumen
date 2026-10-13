@@ -108,10 +108,11 @@ public interface IPullRequestCheckout
 
     /// <summary>
     /// Unified diff between two commits of the pull request (a commit, a range, "since last review"), optionally
-    /// ignoring whitespace and limited to <paramref name="path"/>. When <paramref name="fromSha"/> is not an ancestor
-    /// of <paramref name="toSha"/> (a force-push) the file contents are compared directly, which git does anyway.
+    /// ignoring whitespace and limited to <paramref name="paths"/> (give a renamed file's old path too, or git can't pair
+    /// the two and reports the file as added). When <paramref name="fromSha"/> is not an ancestor of
+    /// <paramref name="toSha"/> (a force-push) the file contents are compared directly, which git does anyway.
     /// </summary>
-    Task<string> GetRangeDiffAsync(string fromSha, string toSha, bool ignoreWhitespace, string? path, CancellationToken cancellationToken) =>
+    Task<string> GetRangeDiffAsync(string fromSha, string toSha, bool ignoreWhitespace, IReadOnlyList<string>? paths, CancellationToken cancellationToken) =>
         throw new NotSupportedException("This checkout can only diff the whole pull request.");
 
     /// <summary>True when <paramref name="ancestor"/> is reachable from <paramref name="descendant"/>.</summary>

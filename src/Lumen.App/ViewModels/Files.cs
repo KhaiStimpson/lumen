@@ -22,6 +22,55 @@ public sealed partial class FileEntryViewModel(ChangedFileSummary file) : Observ
 
     public string MechanicalReason => Model.MechanicalReason;
 
+    public bool IsRenamed => Model.Kind == FileChangeKind.Renamed && Model.OldPath.Length > 0 && Model.OldPath != Model.Path;
+
+    /// <summary>Moved or renamed with the content untouched: nothing to read line by line.</summary>
+    public bool IsPureRename => IsRenamed && !Model.IsBinary && Model.Additions + Model.Deletions == 0;
+
+    /// <summary>A pure rename shows "moved" instead of "+0 −0".</summary>
+    public bool ShowCounts => !IsPureRename;
+
+    /// <summary>
+    /// Under the name in the files tree: "was Old.cs" (renamed in place), "from …/Old/" (moved, shown from where the
+    /// paths part), or the old path when both changed.
+    /// </summary>
+    public string RenamedFromLabel
+    {
+        get
+        {
+            if (PathChange is not { } change)
+            {
+                return "";
+            }
+
+            var oldName = System.IO.Path.GetFileName(Model.OldPath);
+            var oldDirectory = System.IO.Path.GetDirectoryName(Model.OldPath)?.Replace('\\', '/') ?? "";
+            if (oldDirectory == Directory)
+            {
+                return $"was {oldName}";
+            }
+
+            if (oldName != Name)
+            {
+                return $"from {Model.OldPath}";
+            }
+
+            return change.OldMiddle.Length > 0 ? $"from {(change.Head.Length > 0 ? "…/" : "")}{change.OldMiddle}"
+                : oldDirectory.Length > 0 ? $"from {oldDirectory}/"
+                : "from the root";
+        }
+    }
+
+    /// <summary>"94% similar" for a rename with edits; empty for a pure rename or anything else.</summary>
+    public string SimilarityLabel => IsRenamed && Model.Similarity is > 0 and < 100
+        ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{Model.Similarity}% similar")
+        : "";
+
+    public bool HasSimilarity => SimilarityLabel.Length > 0;
+
+    /// <summary>The old and new paths split around the segments that differ, for the header's "old → new" line.</summary>
+    public PathChange? PathChange => IsRenamed ? PathChange.Between(Model.OldPath, Model.Path) : null;
+
     public string KindLabel => Model.Kind switch
     {
         FileChangeKind.Added => "Added",
@@ -48,6 +97,47 @@ public sealed partial class FileEntryViewModel(ChangedFileSummary file) : Observ
     /// <summary>GitHub's per-file "Viewed" checkbox: ticked by the reviewer, never by merely opening the file.</summary>
     [ObservableProperty]
     public partial bool IsViewed { get; set; } = file.IsViewed;
+}
+
+/// <summary>
+/// A rename's two paths split into the shared head, the differing middle and the shared tail, by path segment:
+/// <c>src/Retry/Policy.cs → src/Policies/Policy.cs</c> differs only in <c>Retry/</c> vs <c>Policies/</c>.
+/// </summary>
+public sealed record PathChange(string Head, string OldMiddle, string NewMiddle, string Tail)
+{
+    public static PathChange Between(string oldPath, string newPath)
+    {
+        var a = oldPath.Split('/');
+        var b = newPath.Split('/');
+        var head = 0;
+        while (head < Math.Min(a.Length, b.Length) - 1 && a[head] == b[head])
+        {
+            head++;
+        }
+
+        var tail = 0;
+        while (tail < Math.Min(a.Length, b.Length) - head && a[^(tail + 1)] == b[^(tail + 1)])
+        {
+            tail++;
+        }
+
+        static string Join(IEnumerable<string> parts, bool trailing)
+        {
+            var joined = string.Join('/', parts);
+            return trailing && joined.Length > 0 ? joined + "/" : joined;
+        }
+
+        // The tail is the file name onwards; everything before it keeps its slash.
+        return new PathChange(
+            Join(a.Take(head), trailing: true),
+            Join(a.Skip(head).Take(a.Length - head - tail), trailing: tail > 0),
+            Join(b.Skip(head).Take(b.Length - head - tail), trailing: tail > 0),
+            Join(a.Skip(a.Length - tail), trailing: false));
+    }
+
+    public string OldPath => Head + OldMiddle + Tail;
+
+    public string NewPath => Head + NewMiddle + Tail;
 }
 
 /// <summary>A folder or file in the changed-files tree. Single-child folder chains are compacted ("src/Web/Services").</summary>

@@ -36,6 +36,10 @@ public sealed partial class PullRequestViewModel
     [RelayCommand]
     public void ToggleIgnoreWhitespace() => IgnoreWhitespace = !IgnoreWhitespace;
 
+    /// <summary>A file moved without changes has no diff; this shows its content.</summary>
+    [RelayCommand]
+    public void ShowWholeFile() => ShowFullFile = true;
+
     // Find in file (Ctrl+F) ------------------------------------------------------------------------
 
     [ObservableProperty]
@@ -75,6 +79,8 @@ public sealed partial class PullRequestViewModel
 
     partial void OnCurrentDiffChanged(Diff.DiffDocument? value)
     {
+        OnPropertyChanged(nameof(ChangePositionLabel));
+        OnPropertyChanged(nameof(HasChanges));
         if (FindQuery.Length > 0)
         {
             RunFind(keepPosition: true);
@@ -133,5 +139,52 @@ public sealed partial class PullRequestViewModel
         {
             FindMatchRequested?.Invoke(this, current);
         }
+    }
+
+    // Change navigation ([ and ], the overview ruler) ---------------------------------------------
+
+    private int _currentChange = -1;
+
+    /// <summary>The view asks its editor to step; +1 for the next change, -1 for the previous one.</summary>
+    public event EventHandler<int>? ChangeStepRequested;
+
+    public bool HasChanges => CurrentDiff is { Changes.Count: > 0 };
+
+    /// <summary>"Change 3 of 7" once stepping, else how many there are.</summary>
+    public string ChangePositionLabel => CurrentDiff is not { Changes.Count: > 0 and var count } ? ""
+        : _currentChange >= 0 && _currentChange < count ? string.Create(CultureInfo.InvariantCulture, $"Change {_currentChange + 1} of {count}")
+        : count == 1 ? "1 change" : string.Create(CultureInfo.InvariantCulture, $"{count} changes");
+
+    /// <summary>The editor moved to another change (by key, button or ruler).</summary>
+    public void SetCurrentChange(int index)
+    {
+        _currentChange = index;
+        OnPropertyChanged(nameof(ChangePositionLabel));
+    }
+
+    [RelayCommand]
+    public void NextChange() => ChangeStepRequested?.Invoke(this, +1);
+
+    [RelayCommand]
+    public void PreviousChange() => ChangeStepRequested?.Invoke(this, -1);
+
+    /// <summary>
+    /// Opens the next (+1) or previous (-1) file in the files tree's order, skipping files with nothing to step through.
+    /// False at either end.
+    /// </summary>
+    public async Task<bool> StepFileAsync(int direction)
+    {
+        var ordered = Tree.SelectMany(n => n.Descendants().Prepend(n)).Select(n => n.File).OfType<FileEntryViewModel>().ToList();
+        var at = SelectedFile is null ? -1 : ordered.FindIndex(f => f.Path == SelectedFile.Path);
+        for (var i = at + direction; i >= 0 && i < ordered.Count; i += direction)
+        {
+            if (ordered[i].Model.Additions + ordered[i].Model.Deletions > 0)
+            {
+                await SelectFileAsync(ordered[i]).ConfigureAwait(true);
+                return true;
+            }
+        }
+
+        return false;
     }
 }
