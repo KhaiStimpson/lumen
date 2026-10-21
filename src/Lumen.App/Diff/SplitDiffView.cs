@@ -1,5 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Lumen.App.Motion;
 
 namespace Lumen.App.Diff;
@@ -34,11 +37,31 @@ public sealed class SplitDiffView : UserControl
 
     public SplitDiffView()
     {
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,1,*") };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,*") };
+        grid.ColumnDefinitions[0].MinWidth = 120;
+        grid.ColumnDefinitions[2].MinWidth = 120;
         grid.Children.Add(_left);
-        var divider = new Border { [!Border.BackgroundProperty] = this.GetResourceObservable("Border.Subtle").ToBinding() };
+        // A 1px line, with a wider transparent splitter on top so the panes can be resized by dragging the middle.
+        var divider = new Border
+        {
+            Width = 1,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            IsHitTestVisible = false,
+            [!Border.BackgroundProperty] = this.GetResourceObservable("Border.Subtle").ToBinding(),
+        };
         Grid.SetColumn(divider, 1);
         grid.Children.Add(divider);
+        var splitter = new GridSplitter
+        {
+            Name = "SplitDivider",
+            Width = 5,
+            Background = Brushes.Transparent,
+            ResizeDirection = GridResizeDirection.Columns,
+            ResizeBehavior = GridResizeBehavior.PreviousAndNext,
+            Cursor = new Cursor(StandardCursorType.SizeWestEast),
+        };
+        Grid.SetColumn(splitter, 1);
+        grid.Children.Add(splitter);
         Grid.SetColumn(_right, 2);
         grid.Children.Add(_right);
         Content = grid;
