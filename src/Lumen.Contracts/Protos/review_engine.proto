@@ -947,6 +947,50 @@ message WalkthroughRisk {
   string reason = 4;
 }
 
+// The Map (plan v3): what part of the system a component plays.
+enum ComponentLayer {
+  COMPONENT_LAYER_OTHER = 0;
+  COMPONENT_LAYER_ENTRY = 1;
+  COMPONENT_LAYER_UI = 2;
+  COMPONENT_LAYER_CORE = 3;
+  COMPONENT_LAYER_INTEGRATION = 4;
+  COMPONENT_LAYER_DATA = 5;
+  COMPONENT_LAYER_CONFIG = 6;
+}
+
+// How one changed file uses another, strongest last.
+enum LinkKind {
+  LINK_KIND_REFERENCES = 0;
+  LINK_KIND_DEPENDS_ON = 1;
+  LINK_KIND_IMPLEMENTS = 2;
+  LINK_KIND_TESTS = 3;
+}
+
+// A part of the system the pull request builds or changes, and its (hand-written, non-test) files.
+message WalkthroughComponent {
+  string id = 1;
+  string title = 2;
+  string role = 3;
+  ComponentLayer layer = 4;
+  repeated string paths = 5;
+}
+
+// "from" uses "to" (component ids). Found in the code unless inferred (only the model suggested it).
+message WalkthroughEdge {
+  string from = 1;
+  string to = 2;
+  LinkKind kind = 3;
+  bool inferred = 4;
+  string label = 5;
+}
+
+// A link between two changed files found in the code: "from" uses "to".
+message FileLink {
+  string from = 1;
+  string to = 2;
+  LinkKind kind = 3;
+}
+
 message Walkthrough {
   WalkthroughStatus status = 1;
   // Progress or why it is unavailable / failed.
@@ -956,7 +1000,7 @@ message Walkthrough {
   string description_mismatch = 4;
   repeated WalkthroughGroup groups = 5;
   repeated WalkthroughRisk risks = 6;
-  // e.g. "glm-5.3-flash · walkthrough/v1"
+  // e.g. "glm-5.3-flash · walkthrough/v2"
   string producer = 7;
   string head_sha = 8;
   // Set for a "since last review" walkthrough.
@@ -965,6 +1009,10 @@ message Walkthrough {
   // Files summarised so far / total (while running).
   int32 files_done = 11;
   int32 files_total = 12;
+  // The Map (plan v3): components, how they connect, and the file links found in the code.
+  repeated WalkthroughComponent components = 13;
+  repeated WalkthroughEdge edges = 14;
+  repeated FileLink file_links = 15;
 }
 
 message WalkthroughUpdated {

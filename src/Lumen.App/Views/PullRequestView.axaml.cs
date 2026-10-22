@@ -56,10 +56,28 @@ public sealed partial class PullRequestView : UserControl, IDisposable
             Layout.ColumnDefinitions[4].Width = new GridLength(Math.Max(0, right));
         }
 
-        void Commit(object? sender, VectorEventArgs args) => shell.SavePaneWidths(Layout.ColumnDefinitions[0].ActualWidth, Layout.ColumnDefinitions[4].ActualWidth);
+        void Commit(object? sender, VectorEventArgs args) => shell.SavePaneWidths(Layout.ColumnDefinitions[0].ActualWidth, _rightBeforeMap?.Value ?? Layout.ColumnDefinitions[4].ActualWidth);
         LeftSplitter.DragCompleted += Commit;
         RightSplitter.DragCompleted += Commit;
     }
+
+    /// <summary>The Map is an overview: it takes the walkthrough pane's width while it shows, and gives it back after.</summary>
+    private void ApplyMapPanes(bool map)
+    {
+        var right = Layout.ColumnDefinitions[4];
+        if (map && _rightBeforeMap is null)
+        {
+            _rightBeforeMap = right.Width;
+            right.Width = new GridLength(0);
+        }
+        else if (!map && _rightBeforeMap is { } width)
+        {
+            right.Width = width;
+            _rightBeforeMap = null;
+        }
+    }
+
+    private GridLength? _rightBeforeMap;
 
     private async Task OnMarkerClickedAsync(string id)
     {
@@ -270,6 +288,10 @@ public sealed partial class PullRequestView : UserControl, IDisposable
 
         switch (e.PropertyName)
         {
+            case nameof(PullRequestViewModel.Tab):
+                ApplyMapPanes(_viewModel.IsMapTab);
+                break;
+
             case nameof(PullRequestViewModel.Mode) when _viewModel.IsExamining:
                 var source = _viewModel.CurrentPoint is { } current && ExistingCard(current.Id) is ReviewCardView card && card.IsEffectivelyVisible
                     ? card.CardSurface

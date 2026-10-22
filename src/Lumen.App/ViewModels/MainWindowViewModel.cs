@@ -156,6 +156,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             items.Add(Action(pr.ShowFullFile ? "Show only the changes" : "Show the full file", "X", () => Do(() => pr.ShowFullFile = !pr.ShowFullFile)));
             items.Add(Action("Find in file", "Ctrl+F", () => Do(pr.OpenFind)));
             items.Add(Action("Files", "", () => Do(() => pr.ShowTab(PullRequestTab.Files))));
+            items.Add(Action("Map", "M", () => Do(() => pr.ShowTab(PullRequestTab.Map))));
             items.Add(Action("Conversation", "", () => Do(() => pr.ShowTab(PullRequestTab.Conversation))));
             items.Add(Action("Commits", "", () => Do(() => pr.ShowTab(PullRequestTab.Commits))));
             items.Add(Action("Checks", "", () => Do(() => pr.ShowTab(PullRequestTab.Checks))));

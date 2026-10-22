@@ -25,6 +25,13 @@ public sealed class WalkthroughGeneratorTests
         "walkthrough/file" when request.User.Contains("AbnProvider.cs", StringComparison.Ordinal) && !request.User.Contains("Tests", StringComparison.Ordinal) =>
             """{"summary":"New provider.","kind":"logic","risks":[{"line":3,"category":"error-handling","reason":"Swallows every exception."},{"line":99,"category":"other","reason":"Invented line."}]}""",
         "walkthrough/file" => "```json\n{\"summary\":\"Something.\",\"kind\":\"logic\",\"risks\":[]}\n```",
+        "walkthrough/components" => """
+            {"components":[
+              {"title":"ABN provider","role":"Looks up the registry.","layer":"integration","paths":["src/Providers/AbnProvider.cs","tests/AbnProviderTests.cs","nope.cs"]},
+              {"title":"Contact model","role":"The contact entity.","layer":"data","paths":["src/Models/Contact.cs","src/Providers/AbnProvider.cs"]},
+              {"title":"Ghost","role":"","layer":"core","paths":["Migrations/2026_Init.cs"]}
+            ],"edges":[{"from":0,"to":1,"label":"fills fields"},{"from":1,"to":0,"label":"reversed"},{"from":0,"to":7,"label":"bad"}]}
+            """,
         "walkthrough/groups" => """
             {"groups":[
               {"title":"Contact model","summary":"Data first.","paths":["src/Models/Contact.cs"]},
@@ -55,7 +62,7 @@ public sealed class WalkthroughGeneratorTests
         var risk = Assert.Single(result.Risks);
         Assert.Equal(new CodeLocation("src/Providers/AbnProvider.cs", 3, 3), risk.Location);
         Assert.Equal(RiskCategory.ErrorHandling, risk.Category);
-        Assert.Equal("glm-test · walkthrough/v1", result.Producer);
+        Assert.Equal("glm-test · walkthrough/v2", result.Producer);
 
         // Running → … → complete, with progress in between.
         Assert.Equal(WalkthroughStatus.Running, updates[0].Status);
@@ -147,6 +154,98 @@ public sealed class WalkthroughGeneratorTests
 
         Assert.Equal("old", result.SinceSha);
         Assert.Contains("since they last looked", model.Requests.Single(r => r.Purpose == "walkthrough/intent").System, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ComponentsAreGroundedAndLinkedByTheCode()
+    {
+        var model = new ScriptedModel(Answer);
+        var links = new List<FileLink>
+        {
+            new("src/Providers/AbnProvider.cs", "src/Models/Contact.cs", LinkKind.DependsOn),
+            new("tests/AbnProviderTests.cs", "src/Providers/AbnProvider.cs", LinkKind.Tests),
+            new("src/Providers/AbnProvider.cs", "src/Elsewhere.cs", LinkKind.References),
+        };
+
+        var result = await new WalkthroughGenerator(model, new WalkthroughOptions()).RunAsync(
+            Input(Provider, Model, Test, Migration) with { CodeLinks = links }, _ => { }, CancellationToken.None);
+
+        // Tests, generated files and invented paths never become boxes; each path is in one component.
+        Assert.Equal(["ABN provider", "Contact model"], result.Components.Select(c => c.Title));
+        Assert.Equal(["src/Providers/AbnProvider.cs"], result.Components[0].Paths);
+        Assert.Equal(["src/Models/Contact.cs"], result.Components[1].Paths);
+        Assert.Equal([ComponentLayer.Integration, ComponentLayer.Data], result.Components.Select(c => c.Layer));
+
+        // The code's link becomes the edge and keeps the model's label; the model's reversed or invalid edges are dropped.
+        var edge = Assert.Single(result.Edges);
+        Assert.Equal(("c1", "c2", LinkKind.DependsOn, false, "fills fields"), (edge.From, edge.To, edge.Kind, edge.Inferred, edge.Label));
+
+        // File links stay for "tested by", but only between files in the diff.
+        Assert.Equal(2, result.FileLinks.Count);
+        Assert.Contains("walkthrough/components", model.Requests.Select(r => r.Purpose));
+        Assert.Contains("src/Providers/AbnProvider.cs -> src/Models/Contact.cs (DependsOn)", model.Requests.Single(r => r.Purpose == "walkthrough/components").User, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AModelEdgeTheCodeDoesNotShowIsKeptAsInferred()
+    {
+        var view = Files.File("src/Pages/Contact.cshtml", ["<p/>"]);
+        var (components, edges) = WalkthroughGrounding.GroundComponents(
+            [new("Contact page", "", ComponentLayer.Ui, ["src/Pages/Contact.cshtml"]), new("ABN provider", "", ComponentLayer.Integration, ["src/Providers/AbnProvider.cs"])],
+            [new RawEdge(0, 1, "starts lookups")],
+            [view, Provider, Model],
+            [],
+            16);
+
+        Assert.Equal(["Contact page", "ABN provider", "Other changes"], components.Select(c => c.Title));
+        var edge = Assert.Single(edges);
+        Assert.True(edge.Inferred);
+        Assert.Equal("starts lookups", edge.Label);
+    }
+
+    [Fact]
+    public void ComponentsBeyondTheLimitJoinOtherChanges()
+    {
+        var files = Enumerable.Range(1, 5).Select(i => Files.File($"src/F{i}.cs", ["a"])).ToArray();
+        var (components, _) = WalkthroughGrounding.GroundComponents(
+            [.. files.Select((f, i) => new RawComponent($"C{i + 1}", "", ComponentLayer.Core, [f.Path]))],
+            [],
+            files,
+            [],
+            3);
+
+        Assert.Equal(["C1", "C2", "Other changes"], components.Select(c => c.Title));
+        Assert.Equal(["src/F3.cs", "src/F4.cs", "src/F5.cs"], components[2].Paths);
+    }
+
+    [Fact]
+    public async Task WithoutTheModelsComponentsTheChangeGroupsStandIn()
+    {
+        var model = new ScriptedModel(Answer)
+        {
+            FailWhen = r => r.Purpose == "walkthrough/components" ? new ModelException(ModelFailure.Timeout, "slow") : null,
+        };
+
+        var result = await new WalkthroughGenerator(model, new WalkthroughOptions()).RunAsync(
+            Input(Provider, Model, Test) with { CodeLinks = [new("src/Providers/AbnProvider.cs", "src/Models/Contact.cs", LinkKind.References)] },
+            _ => { },
+            CancellationToken.None);
+
+        Assert.Equal(WalkthroughStatus.Complete, result.Status);
+        Assert.Equal(["Contact model", "ABN provider"], result.Components.Select(c => c.Title));
+        Assert.Equal(("c2", "c1"), (Assert.Single(result.Edges).From, result.Edges[0].To));
+    }
+
+    [Fact]
+    public async Task ASinceLastReviewWalkthroughHasNoComponents()
+    {
+        var model = new ScriptedModel(Answer);
+
+        var result = await new WalkthroughGenerator(model, new WalkthroughOptions()).RunAsync(
+            Input(Provider, Model) with { SinceSha = "old" }, _ => { }, CancellationToken.None);
+
+        Assert.Empty(result.Components);
+        Assert.DoesNotContain("walkthrough/components", model.Requests.Select(r => r.Purpose));
     }
 
     [Fact]

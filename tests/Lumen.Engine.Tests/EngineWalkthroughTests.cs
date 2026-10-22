@@ -88,6 +88,9 @@ public sealed class EngineWalkthroughTests : IAsyncLifetime, IDisposable
         var done = updates[^1];
         Assert.Equal("Adds a retry worker.", done.Intent);
         Assert.Equal(WorkerScenario.NewWorkerPath, Assert.Single(done.Groups).Paths.Single());
+
+        // The Map's components ride along: the model named none here, so the worker sits in one "Changes" box.
+        Assert.Equal(("Changes", WorkerScenario.NewWorkerPath), (Assert.Single(done.Components).Title, done.Components[0].Paths.Single()));
         var risk = Assert.Single(done.Risks);
         Assert.Equal((WorkerScenario.NewWorkerPath, 5), (risk.Location.Path, risk.Location.StartLine));
         Assert.False(done.FromCache);

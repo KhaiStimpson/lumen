@@ -188,7 +188,7 @@ public sealed class DiffUpgradeAndWalkthroughTests
         Assert.Equal(8, walkthrough.Groups.Count);
         Assert.True(walkthrough.Groups[^1].IsMechanical);
         Assert.Equal(5, walkthrough.Risks.Count);
-        Assert.Equal("A model's reading · glm-5.3-flash · walkthrough/v1", walkthrough.Provenance);
+        Assert.Equal("A model's reading · glm-5.3-flash · walkthrough/v2", walkthrough.Provenance);
 
         // A risky area is a marker of its own shape, and a checklist item.
         var risk = walkthrough.Risks.Single(r => r.Path.EndsWith("EnrichmentScheduler.cs", StringComparison.Ordinal));
