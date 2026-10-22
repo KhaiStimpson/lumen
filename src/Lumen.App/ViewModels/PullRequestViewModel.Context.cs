@@ -14,10 +14,12 @@ public sealed partial class PullRequestViewModel
     private static DateTimeOffset Now => DateTimeOffset.UtcNow;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsFilesTab), nameof(IsConversationTab), nameof(IsCommitsTab), nameof(IsChecksTab))]
+    [NotifyPropertyChangedFor(nameof(IsFilesTab), nameof(IsConversationTab), nameof(IsCommitsTab), nameof(IsChecksTab), nameof(IsMapTab))]
     public partial PullRequestTab Tab { get; set; }
 
     public bool IsFilesTab => Tab == PullRequestTab.Files;
+
+    public bool IsMapTab => Tab == PullRequestTab.Map;
 
     public bool IsConversationTab => Tab == PullRequestTab.Conversation;
 
@@ -371,6 +373,8 @@ public sealed partial class PullRequestViewModel
     internal void ApplyDetails(PullRequestDetails details)
     {
         Details = details;
+        _mapSincePaths = null;
+        RebuildMap();
         Labels.Clear();
         foreach (var label in details.Labels)
         {

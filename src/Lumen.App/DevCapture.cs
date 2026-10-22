@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
 using Lumen.App.ViewModels;
 
 namespace Lumen.App;
@@ -27,6 +28,34 @@ internal static class DevCapture
         var steps = (script ?? "diff").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         for (var i = 0; i < steps.Length; i++)
         {
+            // morph:terrain / morph:blueprint switch the Map's layout and save frames while it animates.
+            if (steps[i].StartsWith("morph:", StringComparison.Ordinal) && viewModel.PullRequest is { } morphing)
+            {
+                // Saving a frame takes longer than the whole morph, so it runs slowed down while it is recorded.
+                var duration = Map.MapCanvas.MorphDuration;
+                Map.MapCanvas.MorphDuration = TimeSpan.FromSeconds(4);
+                var terrain = steps[i] == "morph:terrain";
+                if (terrain)
+                {
+                    morphing.Map.ShowTerrain();
+                }
+                else
+                {
+                    morphing.Map.ShowBlueprint();
+                }
+
+                var canvas = window.GetVisualDescendants().OfType<Map.MapCanvas>().FirstOrDefault();
+                for (var frame = 0; frame < 80 && (frame == 0 || canvas?.IsMorphing == true); frame++)
+                {
+                    Save(window, Path.Combine(directory, $"{i + 1:00}-{steps[i].Replace(':', '-')}-{frame:00}.png"));
+                    await Task.Delay(30).ConfigureAwait(true);
+                }
+
+                Save(window, Path.Combine(directory, $"{i + 1:00}-{steps[i].Replace(':', '-')}-end.png"));
+                Map.MapCanvas.MorphDuration = duration;
+                continue;
+            }
+
             await ApplyAsync(viewModel, steps[i]).ConfigureAwait(true);
             await Task.Delay(900).ConfigureAwait(true);
             Save(window, Path.Combine(directory, $"{i + 1:00}-{steps[i].Replace(':', '-')}.png"));
@@ -131,6 +160,33 @@ internal static class DevCapture
                 break;
             case "order" when pr is not null:
                 pr.GroupOrder = !pr.GroupOrder;
+                break;
+            // Plan v3: the Map.
+            case "map" when pr is not null:
+                pr.ShowTab(PullRequestTab.Map);
+                break;
+            case "blueprint" when pr is not null:
+                pr.Map.ShowBlueprint();
+                break;
+            case "terrain" when pr is not null:
+                pr.Map.ShowTerrain();
+                break;
+            case "lens:attention" when pr is not null:
+                pr.Map.SetLens(MapLens.Attention);
+                break;
+            case "lens:since" when pr is not null:
+                pr.Map.SetLens(MapLens.SinceReview);
+                await Task.Delay(800).ConfigureAwait(true);
+                break;
+            case "lens:tests" when pr is not null:
+                pr.Map.SetLens(MapLens.Tests);
+                break;
+            case var s when s.StartsWith("mapselect:", StringComparison.Ordinal) && pr is not null:
+                var mapName = s["mapselect:".Length..];
+                pr.Map.Select(pr.Map.Components.SelectMany(c => c.Files).FirstOrDefault(f => f.Name == mapName)?.Path);
+                break;
+            case "mapopen" when pr is not null:
+                await pr.OpenMapSelectionAsync().ConfigureAwait(true);
                 break;
             case "dark" when Application.Current is { } app:
                 app.RequestedThemeVariant = ThemeVariant.Dark;

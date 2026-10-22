@@ -168,6 +168,7 @@ public sealed partial class PullRequestViewModel
         }
 
         UpdateMarkers();
+        RebuildMap();
     }
 
     private IEnumerable<GutterMarker> RiskMarkers(string path) =>

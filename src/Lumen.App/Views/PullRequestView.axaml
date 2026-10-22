@@ -160,11 +160,13 @@
 
       <!-- ===================== Center: code ===================== -->
       <Grid Grid.Column="2" Name="Center" RowDefinitions="Auto,Auto,*" IsVisible="{Binding !IsExamining}">
-        <!-- Tabs: Files (the review), Conversation, Commits, Checks (plan v2 M2) -->
+        <!-- Tabs: Files (the review), Map (plan v3), Conversation, Commits, Checks (plan v2 M2) -->
         <Grid ColumnDefinitions="*,Auto" Margin="18,10,18,0">
           <StackPanel Orientation="Horizontal" Spacing="2">
             <RadioButton Name="TabFiles" Classes="tab" GroupName="PrTab" Content="Files"
                          IsChecked="{Binding Tab, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Files}" />
+            <RadioButton Name="TabMap" Classes="tab" GroupName="PrTab" Content="Map" ToolTip.Tip="The change as the system it builds (M)"
+                         IsChecked="{Binding Tab, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Map}" />
             <RadioButton Name="TabConversation" Classes="tab" GroupName="PrTab" Content="{Binding ConversationLabel}"
                          IsChecked="{Binding Tab, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Conversation}" />
             <RadioButton Name="TabCommits" Classes="tab" GroupName="PrTab" Content="{Binding CommitsLabel}"
@@ -196,6 +198,7 @@
         <views:ConversationView Grid.Row="2" Name="ConversationTab" IsVisible="{Binding IsConversationTab}" />
         <views:CommitsView Grid.Row="2" Name="CommitsTab" IsVisible="{Binding IsCommitsTab}" />
         <views:ChecksView Grid.Row="2" Name="ChecksTab" IsVisible="{Binding IsChecksTab}" />
+        <views:MapView Grid.Row="2" Name="MapTab" IsVisible="{Binding IsMapTab}" />
 
         <Grid Grid.Row="2" Name="FilesTab" RowDefinitions="Auto,Auto,Auto,*" IsVisible="{Binding IsFilesTab}">
         <!-- Guided review header -->

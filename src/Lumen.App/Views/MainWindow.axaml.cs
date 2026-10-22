@@ -187,6 +187,25 @@ public sealed partial class MainWindow : Window
         e.Handled = true;
         switch (e.Key)
         {
+            // The Map (plan v3): M opens or leaves it; on it B / T switch the layout, L the lens, Enter opens the file.
+            case Key.M:
+                pr.ToggleMap();
+                break;
+            case Key.B when pr.IsMapTab:
+                pr.Map.ShowBlueprint();
+                break;
+            case Key.T when pr.IsMapTab:
+                pr.Map.ShowTerrain();
+                break;
+            case Key.L when pr.IsMapTab:
+                pr.Map.NextLens();
+                break;
+            case Key.Enter when pr.IsMapTab:
+                await pr.OpenMapSelectionAsync().ConfigureAwait(true);
+                break;
+            case Key.Escape when pr.IsMapTab:
+                pr.ShowTab(ViewModels.PullRequestTab.Files);
+                break;
             case Key.J:
                 await pr.NextPointAsync().ConfigureAwait(true);
                 break;

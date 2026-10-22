@@ -49,6 +49,13 @@ Connections.
 - The engine also reads Cloudflare credentials from `LUMEN_CLOUDFLARE_ACCOUNT_ID` / `LUMEN_CLOUDFLARE_API_TOKEN`, for
   Linux and CI where there is no credential manager.
 
+### After v2: the Map (2026-10-22)
+
+A **Map** tab shows the pull request as the system it builds: the walkthrough names components, Roslyn links them from
+the code, and the app draws them as a Blueprint (by how they use each other) or a Terrain (by lines added), with
+Attention / Since my review / Tests lenses. Design, pipeline and limits: [map.md](map.md). Covered by `MapTests`,
+`CodeLinkFinderTests` and the component cases in `WalkthroughGeneratorTests`.
+
 ## Decisions (2026-10-12)
 
 | Topic | Decision |

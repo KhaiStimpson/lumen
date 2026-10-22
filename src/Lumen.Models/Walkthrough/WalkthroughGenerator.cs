@@ -22,6 +22,9 @@ public sealed record WalkthroughInput
 
     /// <summary>Set for "what changed since you last looked": a short walkthrough of that range only.</summary>
     public string? SinceSha { get; init; }
+
+    /// <summary>How the changed files use each other, found in the code (the Map's links and "tested by").</summary>
+    public IReadOnlyList<FileLink> CodeLinks { get; init; } = [];
 }
 
 public sealed record WalkthroughOptions
@@ -35,17 +38,21 @@ public sealed record WalkthroughOptions
     public int MaxConcurrent { get; init; } = 6;
 
     public int MaxRisks { get; init; } = 5;
+
+    /// <summary>The most components the Map shows; the rest of the files join "Other changes".</summary>
+    public int MaxComponents { get; init; } = 16;
 }
 
 /// <summary>
 /// The PR walkthrough (plan v2 M8) as a map-reduce over the diff, so it scales to large pull requests: per-file
 /// summaries in parallel (bounded), the intent alongside them, then one pass that groups and orders the files and one
-/// that picks the risks. Mechanical files send only their path and size. Every model answer is checked against the
-/// diff: a group or risk citing a path or line that isn't in it is dropped.
+/// that picks the risks, and one that names the components of the system the change builds (the Map). Mechanical
+/// files send only their path and size. Every model answer is checked against the diff: a group, risk or component
+/// citing a path or line that isn't in it is dropped.
 /// </summary>
 public sealed class WalkthroughGenerator(IModelProvider model, WalkthroughOptions options)
 {
-    public const string PromptVersion = "walkthrough/v1";
+    public const string PromptVersion = "walkthrough/v2";
 
     private const int MinimumFileBytes = 512;
 
@@ -53,7 +60,7 @@ public sealed class WalkthroughGenerator(IModelProvider model, WalkthroughOption
 
     /// <summary>Changes when anything that shapes the result changes, so the cache never serves a stale shape.</summary>
     public string SettingsHash =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{PromptVersion}|{model.Model}|{options.MaxDiffBytes}|{options.MaxFileBytes}|{options.MaxRisks}")))[..16];
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{PromptVersion}|{model.Model}|{options.MaxDiffBytes}|{options.MaxFileBytes}|{options.MaxRisks}|{options.MaxComponents}")))[..16];
 
     public string Producer => $"{ShortModel(model.Model)} · {PromptVersion}";
 
@@ -73,6 +80,7 @@ public sealed class WalkthroughGenerator(IModelProvider model, WalkthroughOption
             HeadSha = input.HeadSha,
             SinceSha = since,
             FilesTotal = reviewable.Count,
+            FileLinks = WalkthroughGrounding.GroundLinks(input.CodeLinks, input.Files),
         };
         var gate = new Lock();
         void Publish(Func<Domain.Walkthrough, Domain.Walkthrough> change)
@@ -160,9 +168,10 @@ public sealed class WalkthroughGenerator(IModelProvider model, WalkthroughOption
             return failed;
         }
 
-        // Reduce: groups and reading order, and risks, in parallel.
+        // Reduce: groups and reading order, risks, and (for the whole PR) the Map's components, in parallel.
         var groupsTask = GroupAsync(input, summaries, cancellationToken);
         var risksTask = PickRisksAsync(summaries, cancellationToken);
+        var componentsTask = since is null ? ComponentsAsync(input, summaries, cancellationToken) : null;
 
         try
         {
@@ -172,6 +181,31 @@ public sealed class WalkthroughGenerator(IModelProvider model, WalkthroughOption
         catch (ModelException) when (!cancellationToken.IsCancellationRequested)
         {
             Publish(s => s with { Groups = FallbackGroups(input.Files, summaries) });
+        }
+
+        if (componentsTask is not null)
+        {
+            var kinds = summaries.ToDictionary(s => s.Key, s => s.Value.Kind, StringComparer.Ordinal);
+            try
+            {
+                var (components, edges) = await componentsTask.ConfigureAwait(false);
+                Publish(s => s with { Components = components, Edges = edges });
+            }
+            catch (ModelException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // No model reading of the components: one per change group, still linked by the code.
+                Publish(s =>
+                {
+                    var (components, edges) = WalkthroughGrounding.GroundComponents(
+                        [.. s.Groups.Where(g => !g.IsMechanical).Select(g => new RawComponent(g.Title, g.Summary, ComponentLayer.Other, [.. g.Paths]))],
+                        [],
+                        input.Files,
+                        input.CodeLinks,
+                        options.MaxComponents,
+                        kinds);
+                    return s with { Components = components, Edges = edges };
+                });
+            }
         }
 
         IReadOnlyList<WalkthroughRisk> risks;
@@ -410,6 +444,122 @@ public sealed class WalkthroughGenerator(IModelProvider model, WalkthroughOption
     private static IReadOnlyList<WalkthroughGroup> FallbackGroups(IReadOnlyList<ChangedFile> files, IReadOnlyDictionary<string, FileSummary> summaries) =>
         WalkthroughGrounding.GroundGroups([], files, summaries.ToDictionary(s => s.Key, s => s.Value.Kind));
 
+    // ---------------------------------------------------------------- Reduce: components (the Map)
+
+    private const string ComponentSchema = """
+        {
+          "type": "object",
+          "properties": {
+            "components": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string", "description": "A short name, e.g. \"Ingestion pipeline\"." },
+                  "role": { "type": "string", "description": "What it does in the system, in at most 15 words." },
+                  "layer": { "type": "string", "enum": ["entry", "ui", "core", "integration", "data", "config", "other"] },
+                  "paths": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["title", "role", "layer", "paths"],
+                "additionalProperties": false
+              }
+            },
+            "edges": {
+              "type": "array",
+              "maxItems": 24,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": { "type": "integer" },
+                  "to": { "type": "integer" },
+                  "label": { "type": "string", "description": "At most 4 words, e.g. \"proposes fields\"." }
+                },
+                "required": ["from", "to", "label"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["components", "edges"],
+          "additionalProperties": false
+        }
+        """;
+
+    private static readonly string[] Layers = ["other", "entry", "ui", "core", "integration", "data", "config"];
+
+    private async Task<(IReadOnlyList<WalkthroughComponent> Components, IReadOnlyList<WalkthroughEdge> Edges)> ComponentsAsync(
+        WalkthroughInput input,
+        IReadOnlyDictionary<string, FileSummary> summaries,
+        CancellationToken ct)
+    {
+        var kinds = summaries.ToDictionary(s => s.Key, s => s.Value.Kind, StringComparer.Ordinal);
+        var eligible = input.Files.Where(f => WalkthroughGrounding.IsMapFile(f, kinds)).Select(f => f.Path).ToHashSet(StringComparer.Ordinal);
+        if (eligible.Count == 0)
+        {
+            return ([], []);
+        }
+
+        var text = new StringBuilder();
+        text.Append("Title: ").AppendLine(input.Title);
+        text.AppendLine().AppendLine("Changed files:");
+        foreach (var file in input.Files.Where(f => eligible.Contains(f.Path)))
+        {
+            var summary = summaries.GetValueOrDefault(file.Path)?.Summary;
+            text.AppendLine(CultureInfo.InvariantCulture, $"- {file.Path} (+{file.Additions}): {(string.IsNullOrEmpty(summary) ? "(not summarised)" : summary)}");
+        }
+
+        var links = input.CodeLinks.Where(l => l.Kind != LinkKind.Tests && eligible.Contains(l.From) && eligible.Contains(l.To)).Take(300).ToList();
+        if (links.Count > 0)
+        {
+            text.AppendLine().AppendLine("Links found in the code (A uses B):");
+            foreach (var link in links)
+            {
+                text.AppendLine(CultureInfo.InvariantCulture, $"- {link.From} -> {link.To} ({link.Kind})");
+            }
+        }
+
+        var completion = await model.CompleteAsync(
+            new ModelRequest
+            {
+                Purpose = "walkthrough/components",
+                System = string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"""
+                    You help a code reviewer see the system a pull request builds. Group the changed files into at most
+                    {options.MaxComponents} components, the boxes of an architecture diagram (for example "Nightly
+                    scheduler", "Enrichment providers", "Ingestion pipeline", "Contact fields"). Give each a short
+                    title, its role in at most 15 words, and a layer: entry (what starts the work: jobs, endpoints,
+                    commands), ui (views and pages), core (services and logic), integration (external systems and
+                    providers), data (entities and storage), config (wiring, settings), or other. Every path must be one
+                    of the listed paths, and each path belongs to one component.
+                    Then list edges between components by their index (0-based), "from" uses "to", with a label of at
+                    most 4 words. The code links are already drawn; add an edge only where the summaries show a
+                    connection the code links miss (views, configuration), or to label one. Answer with JSON only.
+                    """),
+                User = text.ToString(),
+                SchemaName = "components",
+                JsonSchema = ComponentSchema,
+                MaxOutputTokens = 2500,
+            },
+            null,
+            ct).ConfigureAwait(false);
+
+        var json = ParseJson(completion.Text);
+        var raw = (json?["components"] as JsonArray ?? [])
+            .OfType<JsonObject>()
+            .Select(c => new RawComponent(
+                Str(c["title"]).Trim(),
+                Str(c["role"]).Trim(),
+                Array.IndexOf(Layers, Str(c["layer"])) is var i and >= 0 ? (ComponentLayer)i : ComponentLayer.Other,
+                [.. (c["paths"] as JsonArray ?? []).Select(Str)]))
+            .ToList();
+        var edges = (json?["edges"] as JsonArray ?? [])
+            .OfType<JsonObject>()
+            .Select(e => new RawEdge(Int(e["from"]), Int(e["to"]), Str(e["label"]).Trim()))
+            .ToList();
+        return WalkthroughGrounding.GroundComponents(raw, edges, input.Files, input.CodeLinks, options.MaxComponents, kinds);
+    }
+
     // ---------------------------------------------------------------- Reduce: risks
 
     private const string RiskSchema = """
@@ -556,9 +706,126 @@ public sealed class WalkthroughGenerator(IModelProvider model, WalkthroughOption
         node is JsonValue v && (v.TryGetValue<int>(out var i) || (v.TryGetValue<double>(out var d) && (i = (int)d) == d)) ? i : -1;
 }
 
+/// <summary>A component as the model (or a change group) proposes it, before it is checked against the diff.</summary>
+public sealed record RawComponent(string Title, string Role, ComponentLayer Layer, List<string> Paths);
+
+/// <summary>An edge the model proposes between two of its components, by index.</summary>
+public sealed record RawEdge(int From, int To, string Label);
+
 /// <summary>Keeps a model's answer inside the diff (TDD §2.3: the model's reading, never invented locations).</summary>
 public static class WalkthroughGrounding
 {
+    /// <summary>Files the Map draws as boxes: hand-written code and content. Tests and generated files stay off the map.</summary>
+    public static bool IsMapFile(ChangedFile file, IReadOnlyDictionary<string, string>? kinds = null)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        var kind = kinds?.GetValueOrDefault(file.Path);
+        return !file.Mechanical.IsMechanical && !file.IsBinary && file.Kind != FileChangeKind.Deleted
+               && !TestPaths.IsTest(file.Path) && kind is not ("mechanical" or "test");
+    }
+
+    /// <summary>Keeps links between files that are in the diff.</summary>
+    public static IReadOnlyList<FileLink> GroundLinks(IReadOnlyList<FileLink> links, IReadOnlyList<ChangedFile> files)
+    {
+        var paths = files.Select(f => f.Path).ToHashSet(StringComparer.Ordinal);
+        return [.. links.Where(l => l.From != l.To && paths.Contains(l.From) && paths.Contains(l.To)).DistinctBy(l => (l.From, l.To))];
+    }
+
+    /// <summary>
+    /// Builds the Map's components: paths must be in the diff and drawable (<see cref="IsMapFile"/>), each in one
+    /// component; files left over join "Other changes"; past <paramref name="max"/> components the rest join it too.
+    /// Edges come from the code links between components (strongest kind wins); the model's own edges are kept only
+    /// where the code shows no link either way, marked as inferred.
+    /// </summary>
+    public static (IReadOnlyList<WalkthroughComponent> Components, IReadOnlyList<WalkthroughEdge> Edges) GroundComponents(
+        IReadOnlyList<RawComponent> raw,
+        IReadOnlyList<RawEdge> rawEdges,
+        IReadOnlyList<ChangedFile> files,
+        IReadOnlyList<FileLink> links,
+        int max,
+        IReadOnlyDictionary<string, string>? kinds = null)
+    {
+        ArgumentNullException.ThrowIfNull(raw);
+        ArgumentNullException.ThrowIfNull(rawEdges);
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentNullException.ThrowIfNull(links);
+        var eligible = files.Where(f => IsMapFile(f, kinds)).Select(f => f.Path).ToList();
+        var allowed = eligible.ToHashSet(StringComparer.Ordinal);
+        var placed = new HashSet<string>(StringComparer.Ordinal);
+        var built = new List<(int RawIndex, RawComponent Component, List<string> Paths)>();
+
+        for (var i = 0; i < raw.Count; i++)
+        {
+            var component = raw[i];
+            if (component.Title.Length == 0 || built.Count >= Math.Max(1, max))
+            {
+                continue;
+            }
+
+            var kept = component.Paths.Select(p => p.Trim()).Where(p => allowed.Contains(p) && placed.Add(p)).ToList();
+            if (kept.Count > 0)
+            {
+                built.Add((i, component, kept));
+            }
+        }
+
+        var rest = eligible.Where(p => !placed.Contains(p)).ToList();
+        if (rest.Count > 0 && built.Count >= Math.Max(1, max))
+        {
+            // Keep within the limit: the last component's files join the leftovers.
+            rest = [.. built[^1].Paths, .. rest];
+            built.RemoveAt(built.Count - 1);
+        }
+
+        if (rest.Count > 0)
+        {
+            built.Add((-1, new RawComponent(built.Count == 0 ? "Changes" : "Other changes", "", ComponentLayer.Other, rest), rest));
+        }
+
+        var components = built
+            .Select((b, i) => new WalkthroughComponent(string.Create(CultureInfo.InvariantCulture, $"c{i + 1}"), b.Component.Title, b.Component.Role, b.Component.Layer, b.Paths))
+            .ToList();
+        var componentOf = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var component in components)
+        {
+            foreach (var path in component.Paths)
+            {
+                componentOf[path] = component.Id;
+            }
+        }
+
+        var edges = new Dictionary<(string From, string To), WalkthroughEdge>();
+        foreach (var link in links.Where(l => l.Kind != LinkKind.Tests))
+        {
+            if (componentOf.TryGetValue(link.From, out var from) && componentOf.TryGetValue(link.To, out var to) && from != to
+                && (!edges.TryGetValue((from, to), out var existing) || link.Kind > existing.Kind))
+            {
+                edges[(from, to)] = new WalkthroughEdge(from, to, link.Kind, false, "");
+            }
+        }
+
+        var byRawIndex = built.Select((b, i) => (b.RawIndex, Id: components[i].Id)).Where(x => x.RawIndex >= 0).ToDictionary(x => x.RawIndex, x => x.Id);
+        foreach (var edge in rawEdges)
+        {
+            if (!byRawIndex.TryGetValue(edge.From, out var from) || !byRawIndex.TryGetValue(edge.To, out var to) || from == to)
+            {
+                continue;
+            }
+
+            var label = edge.Label.Length > 40 ? edge.Label[..40] : edge.Label;
+            if (edges.TryGetValue((from, to), out var found))
+            {
+                edges[(from, to)] = found with { Label = found.Label.Length > 0 ? found.Label : label };
+            }
+            else if (!edges.ContainsKey((to, from)))
+            {
+                edges[(from, to)] = new WalkthroughEdge(from, to, LinkKind.References, true, label);
+            }
+        }
+
+        return (components, [.. edges.Values.OrderBy(e => e.From, StringComparer.Ordinal).ThenBy(e => e.To, StringComparer.Ordinal)]);
+    }
+
     /// <summary>
     /// Drops paths that aren't in the diff and empty groups, gives each path one group, puts unlisted files in "Other
     /// changes", and mechanical files in their own collapsed group at the end.

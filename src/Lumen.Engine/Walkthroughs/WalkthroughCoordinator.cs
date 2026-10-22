@@ -6,6 +6,9 @@ using Lumen.Engine.Mapping;
 using Lumen.Engine.Sessions;
 using Lumen.Models;
 using Lumen.Models.Walkthrough;
+using Lumen.Roslyn;
+using FileChangeKind = Lumen.Domain.FileChangeKind;
+using FileLink = Lumen.Domain.FileLink;
 using Walkthrough = Lumen.Domain.Walkthrough;
 using WalkthroughStatus = Lumen.Domain.WalkthroughStatus;
 
@@ -125,6 +128,7 @@ public sealed partial class WalkthroughCoordinator
                 Files = files,
                 HeadSha = snapshot.HeadSha,
                 SinceSha = sinceSha,
+                CodeLinks = sinceSha is null ? await CodeLinksAsync(session, files, ct).ConfigureAwait(false) : [],
             };
 
             // The finished walkthrough is cached before it is announced, so a reopen right after never misses it.
@@ -162,8 +166,44 @@ public sealed partial class WalkthroughCoordinator
         }
     }
 
+    /// <summary>
+    /// How the changed C# files use each other, read from the head checkout (the Map's links and "tested by"). Found
+    /// in the code, not by the model, and nothing here is sent anywhere but the model prompt that groups components.
+    /// </summary>
+    private async Task<IReadOnlyList<FileLink>> CodeLinksAsync(PullRequestSession session, IReadOnlyList<ChangedFile> files, CancellationToken ct)
+    {
+        if (session.Checkout is not { } checkout)
+        {
+            return [];
+        }
+
+        try
+        {
+            var sources = new List<KeyValuePair<string, string>>();
+            foreach (var file in files.Where(f => f.Path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) && !f.IsBinary
+                                                  && !f.Mechanical.IsMechanical && f.Kind != FileChangeKind.Deleted))
+            {
+                var full = Path.Combine(checkout.RootPath, file.Path);
+                if (File.Exists(full))
+                {
+                    sources.Add(new(file.Path, await File.ReadAllTextAsync(full, ct).ConfigureAwait(false)));
+                }
+            }
+
+            return CodeLinkFinder.Find(sources);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            LogCodeLinksFailed(_logger, ex, session.Key);
+            return [];
+        }
+    }
+
     private static void Publish(PullRequestSession session, Walkthrough walkthrough) =>
         session.Publish(new PullRequestEvent { WalkthroughUpdated = new WalkthroughUpdated { Walkthrough = ProtoMapper.ToProto(walkthrough) } });
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{PullRequest}: couldn't read the changed files for the Map's links")]
+    private static partial void LogCodeLinksFailed(ILogger logger, Exception exception, PullRequestKey pullRequest);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "{PullRequest}: walkthrough failed; the review is unaffected")]
     private static partial void LogWalkthroughFailed(ILogger logger, Exception exception, PullRequestKey pullRequest);

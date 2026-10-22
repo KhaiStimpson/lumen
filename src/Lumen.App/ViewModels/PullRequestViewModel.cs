@@ -49,6 +49,8 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         Ref = pullRequest;
         Title = $"{pullRequest.Owner}/{pullRequest.Name} #{pullRequest.Number}";
         Status = "Connecting…";
+        Map.OpenRequested += (_, _) => _ = OpenMapSelectionAsync();
+        Map.PropertyChanged += OnMapPropertyChanged;
     }
 
     public PullRequestRef Ref { get; }
@@ -476,6 +478,8 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         RebuildTree();
         OnPropertyChanged(nameof(GeneratedSummary));
         OnPropertyChanged(nameof(ViewedSummary));
+        _mapSincePaths = null;
+        RebuildMap();
         IsLoading = false;
 
         var firstReviewable = Tree.SelectMany(n => n.Descendants().Prepend(n)).FirstOrDefault(n => n.File is not null)?.File ?? Files.FirstOrDefault();

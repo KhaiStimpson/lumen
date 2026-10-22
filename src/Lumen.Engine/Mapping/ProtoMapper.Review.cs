@@ -198,7 +198,7 @@ public static partial class ProtoMapper
     };
 }
 
-/// <summary>Walkthrough mapping (plan v2 M8).</summary>
+/// <summary>Walkthrough mapping (plan v2 M8, and the Map's components in v3).</summary>
 public static partial class ProtoMapper
 {
     public static Contracts.Walkthrough ToProto(D.Walkthrough walkthrough)
@@ -233,6 +233,21 @@ public static partial class ProtoMapper
             Category = (Contracts.RiskCategory)r.Category,
             Reason = r.Reason,
         }));
+        proto.Components.AddRange(walkthrough.Components.Select(c =>
+        {
+            var component = new Contracts.WalkthroughComponent { Id = c.Id, Title = c.Title, Role = c.Role, Layer = (Contracts.ComponentLayer)c.Layer };
+            component.Paths.AddRange(c.Paths);
+            return component;
+        }));
+        proto.Edges.AddRange(walkthrough.Edges.Select(e => new Contracts.WalkthroughEdge
+        {
+            From = e.From,
+            To = e.To,
+            Kind = (Contracts.LinkKind)e.Kind,
+            Inferred = e.Inferred,
+            Label = e.Label,
+        }));
+        proto.FileLinks.AddRange(walkthrough.FileLinks.Select(l => new Contracts.FileLink { From = l.From, To = l.To, Kind = (Contracts.LinkKind)l.Kind }));
         return proto;
     }
 }

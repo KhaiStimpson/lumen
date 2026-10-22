@@ -10,6 +10,7 @@ public enum PullRequestTab
     Conversation,
     Commits,
     Checks,
+    Map,
 }
 
 /// <summary>Which changes the Files tab shows: a commit, a range, or everything since the last review (plan v2 M2).</summary>

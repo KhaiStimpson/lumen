@@ -5,13 +5,17 @@ deserve judgement — starting with **pattern deviations**: code that differs fr
 solves the same problem, shown next to the precedent it deviates from.
 
 Design: [docs/tdd.md](docs/tdd.md) · v1 plan: [docs/plan.md](docs/plan.md) · Current plan and status:
-[docs/plan-v2.md](docs/plan-v2.md)
+[docs/plan-v2.md](docs/plan-v2.md) · The Map: [docs/map.md](docs/map.md)
 
 Version 2 makes Lumen a place to do the whole review: an **inbox** of the pull requests waiting on you, the PR's
 conversation, commits and checks, comments on any line (single or multi-line, with suggestions) gathered into a
 **pending review** you submit as Comment / Approve / Request changes, existing threads inline in the diff, split view,
 whitespace toggle, find in diff — and an optional AI **walkthrough** (intent, reading order, risky areas) from a fast
 model.
+
+The **Map** tab (`M`) shows the pull request as the system it builds: its components placed by how they use each other
+(**Blueprint**, linked by Roslyn from the code), or sized by lines added (**Terrain**), with lenses for risky areas, what
+changed since your last review, and which code the pull request's tests exercise. See [docs/map.md](docs/map.md).
 
 ## Run it
 
@@ -44,7 +48,9 @@ over a per-user named pipe with gRPC. The engine keeps a blobless clone and a wo
 | `--capture <dir> --capture-script diff,next,examine,evidence,comment,dark` | Render states to PNGs and exit (design review without a human) |
 
 Capture steps for the v2 screens: `inbox`, `open`, `conversation`, `commits`, `checks`, `files`, `since`, `all`,
-`thread`, `draft`, `tray`, `split`, `find`, `palette`, `risk`, `group`, `order`.
+`thread`, `draft`, `tray`, `split`, `find`, `palette`, `risk`, `group`, `order`. For the Map: `map`, `blueprint`,
+`terrain`, `lens:attention`, `lens:since`, `lens:tests`, `mapselect:<file name>`, `mapopen`, and `morph:terrain` /
+`morph:blueprint` (switch the layout and save frames while it animates).
 
 ### Fast model and walkthrough (optional)
 
@@ -125,6 +131,10 @@ src/Lumen.Engine/bin/Debug/net10.0/Lumen.Engine.exe connections
 | `Ctrl+F` | Find in diff (`Enter` / `Shift+Enter` next / previous) |
 | `P` / `E` | Show precedent / evidence |
 | `Ctrl+K`, `F` | Command palette: files, pull requests, actions |
+| `M` | The Map, or back to the files (`Esc` too) |
+| `B` / `T` | On the Map: Blueprint / Terrain |
+| `L` | On the Map: next lens (Attention, Since my review, Tests) |
+| `Enter` | On the Map: open the selected file in the diff |
 
 The diff's scrollbar is a map of the file: removed lines on the left, added lines on the right, review points, threads,
 drafts and find matches on top. Click a mark to jump to it; hover it to see its lines. A file that was only moved or
