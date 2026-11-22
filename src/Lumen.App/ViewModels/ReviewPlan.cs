@@ -145,7 +145,11 @@ public sealed partial class ReviewPlanViewModel : ObservableObject
     public partial IReadOnlyList<double> TierLines { get; set; } = [0, 0, 0, 0];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ItemsCount))]
     public partial string ItemsLabel { get; set; } = "";
+
+    /// <summary>The leading number of <see cref="ItemsLabel"/>, for the nav rail count.</summary>
+    public string ItemsCount => ItemsLabel.Split(' ', 2)[0] is var first && first.Length > 0 && first.All(char.IsAsciiDigit) ? first : "";
 
     public ObservableCollection<PlanSectionViewModel> Sections { get; } = [];
 

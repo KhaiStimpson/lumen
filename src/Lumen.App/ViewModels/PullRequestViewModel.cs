@@ -330,6 +330,9 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
     [ObservableProperty]
     public partial (int Start, int End)? FocusRange { get; set; }
 
+    /// <summary>Nav rail count: viewed / total files.</summary>
+    public string ViewedCount => string.Create(CultureInfo.InvariantCulture, $"{Files.Count(f => f.IsViewed)} / {Files.Count}");
+
     public string ViewedSummary => string.Create(CultureInfo.InvariantCulture, $"{Files.Count(f => f.IsViewed)} / {Files.Count} viewed");
 
     public string GeneratedSummary => GeneratedFiles.Count == 0
@@ -490,6 +493,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         _completeStatus = "";
         RebuildPlan();
         OnPropertyChanged(nameof(ViewedSummary));
+        OnPropertyChanged(nameof(ViewedCount));
         OnPropertyChanged(nameof(GeneratedSummary));
         Error = null;
         NewHeadLabel = null;
@@ -581,6 +585,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
                 {
                     viewedFile.IsViewed = evt.FileViewed.Viewed;
                     OnPropertyChanged(nameof(ViewedSummary));
+                    OnPropertyChanged(nameof(ViewedCount));
                     UpdateCoverage();
                 }
 
@@ -708,6 +713,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         RebuildTree();
         OnPropertyChanged(nameof(GeneratedSummary));
         OnPropertyChanged(nameof(ViewedSummary));
+        OnPropertyChanged(nameof(ViewedCount));
         _mapSincePaths = null;
         RebuildMap();
         IsLoading = false;
@@ -944,6 +950,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         var twins = Files.Concat(ScopeFiles).Where(f => f.Path == file.Path).Append(file).Distinct().ToList();
         twins.ForEach(f => f.IsViewed = viewed);
         OnPropertyChanged(nameof(ViewedSummary));
+        OnPropertyChanged(nameof(ViewedCount));
         UpdateCoverage();
         try
         {
@@ -953,6 +960,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         {
             twins.ForEach(f => f.IsViewed = !viewed);
             OnPropertyChanged(nameof(ViewedSummary));
+            OnPropertyChanged(nameof(ViewedCount));
             UpdateCoverage();
             Toast = $"Couldn't mark {file.Name} as {(viewed ? "viewed" : "not viewed")}: {ex.Status.Detail}";
         }

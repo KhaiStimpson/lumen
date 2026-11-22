@@ -102,6 +102,10 @@ public sealed class MainWindowTests
         Directory.CreateDirectory(ScreensDirectory);
         await using var session = await Session.OpenAsync();
         var pr = session.PullRequest;
+        // The file tree sits behind the nav rail's Files item; the review plan is the default list.
+        pr.ShowFiles();
+        await Fixture.PumpAsync(4);
+        Assert.True(Find<RadioButton>(session.Window, "TabFiles").IsChecked);
         var tree = Find<TreeView>(session.Window, "FileTree");
         var box = tree.GetVisualDescendants().OfType<CheckBox>()
             .First(c => c.IsEffectivelyVisible && c.DataContext is FileTreeNode { File: { } f } && f != pr.SelectedFile

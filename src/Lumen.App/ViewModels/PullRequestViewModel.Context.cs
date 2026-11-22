@@ -14,8 +14,34 @@ public sealed partial class PullRequestViewModel
     private static DateTimeOffset Now => DateTimeOffset.UtcNow;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsFilesTab), nameof(IsConversationTab), nameof(IsCommitsTab), nameof(IsChecksTab), nameof(IsMapTab))]
+    [NotifyPropertyChangedFor(nameof(IsFilesTab), nameof(IsConversationTab), nameof(IsCommitsTab), nameof(IsChecksTab), nameof(IsMapTab),
+        nameof(IsPlanNav), nameof(IsFilesNav))]
     public partial PullRequestTab Tab { get; set; }
+
+    /// <summary>The list beside the diff: the review plan (false) or the changed-file tree (true). Both review the Files tab.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPlanNav), nameof(IsFilesNav))]
+    public partial bool ShowFileList { get; set; }
+
+    /// <summary>Nav rail: "Review plan" is current.</summary>
+    public bool IsPlanNav => IsFilesTab && !ShowFileList;
+
+    /// <summary>Nav rail: "Files" is current.</summary>
+    public bool IsFilesNav => IsFilesTab && ShowFileList;
+
+    [RelayCommand]
+    public void ShowPlan()
+    {
+        ShowFileList = false;
+        ShowTab(PullRequestTab.Files);
+    }
+
+    [RelayCommand]
+    public void ShowFiles()
+    {
+        ShowFileList = true;
+        ShowTab(PullRequestTab.Files);
+    }
 
     public bool IsFilesTab => Tab == PullRequestTab.Files;
 
@@ -135,13 +161,20 @@ public sealed partial class PullRequestViewModel
         }
 
         OnPropertyChanged(nameof(ConversationLabel));
+        OnPropertyChanged(nameof(ConversationCount));
     }
+
+    /// <summary>Nav rail count: the number of conversation items, or nothing.</summary>
+    public string ConversationCount => Timeline.Count == 0 ? "" : Timeline.Count.ToString(CultureInfo.InvariantCulture);
 
     public string ConversationLabel => Timeline.Count == 0 ? "Conversation" : string.Create(CultureInfo.InvariantCulture, $"Conversation · {Timeline.Count}");
 
     // Commits --------------------------------------------------------------------------------------
 
     public ObservableCollection<CommitViewModel> Commits { get; } = [];
+
+    /// <summary>Nav rail count: the number of commits, or nothing.</summary>
+    public string CommitsCount => Commits.Count == 0 ? "" : Commits.Count.ToString(CultureInfo.InvariantCulture);
 
     public string CommitsLabel => Commits.Count == 0 ? "Commits" : string.Create(CultureInfo.InvariantCulture, $"Commits · {Commits.Count}");
 
@@ -320,6 +353,13 @@ public sealed partial class PullRequestViewModel
 
     public string ChecksLabel => Checks.Count == 0 ? "Checks" : string.Create(CultureInfo.InvariantCulture, $"Checks · {Checks.Count(c => c.Model.State == CheckState.Success)}/{Checks.Count}");
 
+    /// <summary>Nav rail count: "2 failing" when any fail (written, never colour alone), otherwise passed / total.</summary>
+    public string ChecksCount => Checks.Count == 0 ? ""
+        : ChecksFailing ? string.Create(CultureInfo.InvariantCulture, $"{Checks.Count(c => c.Model.State == CheckState.Failure)} failing")
+        : string.Create(CultureInfo.InvariantCulture, $"{Checks.Count(c => c.Model.State == CheckState.Success)}/{Checks.Count}");
+
+    public bool ChecksFailing => Checks.Any(c => c.Model.State == CheckState.Failure);
+
     /// <summary>"success", "failure" or "pending" across all checks.</summary>
     public string ChecksSummaryKind => Checks.Count == 0 ? ""
         : Checks.Any(c => c.Model.State == CheckState.Failure) ? "failure"
@@ -336,6 +376,8 @@ public sealed partial class PullRequestViewModel
 
         OnPropertyChanged(nameof(ChecksLabel));
         OnPropertyChanged(nameof(ChecksSummaryKind));
+        OnPropertyChanged(nameof(ChecksCount));
+        OnPropertyChanged(nameof(ChecksFailing));
     }
 
     // New commits ----------------------------------------------------------------------------------
@@ -394,6 +436,7 @@ public sealed partial class PullRequestViewModel
         }
 
         OnPropertyChanged(nameof(CommitsLabel));
+        OnPropertyChanged(nameof(CommitsCount));
         if (Timeline.Count == 0)
         {
             ApplyTimeline(details.Timeline);

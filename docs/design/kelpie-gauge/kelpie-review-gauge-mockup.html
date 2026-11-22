@@ -1,0 +1,1045 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Kelpie Review on Gauge: mock-up</title>
+<style>
+/* Generated from tokens.json by build-theme.py. */
+
+:root {
+  color-scheme: dark;
+  --gauge-sans: 'Segoe UI Variable Text', 'Segoe UI Variable', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --gauge-mono: 'Cascadia Code', 'JetBrains Mono', 'Consolas', ui-monospace, monospace;
+  --gauge-r-1: 3px;
+  --gauge-r-2: 3px;
+  --gauge-r-3: 4px;
+  --gauge-bg-0: #1e1e1e;
+  --gauge-bg-1: #252525;
+  --gauge-bg-2: #2b2b2b;
+  --gauge-bg-3: #333333;
+  --gauge-bg-4: #444444;
+  --gauge-line: #3c3c3c;
+  --gauge-line-2: #555555;
+  --gauge-line-ctl: #767676;
+  --gauge-fg-0: #f2f2f2;
+  --gauge-fg-1: #dcdcdc;
+  --gauge-fg-2: #c4c4c4;
+  --gauge-fg-3: #9e9e9e;
+  --gauge-accent: #7cc0ff;
+  --gauge-accent-dim: #7cc0ff22;
+  --gauge-accent-ink: #06263f;
+  --gauge-sel: #0a4a78;
+  --gauge-crit: #ff7b72;
+  --gauge-crit-dim: #ff7b721f;
+  --gauge-warn: #e9b44c;
+  --gauge-warn-dim: #e9b44c1f;
+  --gauge-info: #7cc0ff;
+  --gauge-info-dim: #7cc0ff1f;
+  --gauge-ok: #6fcf97;
+  --gauge-ok-dim: #6fcf971f;
+  --gauge-code: #d6b4ff;
+  --gauge-sel-fg: #ffffff;
+  --gauge-sel-crit: #ffffff;
+  --gauge-sel-warn: #ffffff;
+  --gauge-sel-edge: #7cc0ff;
+  --gauge-val-str: #a7f3d0;
+  --gauge-val-num: #fcd34d;
+  --gauge-tm-fg: #ffffff;
+  --gauge-tm-1: #2f5d8a;
+  --gauge-tm-2: #34526f;
+  --gauge-tm-3: #37495c;
+  --gauge-tm-4: #383f4a;
+  --gauge-tm-5: #363b42;
+  --gauge-tm-6: #34383d;
+  --gauge-tm-7: #33363a;
+  --gauge-tm-8: #323437;
+  --gauge-tm-9: #313335;
+  --gauge-shadow: #00000088;
+  --gauge-scrim: #05070999;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --gauge-bg-0: #ffffff;
+  --gauge-bg-1: #fafafa;
+  --gauge-bg-2: #f3f3f3;
+  --gauge-bg-3: #e8e8e8;
+  --gauge-bg-4: #dcdcdc;
+  --gauge-line: #e1e1e1;
+  --gauge-line-2: #c6c6c6;
+  --gauge-line-ctl: #858585;
+  --gauge-fg-0: #1b1b1b;
+  --gauge-fg-1: #2f2f2f;
+  --gauge-fg-2: #4d4d4d;
+  --gauge-fg-3: #6b6b6b;
+  --gauge-accent: #0a64c8;
+  --gauge-accent-dim: #0a64c81a;
+  --gauge-accent-ink: #ffffff;
+  --gauge-sel: #d6e6f8;
+  --gauge-crit: #b42318;
+  --gauge-crit-dim: #b4231814;
+  --gauge-warn: #8a5700;
+  --gauge-warn-dim: #8a570014;
+  --gauge-info: #0a64c8;
+  --gauge-info-dim: #0a64c814;
+  --gauge-ok: #1d7a3a;
+  --gauge-ok-dim: #1d7a3a14;
+  --gauge-code: #7a3fc4;
+  --gauge-sel-fg: #1b1b1b;
+  --gauge-sel-crit: #b42318;
+  --gauge-sel-warn: #8a5700;
+  --gauge-sel-edge: #0a64c8;
+  --gauge-val-str: #11703a;
+  --gauge-val-num: #9a4a00;
+  --gauge-tm-fg: #1b1b1b;
+  --gauge-tm-1: #a9c8ea;
+  --gauge-tm-2: #bcd0e4;
+  --gauge-tm-3: #c8d5e2;
+  --gauge-tm-4: #d2d9e0;
+  --gauge-tm-5: #d8dce1;
+  --gauge-tm-6: #dcdfe3;
+  --gauge-tm-7: #dfe1e4;
+  --gauge-tm-8: #e2e3e6;
+  --gauge-tm-9: #e4e5e7;
+  --gauge-shadow: #00000026;
+  --gauge-scrim: #00000040;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --gauge-bg-0: #ffffff;
+    --gauge-bg-1: #fafafa;
+    --gauge-bg-2: #f3f3f3;
+    --gauge-bg-3: #e8e8e8;
+    --gauge-bg-4: #dcdcdc;
+    --gauge-line: #e1e1e1;
+    --gauge-line-2: #c6c6c6;
+    --gauge-line-ctl: #858585;
+    --gauge-fg-0: #1b1b1b;
+    --gauge-fg-1: #2f2f2f;
+    --gauge-fg-2: #4d4d4d;
+    --gauge-fg-3: #6b6b6b;
+    --gauge-accent: #0a64c8;
+    --gauge-accent-dim: #0a64c81a;
+    --gauge-accent-ink: #ffffff;
+    --gauge-sel: #d6e6f8;
+    --gauge-crit: #b42318;
+    --gauge-crit-dim: #b4231814;
+    --gauge-warn: #8a5700;
+    --gauge-warn-dim: #8a570014;
+    --gauge-info: #0a64c8;
+    --gauge-info-dim: #0a64c814;
+    --gauge-ok: #1d7a3a;
+    --gauge-ok-dim: #1d7a3a14;
+    --gauge-code: #7a3fc4;
+    --gauge-sel-fg: #1b1b1b;
+    --gauge-sel-crit: #b42318;
+    --gauge-sel-warn: #8a5700;
+    --gauge-sel-edge: #0a64c8;
+    --gauge-val-str: #11703a;
+    --gauge-val-num: #9a4a00;
+    --gauge-tm-fg: #1b1b1b;
+    --gauge-tm-1: #a9c8ea;
+    --gauge-tm-2: #bcd0e4;
+    --gauge-tm-3: #c8d5e2;
+    --gauge-tm-4: #d2d9e0;
+    --gauge-tm-5: #d8dce1;
+    --gauge-tm-6: #dcdfe3;
+    --gauge-tm-7: #dfe1e4;
+    --gauge-tm-8: #e2e3e6;
+    --gauge-tm-9: #e4e5e7;
+    --gauge-shadow: #00000026;
+    --gauge-scrim: #00000040;
+  }
+}
+
+@media print {
+  :root:root {
+    color-scheme: light;
+    --gauge-bg-0: #ffffff;
+    --gauge-bg-1: #fafafa;
+    --gauge-bg-2: #f3f3f3;
+    --gauge-bg-3: #e8e8e8;
+    --gauge-bg-4: #dcdcdc;
+    --gauge-line: #e1e1e1;
+    --gauge-line-2: #c6c6c6;
+    --gauge-line-ctl: #858585;
+    --gauge-fg-0: #1b1b1b;
+    --gauge-fg-1: #2f2f2f;
+    --gauge-fg-2: #4d4d4d;
+    --gauge-fg-3: #6b6b6b;
+    --gauge-accent: #0a64c8;
+    --gauge-accent-dim: #0a64c81a;
+    --gauge-accent-ink: #ffffff;
+    --gauge-sel: #d6e6f8;
+    --gauge-crit: #b42318;
+    --gauge-crit-dim: #b4231814;
+    --gauge-warn: #8a5700;
+    --gauge-warn-dim: #8a570014;
+    --gauge-info: #0a64c8;
+    --gauge-info-dim: #0a64c814;
+    --gauge-ok: #1d7a3a;
+    --gauge-ok-dim: #1d7a3a14;
+    --gauge-code: #7a3fc4;
+    --gauge-sel-fg: #1b1b1b;
+    --gauge-sel-crit: #b42318;
+    --gauge-sel-warn: #8a5700;
+    --gauge-sel-edge: #0a64c8;
+    --gauge-val-str: #11703a;
+    --gauge-val-num: #9a4a00;
+    --gauge-tm-fg: #1b1b1b;
+    --gauge-tm-1: #a9c8ea;
+    --gauge-tm-2: #bcd0e4;
+    --gauge-tm-3: #c8d5e2;
+    --gauge-tm-4: #d2d9e0;
+    --gauge-tm-5: #d8dce1;
+    --gauge-tm-6: #dcdfe3;
+    --gauge-tm-7: #dfe1e4;
+    --gauge-tm-8: #e2e3e6;
+    --gauge-tm-9: #e4e5e7;
+    --gauge-shadow: #00000026;
+    --gauge-scrim: #00000040;
+  }
+}
+
+/* Gauge components. Optional: load after theme.css. Every class is prefixed `g-` so it can
+   sit beside a project's own styles. Dimensions, states and keyboard behaviour are in
+   COMPONENTS.md. */
+
+.g-root {
+  background: var(--gauge-bg-0);
+  color: var(--gauge-fg-1);
+  font: 13px/1.45 var(--gauge-sans);
+}
+.g-mono {
+  font-family: var(--gauge-mono);
+  font-size: 12px;
+}
+
+/* Focus: 2px accent ring, 2px offset, never removed. */
+.g-root :focus {
+  outline: none;
+}
+.g-root :focus-visible {
+  outline: 2px solid var(--gauge-accent);
+  outline-offset: 2px;
+  border-radius: var(--gauge-r-3);
+}
+
+/* Button: secondary by default, --primary for the one main action, --ghost inside toolbars. */
+.g-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  padding: 3px 11px;
+  border: 1px solid var(--gauge-line-2);
+  border-radius: var(--gauge-r-2);
+  background: var(--gauge-bg-3);
+  color: var(--gauge-fg-0);
+  font: inherit;
+  cursor: pointer;
+}
+.g-btn:hover {
+  background: var(--gauge-bg-4);
+}
+.g-btn--primary {
+  background: var(--gauge-accent);
+  border-color: var(--gauge-accent);
+  color: var(--gauge-accent-ink);
+  font-weight: 600;
+}
+.g-btn--primary:hover {
+  background: var(--gauge-accent);
+  filter: brightness(1.08);
+}
+/* A ghost button has no fill, so its border is the control boundary. */
+.g-btn--ghost {
+  background: none;
+  border-color: var(--gauge-line-ctl);
+}
+.g-btn--ghost:hover {
+  background: var(--gauge-bg-3);
+}
+.g-btn[aria-pressed='true'] {
+  border-color: var(--gauge-accent);
+  color: var(--gauge-accent);
+}
+.g-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  filter: none;
+}
+
+/* Fields: the border is the only boundary, so it uses line-ctl. */
+.g-field {
+  min-height: 26px;
+  padding: 3px 8px;
+  border: 1px solid var(--gauge-line-ctl);
+  border-radius: var(--gauge-r-2);
+  background: var(--gauge-bg-0);
+  color: var(--gauge-fg-0);
+  font: inherit;
+}
+select.g-field {
+  padding-right: 4px;
+  cursor: pointer;
+}
+textarea.g-field {
+  min-height: 64px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+.g-field::placeholder {
+  color: var(--gauge-fg-3);
+}
+
+/* Segmented control: mutually exclusive views or filters, 2-5 short options. */
+.g-seg {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--gauge-line-ctl);
+  border-radius: var(--gauge-r-2);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.g-seg button {
+  min-height: 22px;
+  padding: 2px 10px;
+  border: 0;
+  border-left: 1px solid var(--gauge-line-2);
+  background: none;
+  color: var(--gauge-fg-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.g-seg button:first-child {
+  border-left: 0;
+}
+.g-seg button:hover {
+  background: var(--gauge-bg-3);
+  color: var(--gauge-fg-0);
+}
+.g-seg button[aria-pressed='true'] {
+  background: var(--gauge-bg-4);
+  color: var(--gauge-fg-0);
+  font-weight: 600;
+}
+.g-root .g-seg button:focus-visible {
+  outline-offset: -2px;
+  border-radius: 0;
+}
+
+/* Entity link: any named thing that opens details. Underlined text, never a badge. */
+.g-entity {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gauge-fg-0);
+  font-family: var(--gauge-mono);
+  font-size: 12px;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--gauge-fg-3);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.g-entity:hover {
+  color: var(--gauge-accent);
+  text-decoration-color: var(--gauge-accent);
+}
+/* Entities with human names (files, types, people) read in sans. */
+.g-entity--sans {
+  font-family: var(--gauge-sans);
+  font-size: 13px;
+}
+
+/* Severity: always a word. Only critical and warning carry colour. */
+.g-sev {
+  color: var(--gauge-fg-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.g-sev--crit {
+  color: var(--gauge-crit);
+}
+.g-sev--warn {
+  color: var(--gauge-warn);
+}
+.g-sev--ok {
+  color: var(--gauge-ok);
+}
+
+.g-kbd {
+  padding: 0 5px;
+  border: 1px solid var(--gauge-line-2);
+  border-bottom-width: 2px;
+  border-radius: var(--gauge-r-3);
+  background: var(--gauge-bg-2);
+  color: var(--gauge-fg-2);
+  font-family: var(--gauge-mono);
+  font-size: 11px;
+}
+/* A glossary term: dotted underline, definition on hover or in a help view. */
+.g-term {
+  border-bottom: 1px dotted var(--gauge-fg-3);
+  cursor: help;
+}
+.g-term:hover {
+  border-bottom-color: var(--gauge-fg-2);
+  color: var(--gauge-fg-0);
+}
+
+.g-callout {
+  margin: 18px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--gauge-line-2);
+  border-radius: var(--gauge-r-2);
+  background: var(--gauge-bg-2);
+  color: var(--gauge-fg-1);
+}
+.g-callout--crit {
+  border-color: var(--gauge-crit);
+}
+
+/* Pane header: title, inline facts, actions pushed right. */
+.g-pane-h {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--gauge-line);
+}
+.g-pane-h > h2,
+.g-pane-h > h3 {
+  margin: 0;
+  color: var(--gauge-fg-0);
+  font-size: 14px;
+  font-weight: 600;
+}
+.g-pane-h .g-facts {
+  color: var(--gauge-fg-2);
+  font-size: 12.5px;
+}
+.g-pane-h .g-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Navigation rail. Mark the current item with aria-current="page". */
+.g-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+  border-right: 1px solid var(--gauge-line);
+  background: var(--gauge-bg-2);
+}
+.g-nav button,
+.g-nav a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 30px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--gauge-r-3);
+  background: none;
+  color: var(--gauge-fg-2);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.g-nav :is(button, a):hover {
+  background: var(--gauge-bg-3);
+  color: var(--gauge-fg-0);
+}
+.g-nav [aria-current='page'] {
+  background: var(--gauge-bg-4);
+  color: var(--gauge-fg-0);
+  font-weight: 600;
+}
+.g-nav .g-count {
+  margin-left: auto;
+  color: var(--gauge-fg-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+/* fg-3 drops below 4.5:1 on bg-3 and bg-4. */
+.g-nav :is(:hover, [aria-current='page']) .g-count {
+  color: var(--gauge-fg-2);
+}
+.g-nav .g-count.g-count--crit {
+  color: var(--gauge-crit);
+}
+/* crit falls below 4.5:1 on dark bg-4; the current section no longer needs the alert. */
+.g-nav [aria-current='page'] .g-count.g-count--crit {
+  color: var(--gauge-fg-0);
+}
+.g-nav hr {
+  margin: 5px 2px;
+  border: 0;
+  border-top: 1px solid var(--gauge-line);
+}
+
+/* Data table with a selectable row. Mark the selected row with .is-selected; the control that
+   selected it carries aria-current="true". */
+.g-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.g-table th {
+  padding: 6px 14px;
+  background: var(--gauge-bg-2);
+  color: var(--gauge-fg-2);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+.g-table td {
+  padding: 6px 14px;
+  border-top: 1px solid var(--gauge-line);
+}
+.g-table .g-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.g-table tbody tr:hover {
+  background: var(--gauge-bg-2);
+}
+.g-table tbody tr.is-selected {
+  background: var(--gauge-sel);
+  color: var(--gauge-sel-fg);
+  box-shadow: inset 2px 0 var(--gauge-sel-edge);
+}
+.g-table tbody tr.is-selected :is(.g-entity, .g-sev) {
+  color: var(--gauge-sel-fg);
+  text-decoration-color: currentColor;
+}
+.g-table tbody tr.is-selected .g-sev--warn {
+  color: var(--gauge-sel-warn);
+}
+.g-table tbody tr.is-selected .g-sev--crit {
+  color: var(--gauge-sel-crit);
+}
+
+/* Menus: dropdown and context menu share one look. */
+.g-menu {
+  min-width: 190px;
+  padding: 4px;
+  border: 1px solid var(--gauge-line-2);
+  border-radius: var(--gauge-r-3);
+  background: var(--gauge-bg-2);
+  box-shadow: 0 8px 24px var(--gauge-shadow);
+}
+.g-menu [role^='menuitem'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--gauge-r-3);
+  background: none;
+  color: var(--gauge-fg-1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.g-menu [role^='menuitem']:is(:hover, :focus-visible) {
+  background: var(--gauge-bg-4);
+  color: var(--gauge-fg-0);
+}
+.g-root .g-menu [role^='menuitem']:focus-visible {
+  outline-offset: -2px;
+}
+.g-menu [aria-checked='true'] {
+  color: var(--gauge-fg-0);
+  font-weight: 600;
+}
+.g-menu .g-note {
+  color: var(--gauge-fg-2);
+  font-size: 12px;
+  font-weight: 400;
+}
+.g-menu hr {
+  margin: 4px 2px;
+  border: 0;
+  border-top: 1px solid var(--gauge-line);
+}
+
+/* Command palette: a modal dialog over a scrim. */
+.g-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: var(--gauge-scrim);
+}
+.g-palette {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  z-index: 31;
+  width: min(600px, calc(100vw - 24px));
+  margin: 0;
+  padding: 0;
+  transform: translateX(-50%);
+  border: 1px solid var(--gauge-line-2);
+  border-radius: 6px;
+  background: var(--gauge-bg-2);
+  color: var(--gauge-fg-1);
+  box-shadow: 0 12px 32px var(--gauge-shadow);
+}
+.g-palette input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--gauge-line);
+  background: none;
+  color: var(--gauge-fg-0);
+  font: inherit;
+  font-size: 15px;
+}
+.g-root .g-palette input:focus-visible {
+  outline: none;
+}
+.g-palette [role='listbox'] {
+  max-height: 50vh;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+  list-style: none;
+}
+.g-palette .g-group {
+  padding: 8px 10px 4px;
+  color: var(--gauge-fg-2);
+  font-size: 12px;
+}
+.g-palette [role='option'] {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--gauge-r-2);
+  cursor: pointer;
+}
+.g-palette [role='option'][aria-selected='true'] {
+  background: var(--gauge-sel);
+  color: var(--gauge-sel-fg);
+  box-shadow: inset 2px 0 var(--gauge-sel-edge);
+}
+.g-palette [role='option'] .g-note {
+  color: var(--gauge-fg-2);
+  font-size: 12px;
+}
+.g-palette [aria-selected='true'] .g-note {
+  color: var(--gauge-sel-fg);
+}
+
+/* Status bar: counts, background work, theme control. */
+.g-statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  min-height: 24px;
+  padding: 0 12px;
+  border-top: 1px solid var(--gauge-line);
+  background: var(--gauge-bg-2);
+  color: var(--gauge-fg-2);
+  font-size: 11.5px;
+}
+
+.g-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Motion: 120ms for hover and selection; respect the system setting. */
+.g-btn,
+.g-entity,
+.g-seg button,
+.g-nav :is(button, a),
+.g-table tr,
+.g-menu [role^='menuitem'] {
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+}
+@media (prefers-reduced-motion: reduce) {
+  [class^='g-'],
+  [class^='g-'] * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Windows high contrast and other forced-colour modes replace every colour above. Restore the
+   cues that were carried by fill alone: selection, the current nav item and pressed toggles. */
+@media (forced-colors: active) {
+  .g-table tbody tr.is-selected,
+  .g-palette [role='option'][aria-selected='true'],
+  .g-nav [aria-current='page'],
+  .g-seg button[aria-pressed='true'] {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+  .g-table tbody tr.is-selected :is(.g-entity, .g-sev) {
+    color: HighlightText;
+  }
+  .g-btn,
+  .g-seg,
+  .g-field {
+    border-color: ButtonText;
+  }
+  .g-root :focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+
+/* ---- mock-up page (outside the app frame) ---- */
+body { margin: 0; font-family: var(--font-sans, var(--gauge-sans)); }
+.stage { container-type: inline-size; }
+.frame-wrap { width: 1440px; transform-origin: 0 0; }
+.notes { margin: 18px 2px 4px; font-size: 13px; line-height: 1.5; color: var(--foreground, var(--gauge-fg-1)); }
+.notes h3 { margin: 18px 0 6px; font-size: 14px; }
+.notes ol { margin: 0; padding-left: 20px; }
+.notes li { margin: 3px 0; }
+.notes code { font-family: var(--font-mono, var(--gauge-mono)); font-size: 12px; }
+
+/* ---- the app ---- */
+.app { width: 1440px; height: 900px; display: grid; grid-template-rows: 36px 1fr 24px; border: 1px solid var(--gauge-line); border-radius: 6px; overflow: hidden; }
+.tb { display: flex; align-items: center; gap: 12px; padding: 0 0 0 10px; background: var(--gauge-bg-2); border-bottom: 1px solid var(--gauge-line); color: var(--gauge-fg-2); }
+.tb .appname { flex: none; white-space: nowrap; display: flex; align-items: center; gap: 8px; color: var(--gauge-fg-0); font-weight: 600; }
+.tb .appname svg { width: 18px; height: 18px; border-radius: 3px; }
+.crumb { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
+.crumb .sep { color: var(--gauge-fg-3); }
+.crumb b { color: var(--gauge-fg-0); font-weight: 600; }
+.crumb .t { overflow: hidden; text-overflow: ellipsis; max-width: 420px; color: var(--gauge-fg-1); }
+.goto { margin-left: auto; display: flex; align-items: center; gap: 8px; width: 320px; height: 24px; padding: 0 8px; border: 1px solid var(--gauge-line-ctl); border-radius: 3px; background: var(--gauge-bg-0); color: var(--gauge-fg-3); }
+.tb .g-btn { flex: none; white-space: nowrap; }
+.goto .g-kbd { margin-left: auto; }
+.caption { display: flex; height: 100%; }
+.caption span { width: 46px; display: grid; place-items: center; color: var(--gauge-fg-2); font-size: 12px; }
+.body { display: grid; grid-template-columns: 176px 312px 1fr 348px; min-height: 0; }
+
+.g-nav { overflow: hidden; }
+.g-nav .lbl { padding: 8px 9px 4px; color: var(--gauge-fg-3); font-size: 11.5px; }
+.g-nav .ico { width: 16px; text-align: center; color: var(--gauge-fg-3); font-size: 12px; }
+.g-nav [aria-current='page'] .ico { color: var(--gauge-fg-0); }
+.g-nav .spacer { flex: 1; }
+
+.list { background: var(--gauge-bg-0); border-right: 1px solid var(--gauge-line); display: flex; flex-direction: column; min-height: 0; }
+.verdict { padding: 12px 14px 14px; border-bottom: 1px solid var(--gauge-line); }
+.verdict p { margin: 0 0 8px; color: var(--gauge-fg-1); }
+.verdict p strong { color: var(--gauge-fg-0); }
+.bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--gauge-bg-3); margin: 10px 0 6px; }
+.bar i { display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--gauge-fg-2); font-size: 12px; }
+.legend span::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; background: var(--c); vertical-align: 0; }
+.grp { display: flex; align-items: baseline; gap: 8px; padding: 10px 14px 4px; color: var(--gauge-fg-2); font-size: 12px; font-weight: 600; }
+.grp .n { margin-left: auto; color: var(--gauge-fg-3); font-weight: 400; font-variant-numeric: tabular-nums; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 7px 14px; border-top: 1px solid var(--gauge-line); cursor: pointer; }
+.row:hover { background: var(--gauge-bg-2); }
+.row .ttl { color: var(--gauge-fg-0); }
+.row .meta { grid-column: 1 / -1; color: var(--gauge-fg-3); font-size: 12px; }
+.row .g-sev { font-size: 12px; }
+.row.is-selected { background: var(--gauge-sel); box-shadow: inset 2px 0 var(--gauge-sel-edge); }
+.row.is-selected :is(.ttl, .meta) { color: var(--gauge-sel-fg); }
+.row.is-selected .g-sev--crit { color: var(--gauge-sel-crit); }
+.row.is-selected .g-sev--warn { color: var(--gauge-sel-warn); }
+.row .seen { color: var(--gauge-ok); font-size: 12px; font-weight: 600; }
+.scroll { overflow: hidden; flex: 1; }
+
+.reader { background: var(--gauge-bg-1); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.reader .g-pane-h { background: var(--gauge-bg-1); }
+.path { color: var(--gauge-fg-3); font-family: var(--gauge-mono); font-size: 12px; }
+.code { font-family: var(--gauge-mono); font-size: 12px; line-height: 20px; overflow: hidden; flex: 1; padding: 6px 0; }
+.ln { display: grid; grid-template-columns: 44px 18px 1fr; white-space: pre; }
+.ln .no { text-align: right; padding-right: 8px; color: var(--gauge-fg-3); font-variant-numeric: tabular-nums; }
+.ln .sg { color: var(--gauge-fg-3); }
+.ln.add { background: var(--gauge-ok-dim); }
+.ln.add .sg { color: var(--gauge-ok); }
+.ln.del { background: var(--gauge-crit-dim); }
+.ln.del .sg { color: var(--gauge-crit); }
+.ln.focus { background: var(--gauge-sel); box-shadow: inset 2px 0 var(--gauge-sel-edge); color: var(--gauge-sel-fg); }
+.ln.focus .no, .ln.focus .sg { color: var(--gauge-sel-fg); }
+.ln.hunk { color: var(--gauge-fg-3); background: var(--gauge-bg-2); }
+.k { color: var(--gauge-code); } .s { color: var(--gauge-val-str); } .c { color: var(--gauge-fg-3); } .ty { color: var(--gauge-fg-0); font-weight: 600; }
+.ln.focus :is(.k,.c,.ty) { color: var(--gauge-sel-fg); }
+.pin { display: grid; grid-template-columns: 62px 1fr; margin: 2px 0 4px; font-family: var(--gauge-sans); font-size: 12.5px; white-space: normal; }
+.pin > div { display: flex; align-items: center; gap: 10px; padding: 5px 10px; border: 1px solid var(--gauge-line-2); border-left: 2px solid var(--gauge-line-ctl); border-radius: 3px; background: var(--gauge-bg-2); margin-right: 14px; }
+.pin.is-current > div { border-color: var(--gauge-sel-edge); border-left-width: 2px; }
+.pin .rid { font-family: var(--gauge-mono); font-size: 11.5px; color: var(--gauge-fg-2); }
+.pin .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gauge-fg-0); }
+.pin .go { flex: none; white-space: nowrap; margin-left: auto; color: var(--gauge-fg-3); }
+.fold { display: grid; grid-template-columns: 62px 1fr; color: var(--gauge-fg-3); font-family: var(--gauge-sans); font-size: 12px; background: var(--gauge-bg-0); border-block: 1px solid var(--gauge-line); padding: 3px 0; white-space: normal; }
+
+.insp { background: var(--gauge-bg-1); border-left: 1px solid var(--gauge-line); display: flex; flex-direction: column; min-height: 0; }
+.insp .sec { padding: 12px 14px; border-bottom: 1px solid var(--gauge-line); }
+.insp h4 { margin: 0 0 8px; color: var(--gauge-fg-2); font-size: 12px; font-weight: 600; }
+.insp .head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.insp .kind { color: var(--gauge-fg-2); font-size: 12.5px; }
+.insp .sec h3 { margin: 0 0 8px; color: var(--gauge-fg-0); font-size: 15px; font-weight: 600; line-height: 1.35; }
+.insp p { margin: 0 0 8px; }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 12.5px; }
+.facts dt { color: var(--gauge-fg-2); } .facts dd { margin: 0; color: var(--gauge-fg-0); }
+.prec { list-style: none; margin: 0; padding: 0; }
+.prec li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px solid var(--gauge-line); }
+.prec li:first-child { border-top: 0; }
+.prec .ok { color: var(--gauge-fg-2); font-size: 12px; }
+.snip { margin-top: 8px; padding: 8px 10px; background: var(--gauge-bg-0); border: 1px solid var(--gauge-line); border-radius: 3px; font-family: var(--gauge-mono); font-size: 12px; line-height: 18px; white-space: pre; overflow: hidden; }
+.acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.acts .g-kbd { margin-left: 2px; }
+.g-statusbar .ok { color: var(--gauge-ok); font-weight: 600; }
+.g-statusbar .r { margin-left: auto; }
+
+/* empty-state frame */
+.empty { width: 1440px; height: 420px; margin-top: 18px; display: grid; grid-template-rows: 36px 1fr; border: 1px solid var(--gauge-line); border-radius: 6px; overflow: hidden; }
+.empty .mid { display: grid; place-items: center; text-align: center; }
+.empty .mid svg.lock { width: 300px; height: auto; }
+.empty .cap { font-family: var(--gauge-mono); font-size: 12px; color: var(--gauge-fg-3); margin: 6px 0 18px; }
+.empty .mid p { margin: 0 0 14px; color: var(--gauge-fg-1); font-size: 14px; }
+.empty .mid p strong { color: var(--gauge-fg-0); }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+<div class="frame-wrap" id="wrap">
+
+<div class="app g-root" role="application" aria-label="Kelpie Review mock-up">
+  <!-- Title bar: bg-2, Kelpie icon, Gauge colours -->
+  <header class="tb">
+    <span class="appname"><svg class="icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img">
+<title>Kelpie app icon</title>
+<rect fill="#F4EFE5" x="0" y="0" width="512" height="512" rx="98"/>
+<g transform="translate(5 12) scale(1.51)">
+
+<path fill="#34495A" d="M 45,260 C 60,228 63,187 91,152 C 86,137 98,112 111,87 L 137,33 Q 144,20 148,35 C 154,57 153,79 155,100 C 163,79 176,57 187,46 Q 195,38 197,52 C 199,70 193,99 189,111 C 218,123 232,141 236,159 C 238,169 244,173 255,178 L 290,195 Q 302,200 294,211 C 283,233 264,239 240,237 C 193,233 171,252 181,283 C 142,280 112,251 45,260 Z"/>
+<path fill="#ECD9B8" d="M 117,196 C 127,178 153,168 165,173 C 172,176 158,189 174,189 C 194,189 213,193 230,185 C 245,178 258,185 281,197 C 277,202 280,208 287,212 C 278,226 263,230 242,229 C 200,226 169,238 160,265 C 145,252 138,228 148,214 C 138,207 111,214 117,196 Z"/>
+<path fill="#ECD9B8" d="M 108,137 C 112,112 128,86 141,52 C 146,74 146,99 143,117 C 132,123 122,128 108,137 Z"/>
+<ellipse fill="#ECD9B8" cx="215" cy="146" rx="6" ry="3.5"/>
+<ellipse fill="#F4EFE5" cx="214" cy="160" rx="9" ry="5.5"/>
+<ellipse fill="#34495A" cx="217" cy="160" rx="4" ry="4"/>
+</g>
+<rect fill="#A4513B" x="464" y="256" width="32" height="32" rx="0"/>
+</svg>
+Kelpie Review</span>
+    <nav class="crumb" aria-label="Location">
+      <span class="sep">/</span><span>KhaiStimpson / andrew-crm</span><span class="sep">/</span>
+      <b>#1001</b><span class="t">refactor: collapse three AI treatments into one deep AiInvocation module</span>
+    </nav>
+    <div class="goto">Go to file, pull request or command <span class="g-kbd">Ctrl K</span></div>
+    <button class="g-btn g-btn--primary">Submit review · 2 pending</button>
+    <div class="caption"><span>—</span><span>▢</span><span>✕</span></div>
+  </header>
+
+  <div class="body">
+    <!-- Nav rail -->
+    <nav class="g-nav" aria-label="Sections">
+      <a href="#"><span class="ico">▤</span>Inbox<span class="g-count">6</span></a>
+      <hr>
+      <div class="lbl">#1001 · refactor → main</div>
+      <a href="#" aria-current="page"><span class="ico">◎</span>Review plan<span class="g-count">5</span></a>
+      <a href="#"><span class="ico">▦</span>Files<span class="g-count">0 / 14</span></a>
+      <a href="#"><span class="ico">⌗</span>Map</a>
+      <a href="#"><span class="ico">✎</span>Conversation<span class="g-count">3</span></a>
+      <a href="#"><span class="ico">⎇</span>Commits<span class="g-count">4</span></a>
+      <a href="#"><span class="ico">✓</span>Checks<span class="g-count g-count--crit">1 failing</span></a>
+      <a href="#"><span class="ico">↳</span>Walkthrough</a>
+      <div class="spacer"></div>
+      <hr>
+      <a href="#"><span class="ico">⚙</span>Settings</a>
+    </nav>
+
+    <!-- List: the review plan, verdict first -->
+    <section class="list" aria-label="Review plan">
+      <div class="g-pane-h"><h2>Review plan</h2><span class="g-facts">0 of 22 seen</span></div>
+      <div class="verdict">
+        <p><strong>5 places need your judgement</strong>, all in <button class="g-entity g-entity--sans">AiInvocation.cs</button>. The other 2,246 changed lines are proven moves or new code you can skim.</p>
+        <div class="bar" aria-hidden="true">
+          <i style="width:3%;background:var(--gauge-fg-0)"></i>
+          <i style="width:30%;background:var(--gauge-fg-3)"></i>
+          <i style="width:67%;background:var(--gauge-line-2)"></i>
+        </div>
+        <div class="legend">
+          <span style="--c:var(--gauge-fg-0)">Judgement 78</span>
+          <span style="--c:var(--gauge-fg-3)">Skim 678</span>
+          <span style="--c:var(--gauge-line-2)">Proven mechanical 1,490</span>
+        </div>
+      </div>
+      <div class="scroll">
+        <div class="grp">Needs judgement <span class="n">5</span></div>
+        <div class="row is-selected" aria-current="true"><span class="ttl">Missing [DisableConcurrentExecution]</span><span class="g-sev g-sev--crit">High</span><span class="meta">R1 · AiInvocation.cs:14 · 3 of 3 peers differ</span></div>
+        <div class="row"><span class="ttl">Doesn't use AiSourceAuthorizationService</span><span class="g-sev g-sev--warn">Medium</span><span class="meta">R3 · AiInvocation.cs:25 · 3 of 3 peers differ</span></div>
+        <div class="row"><span class="ttl">Budget settled before audit write</span><span class="g-sev g-sev--warn">Medium</span><span class="meta">R2 · AiInvocation.cs:88 · ordering changed</span></div>
+        <div class="row"><span class="ttl">Retry policy dropped for PII gateway</span><span class="g-sev">Low</span><span class="meta">R4 · AiInvocation.cs:141</span></div>
+        <div class="row"><span class="ttl">New public type with no tests</span><span class="g-sev">Low</span><span class="meta">R5 · IAiTreatment.cs:1</span></div>
+        <div class="grp">Skim <span class="n">17</span></div>
+        <div class="row"><span class="ttl">Moved AiSafeFailureCodes from CatchMeUpService.cs</span><span class="seen">Seen</span><span class="meta">2 hunks in 2 files · 20 lines</span></div>
+        <div class="row"><span class="ttl">Moved ManagedIdentityAzureAiAccessToken…</span><span></span><span class="meta">2 hunks in 2 files · 16 lines</span></div>
+        <div class="row"><span class="ttl">Moved AzureProviderException</span><span></span><span class="meta">2 hunks in 2 files · 13 lines</span></div>
+        <div class="row"><span class="ttl">Moved TokenisedContext to PiiGateway.cs</span><span></span><span class="meta">4 hunks in 2 files · 6 lines</span></div>
+        <div class="row"><span class="ttl">Moved ValidatedClaim from CatchMeUpService.cs</span><span></span><span class="meta">2 hunks in 2 files · 5 lines</span></div>
+      </div>
+    </section>
+
+    <!-- Reader: the code stays central -->
+    <section class="reader" aria-label="Diff">
+      <div class="g-pane-h">
+        <h2>AiInvocation.cs</h2>
+        <span class="g-facts">Added · <span style="color:var(--gauge-ok)">+199</span> · 5 review points</span>
+        <div class="g-actions">
+          <div class="g-seg"><button aria-pressed="true">Changes</button><button>Full file</button></div>
+          <div class="g-seg"><button aria-pressed="true">Unified</button><button>Split</button></div>
+          <button class="g-btn g-btn--ghost">‹</button><span style="color:var(--gauge-fg-2);font-size:12.5px">Point 1 of 5</span><button class="g-btn g-btn--ghost">›</button>
+        </div>
+        <div class="path" style="flex-basis:100%">src/AndrewCrm.Web/Services/Ai/AiInvocation.cs · analysed in 2.6 s</div>
+      </div>
+      <div class="code">
+        <div class="ln add"><span class="no">9</span><span class="sg">+</span><span class="c">/// &lt;summary&gt;</span></div>
+        <div class="ln add"><span class="no">10</span><span class="sg">+</span><span class="c">/// The single application-owned AI orchestration boundary. It resolves</span></div>
+        <div class="ln add"><span class="no">11</span><span class="sg">+</span><span class="c">/// the tenant, tokenises via the PII gateway, reserves and settles budget,</span></div>
+        <div class="ln add"><span class="no">12</span><span class="sg">+</span><span class="c">/// and records an immutable audit event per treatment.</span></div>
+        <div class="ln add"><span class="no">13</span><span class="sg">+</span><span class="c">/// &lt;/summary&gt;</span></div>
+        <div class="ln focus"><span class="no">14</span><span class="sg">+</span><span><span class="k">public sealed class</span> <span class="ty">AiInvocation</span></span></div>
+        <div class="pin is-current"><span></span><div><span class="g-sev g-sev--crit">High</span><span class="rid">R1</span><span class="what">Missing [DisableConcurrentExecution]: 3 of 3 peers have it</span><span class="go">in inspector →</span></div></div>
+        <div class="ln add"><span class="no">15</span><span class="sg">+</span><span>{</span></div>
+        <div class="ln add"><span class="no">16</span><span class="sg">+</span><span>    <span class="k">private readonly</span> AppDbContext _db;</span></div>
+        <div class="ln add"><span class="no">17</span><span class="sg">+</span><span>    <span class="k">private readonly</span> ITenantProvider _tenant;</span></div>
+        <div class="ln add"><span class="no">18</span><span class="sg">+</span><span>    <span class="k">private readonly</span> PiiGateway _gateway;</span></div>
+        <div class="ln add"><span class="no">19</span><span class="sg">+</span><span>    <span class="k">private readonly</span> AzureAiProvider _provider;</span></div>
+        <div class="ln add"><span class="no">20</span><span class="sg">+</span><span>    <span class="k">private readonly</span> TimeProvider _time;</span></div>
+        <div class="ln add"><span class="no">21</span><span class="sg">+</span><span>    <span class="k">private readonly</span> ILogger&lt;AiInvocation&gt; _log;</span></div>
+        <div class="ln add"><span class="no">22</span><span class="sg">+</span><span></span></div>
+        <div class="ln add"><span class="no">23</span><span class="sg">+</span><span>    <span class="k">public</span> AiInvocation(AppDbContext db, ITenantProvider tenant,</span></div>
+        <div class="ln add"><span class="no">24</span><span class="sg">+</span><span>        PiiGateway gateway, AzureAiProvider provider,</span></div>
+        <div class="ln add"><span class="no">25</span><span class="sg">+</span><span>        TimeProvider time, ILogger&lt;AiInvocation&gt; log)</span></div>
+        <div class="pin"><span></span><div><span class="g-sev g-sev--warn">Medium</span><span class="rid">R3</span><span class="what">Doesn't take AiSourceAuthorizationService, unlike 3 of 3 peers</span><span class="go">J / K to move</span></div></div>
+        <div class="ln add"><span class="no">26</span><span class="sg">+</span><span>    {</span></div>
+        <div class="ln add"><span class="no">27</span><span class="sg">+</span><span>        _db = db; _tenant = tenant; _gateway = gateway;</span></div>
+        <div class="ln add"><span class="no">28</span><span class="sg">+</span><span>        _provider = provider; _time = time; _log = log;</span></div>
+        <div class="ln add"><span class="no">29</span><span class="sg">+</span><span>    }</span></div>
+        <div class="fold"><span></span><span>⋯ 46 lines of constructor wiring and guard clauses, nothing flagged · <button class="g-entity g-entity--sans" style="font-size:12px">Expand</button></span></div>
+        <div class="ln add"><span class="no">76</span><span class="sg">+</span><span>    <span class="k">public async</span> Task&lt;AiResult&gt; RunAsync(IAiTreatment treatment,</span></div>
+        <div class="ln add"><span class="no">77</span><span class="sg">+</span><span>        CancellationToken ct)</span></div>
+        <div class="ln add"><span class="no">78</span><span class="sg">+</span><span>    {</span></div>
+        <div class="ln add"><span class="no">79</span><span class="sg">+</span><span>        <span class="k">var</span> tenant = <span class="k">await</span> _tenant.RequireEnabledAsync(<span class="s">"ai"</span>, ct);</span></div>
+        <div class="ln add"><span class="no">80</span><span class="sg">+</span><span>        <span class="k">var</span> context = <span class="k">await</span> _gateway.TokeniseAsync(treatment, ct);</span></div>
+      </div>
+    </section>
+
+    <!-- Inspector: the finding, plain verdict then evidence -->
+    <aside class="insp" aria-label="Inspector">
+      <div class="g-pane-h"><h3>Review point R1</h3><span class="g-facts">1 of 5</span></div>
+      <div class="sec">
+        <div class="head"><span class="g-sev g-sev--crit">High</span><span class="kind">Pattern deviation</span></div>
+        <h3>AiInvocation can run twice at once. Every peer prevents that.</h3>
+        <p>All 3 classes that take <button class="g-entity">PiiGateway</button> carry <code class="g-mono">[DisableConcurrentExecution]</code>. Without it, two scheduled runs can overlap and reserve the same budget twice.</p>
+        <dl class="facts">
+          <dt>Evidence</dt><dd>3 of 3 peers · no executable evidence</dd>
+          <dt>Changes</dt><dd>New code, not a move</dd>
+          <dt>Fan-in</dt><dd>4 callers</dd>
+        </dl>
+      </div>
+      <div class="sec">
+        <h4>Precedent</h4>
+        <ul class="prec">
+          <li><button class="g-entity">PiiGatewayJob.cs:14</button><span class="ok">has it</span></li>
+          <li><button class="g-entity">TenantSyncJob.cs:22</button><span class="ok">has it</span></li>
+          <li><button class="g-entity">BudgetSettleJob.cs:9</button><span class="ok">has it</span></li>
+        </ul>
+        <div class="snip"><span class="c">// PiiGatewayJob.cs</span>
+[DisableConcurrentExecution(<span style="color:var(--gauge-val-num)">600</span>)]
+<span class="k">public sealed class</span> <span class="ty">PiiGatewayJob</span></div>
+      </div>
+      <div class="sec">
+        <div class="acts">
+          <button class="g-btn">Comment <span class="g-kbd">C</span></button>
+          <button class="g-btn">Show precedent <span class="g-kbd">P</span></button>
+          <button class="g-btn g-btn--ghost">Dismiss <span class="g-kbd">D</span></button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="g-statusbar">
+    <span><span class="ok">Ready</span> · engine connected</span>
+    <span>refactor → main · 4 commits</span>
+    <span>0 of 14 files viewed</span>
+    <span>2 comments pending</span>
+    <span class="r">Walkthrough: off</span>
+    <span>Dark</span>
+  </footer>
+</div>
+
+<!-- Empty inbox: the one place the Kelpie brand appears inside the app -->
+<div class="empty g-root">
+  <header class="tb"><span class="appname"><svg class="icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img">
+<title>Kelpie app icon</title>
+<rect fill="#F4EFE5" x="0" y="0" width="512" height="512" rx="98"/>
+<g transform="translate(5 12) scale(1.51)">
+
+<path fill="#34495A" d="M 45,260 C 60,228 63,187 91,152 C 86,137 98,112 111,87 L 137,33 Q 144,20 148,35 C 154,57 153,79 155,100 C 163,79 176,57 187,46 Q 195,38 197,52 C 199,70 193,99 189,111 C 218,123 232,141 236,159 C 238,169 244,173 255,178 L 290,195 Q 302,200 294,211 C 283,233 264,239 240,237 C 193,233 171,252 181,283 C 142,280 112,251 45,260 Z"/>
+<path fill="#ECD9B8" d="M 117,196 C 127,178 153,168 165,173 C 172,176 158,189 174,189 C 194,189 213,193 230,185 C 245,178 258,185 281,197 C 277,202 280,208 287,212 C 278,226 263,230 242,229 C 200,226 169,238 160,265 C 145,252 138,228 148,214 C 138,207 111,214 117,196 Z"/>
+<path fill="#ECD9B8" d="M 108,137 C 112,112 128,86 141,52 C 146,74 146,99 143,117 C 132,123 122,128 108,137 Z"/>
+<ellipse fill="#ECD9B8" cx="215" cy="146" rx="6" ry="3.5"/>
+<ellipse fill="#F4EFE5" cx="214" cy="160" rx="9" ry="5.5"/>
+<ellipse fill="#34495A" cx="217" cy="160" rx="4" ry="4"/>
+</g>
+<rect fill="#A4513B" x="464" y="256" width="32" height="32" rx="0"/>
+</svg>
+Kelpie Review</span><div class="goto">Go to file, pull request or command <span class="g-kbd">Ctrl K</span></div><div class="caption"><span>—</span><span>▢</span><span>✕</span></div></header>
+  <div class="mid"><div>
+    <svg class="lock" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1053 305" role="img">
+<title>Kelpie wordmark</title>
+<g transform="translate(-15 0)">
+<path fill="#F4EFE5" d="M 45,260 C 60,228 63,187 91,152 C 86,137 98,112 111,87 L 137,33 Q 144,20 148,35 C 154,57 153,79 155,100 C 163,79 176,57 187,46 Q 195,38 197,52 C 199,70 193,99 189,111 C 218,123 232,141 236,159 C 238,169 244,173 255,178 L 290,195 Q 302,200 294,211 C 283,233 264,239 240,237 C 193,233 171,252 181,283 C 142,280 112,251 45,260 Z"/>
+<g transform="translate(3.4 4.4) scale(.978)">
+<path fill="#34495A" d="M 45,260 C 60,228 63,187 91,152 C 86,137 98,112 111,87 L 137,33 Q 144,20 148,35 C 154,57 153,79 155,100 C 163,79 176,57 187,46 Q 195,38 197,52 C 199,70 193,99 189,111 C 218,123 232,141 236,159 C 238,169 244,173 255,178 L 290,195 Q 302,200 294,211 C 283,233 264,239 240,237 C 193,233 171,252 181,283 C 142,280 112,251 45,260 Z"/>
+</g>
+<path fill="#ECD9B8" d="M 117,196 C 127,178 153,168 165,173 C 172,176 158,189 174,189 C 194,189 213,193 230,185 C 245,178 258,185 281,197 C 277,202 280,208 287,212 C 278,226 263,230 242,229 C 200,226 169,238 160,265 C 145,252 138,228 148,214 C 138,207 111,214 117,196 Z"/>
+<path fill="#ECD9B8" d="M 108,137 C 112,112 128,86 141,52 C 146,74 146,99 143,117 C 132,123 122,128 108,137 Z"/>
+<ellipse fill="#ECD9B8" cx="215" cy="146" rx="6" ry="3.5"/>
+<ellipse fill="#F4EFE5" cx="214" cy="160" rx="9" ry="5.5"/>
+<ellipse fill="#34495A" cx="217" cy="160" rx="4" ry="4"/>
+</g>
+<path fill="#F4EFE5" d="M454.601 223H401.705Q391.935 205.817 383.849 193.857Q375.763 181.896 368.575 171.677L361.837 177.404V201.887Q361.837 205.93 363.016 208.513Q364.195 211.096 367.564 212.331Q369.586 213.229 372.281 213.903Q374.977 214.577 377.672 214.802V223H308.155V214.802Q310.963 214.577 313.771 214.184Q316.578 213.791 318.712 213.117Q322.306 211.882 323.597 209.299Q324.889 206.716 324.889 202.561V77.341Q324.889 73.635 323.26 69.648Q321.632 65.661 318.487 63.64Q316.354 62.292 312.086 61.394Q307.818 60.495 304.337 60.271V52.072L360.152 49.152L361.837 50.949V166.848Q370.147 159.436 380.536 149.665Q390.924 139.895 397.213 133.493Q400.919 129.675 401.312 127.709Q401.705 125.744 401.705 125.295Q401.705 123.273 398.167 121.926Q394.63 120.578 387.555 119.567V111.594H444.605V119.343Q433.375 122.487 427.479 125.239Q421.583 127.99 414.62 132.595Q410.016 135.627 405.692 138.94Q401.368 142.253 395.753 147.194Q406.759 163.142 416.08 176.73Q425.401 190.319 435.621 205.48Q439.103 210.759 444.269 212.556Q449.435 214.353 454.601 214.802ZM572.563 196.159Q568.633 202.561 563.074 208.232Q557.515 213.903 550.439 217.946Q542.915 222.214 535.222 224.404Q527.529 226.594 517.534 226.594Q500.913 226.594 488.84 221.877Q476.768 217.16 468.906 209.187Q461.045 201.213 457.17 190.375Q453.296 179.538 453.296 166.848Q453.296 155.393 457.507 144.892Q461.719 134.392 469.468 126.193Q477.104 118.22 488.728 113.278Q500.352 108.337 514.727 108.337Q530.449 108.337 540.557 112.155Q550.664 115.974 557.29 122.712Q563.691 129.113 566.611 137.817Q569.531 146.521 569.531 156.066V163.366H493.613Q493.613 186.389 502.485 198.405Q511.357 210.422 530.674 210.422Q541.23 210.422 549.653 204.638Q558.076 198.854 564.028 189.982ZM529.663 153.483Q529.663 146.745 528.989 139.67Q528.315 132.595 526.631 128.103Q524.722 122.824 521.409 120.129Q518.096 117.434 513.042 117.434Q504.395 117.434 499.229 126.193Q494.062 134.953 493.613 153.933ZM647.738 223H577.323V214.802Q580.243 214.577 582.995 214.24Q585.746 213.903 587.88 213.117Q591.474 211.77 592.765 209.243Q594.057 206.716 594.057 202.561V78.127Q594.057 73.859 592.316 70.209Q590.575 66.56 587.655 64.65Q585.409 63.19 580.861 61.843Q576.312 60.495 572.831 60.271V52.072L629.32 49.152L631.005 50.949V201.101Q631.005 205.256 632.465 207.839Q633.925 210.422 637.182 211.882Q639.428 212.893 641.898 213.679Q644.369 214.465 647.738 214.802ZM791.307 168.308Q791.307 192.004 775.472 208.962Q759.637 225.92 735.379 225.92Q724.598 225.92 717.859 223.73Q711.121 221.54 706.741 218.396H705.843V249.953Q705.843 253.884 707.583 256.804Q709.324 259.724 712.469 261.071Q715.501 262.307 721.06 263.317Q726.619 264.328 730.325 264.553V272.863H649.241V264.553Q652.049 264.328 656.316 263.71Q660.584 263.093 662.718 262.419Q666.312 261.184 667.603 258.208Q668.895 255.231 668.895 251.413V136.525Q668.558 132.819 667.154 130.012Q665.75 127.204 662.718 125.07Q660.472 123.61 656.766 122.656Q653.06 121.701 649.466 121.364V113.166L704.158 110.246L705.843 111.706V124.172L706.741 124.396Q714.153 116.872 723.194 112.717Q732.234 108.562 741.106 108.562Q764.354 108.562 777.83 125.014Q791.307 141.467 791.307 168.308ZM750.989 168.757Q750.989 160.334 749.754 152.641Q748.519 144.948 745.374 138.884Q742.342 132.819 737.344 129.226Q732.347 125.632 725.159 125.632Q717.859 125.632 713.479 128.159Q709.1 130.686 705.843 134.729V198.405Q706.517 200.651 708.426 204.189Q710.335 207.727 712.244 209.86Q715.052 212.893 718.646 214.353Q722.239 215.812 726.507 215.812Q737.625 215.812 744.307 203.852Q750.989 191.892 750.989 168.757ZM872.771 223H801.794V214.802Q804.714 214.577 807.521 214.24Q810.329 213.903 812.351 213.117Q815.944 211.77 817.404 209.243Q818.864 206.716 818.864 202.561V137.199Q818.864 133.269 817.067 130.292Q815.271 127.316 812.575 125.52Q810.554 124.172 806.455 122.937Q802.355 121.701 798.986 121.364V113.166L854.016 110.246L855.7 111.931V201.101Q855.7 205.031 857.385 207.783Q859.069 210.534 862.214 211.882Q864.46 212.893 867.155 213.679Q869.851 214.465 872.771 214.802ZM856.374 69.816Q856.374 78.352 849.804 84.36Q843.234 90.368 834.25 90.368Q825.153 90.368 818.583 84.36Q812.014 78.352 812.014 69.816Q812.014 61.281 818.583 55.217Q825.153 49.152 834.25 49.152Q843.347 49.152 849.86 55.217Q856.374 61.281 856.374 69.816ZM999.83 196.159Q995.899 202.561 990.34 208.232Q984.781 213.903 977.706 217.946Q970.182 222.214 962.489 224.404Q954.796 226.594 944.801 226.594Q928.18 226.594 916.107 221.877Q904.034 217.16 896.173 209.187Q888.312 201.213 884.437 190.375Q880.562 179.538 880.562 166.848Q880.562 155.393 884.774 144.892Q888.985 134.392 896.734 126.193Q904.371 118.22 915.995 113.278Q927.618 108.337 941.993 108.337Q957.716 108.337 967.823 112.155Q977.931 115.974 984.557 122.712Q990.958 129.113 993.878 137.817Q996.798 146.521 996.798 156.066V163.366H920.88Q920.88 186.389 929.752 198.405Q938.624 210.422 957.94 210.422Q968.497 210.422 976.92 204.638Q985.343 198.854 991.295 189.982ZM956.93 153.483Q956.93 146.745 956.256 139.67Q955.582 132.595 953.897 128.103Q951.988 122.824 948.675 120.129Q945.362 117.434 940.309 117.434Q931.661 117.434 926.495 126.193Q921.329 134.953 920.88 153.933Z"/>
+<rect fill="#A4513B" x="1002" y="195" width="28" height="28" rx="0"/>
+</svg>
+
+    <div class="cap">Kelpie Review · what needs my judgement?</div>
+    <p><strong>Nothing is waiting on you.</strong> 0 review requests across 4 watched repositories.</p>
+    <button class="g-btn g-btn--primary">Open a pull request</button>
+    <button class="g-btn g-btn--ghost">Watch a repository</button>
+  </div></div>
+</div>
+
+</div>
+</div>
+<script>
+  const wrap = document.getElementById('wrap'), stage = document.getElementById('stage');
+  function fit() { const z = Math.min(1, stage.clientWidth / 1440); wrap.style.zoom = z; }
+  addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>

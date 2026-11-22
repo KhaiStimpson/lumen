@@ -6,6 +6,7 @@
     <AssemblyName>Lumen</AssemblyName>
     <RootNamespace>Lumen.App</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>Assets\kelpie.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

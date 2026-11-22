@@ -4,26 +4,24 @@
         xmlns:views="using:Lumen.App.Views"
         x:Class="Lumen.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Title="Lumen"
+        Title="Kelpie Review"
+        Icon="/Assets/kelpie.ico"
         Width="1480" Height="920" MinWidth="1080" MinHeight="640"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource Surface.Window}"
         FontFamily="{StaticResource UiFont}"
         FontSize="13"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaTitleBarHeightHint="44">
+        ExtendClientAreaTitleBarHeightHint="38">
 
-  <Grid RowDefinitions="44,*">
-    <!-- Title bar: identity, where you are, and a quiet go-to box. Drag area is the empty space. -->
-    <Grid Name="TitleBar" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto,150" Background="{DynamicResource Surface.Window}">
-      <StackPanel Orientation="Horizontal" Spacing="9" Margin="16,0,18,0" VerticalAlignment="Center">
-        <Border Width="22" Height="22" CornerRadius="6" Background="{DynamicResource Accent}">
-          <Path Data="{StaticResource Icon.Spark}" Fill="{DynamicResource Accent.OnAccent}" Width="12" Height="12" Stretch="Uniform" />
-        </Border>
-        <TextBlock Text="Lumen" FontWeight="SemiBold" FontSize="13.5" VerticalAlignment="Center" />
-        <Border Classes="pill" Padding="6,1" VerticalAlignment="Center">
-          <TextBlock Text="Preview" FontSize="10" />
-        </Border>
+  <Grid RowDefinitions="38,*">
+    <!-- Title bar (Gauge window chrome: bg-2 with a line border): the Kelpie icon, where you are, and the go-to box.
+         Drag area is the empty space. -->
+    <Border Grid.ColumnSpan="8" Classes="chrome" BorderThickness="0,0,0,1" />
+    <Grid Name="TitleBar" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto,150">
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0,16,0" VerticalAlignment="Center">
+        <Image Source="/Assets/kelpie-icon-64.png" Width="18" Height="18" RenderOptions.BitmapInterpolationMode="HighQuality" />
+        <TextBlock Text="Kelpie Review" Classes="h3" FontSize="13" VerticalAlignment="Center" />
       </StackPanel>
 
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
@@ -32,13 +30,13 @@
           <TextBlock Text="{Binding PullRequest.RepositoryLabel, FallbackValue=''}" Classes="secondary" FontSize="12.5" />
         </Button>
         <TextBlock Text="/" Classes="tertiary" VerticalAlignment="Center" />
-        <TextBlock Text="{Binding PullRequest.NumberLabel, FallbackValue=''}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding PullRequest.NumberLabel, FallbackValue=''}" Classes="h3" FontSize="12.5" VerticalAlignment="Center" />
         <TextBlock Text="{Binding PullRequest.Title, FallbackValue=''}" FontSize="12.5" MaxWidth="420"
                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
       </StackPanel>
 
       <!-- Command palette (Ctrl+K, TDD §30): go to file, go to pull request, actions with their shortcuts -->
-      <Panel Name="PalettePanel" Grid.Column="3" Width="380" Margin="0,0,12,0" VerticalAlignment="Center">
+      <Panel Name="PalettePanel" Grid.Column="3" Width="340" Margin="0,0,12,0" VerticalAlignment="Center">
         <TextBox Name="GoToFile" Classes="search" PlaceholderText="Go to file, pull request or command…" Text="{Binding Palette.Query}" />
         <Path Data="{StaticResource Icon.Search}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke"
               Width="12" Height="12" HorizontalAlignment="Left" Margin="11,0,0,0" IsHitTestVisible="False" />
@@ -47,7 +45,8 @@
         </Border>
         <Popup Name="PalettePopup" PlacementTarget="GoToFile" Placement="BottomEdgeAlignedLeft" VerticalOffset="6"
                IsOpen="{Binding Palette.IsOpen}" IsLightDismissEnabled="False" WindowManagerAddShadowHint="False">
-          <Border Classes="card" Width="520" MaxHeight="440" BoxShadow="0 12 40 0 #2A000000" Padding="6">
+          <Border Classes="card" Width="600" MaxHeight="440" Background="{DynamicResource Surface.Chrome}" BorderBrush="{DynamicResource Border.Strong}"
+                  CornerRadius="6" BoxShadow="0 12 32 0 #88000000" Padding="4">
             <Grid RowDefinitions="Auto,*">
               <TextBlock Classes="caption tertiary" Text="{Binding Palette.Hint}" Margin="10,4,10,6" />
               <ScrollViewer Grid.Row="1">
@@ -108,10 +107,10 @@
 
     <!-- Settings: a modal card over the current view; click outside or Escape to close (docs/design/settings-overlay.md). -->
     <Panel Name="SettingsOverlay" Grid.Row="1" IsVisible="{Binding IsSettingsOpen}">
-      <Border Name="SettingsScrim" Background="{DynamicResource Surface.Window}" Opacity="0.72" />
+      <Border Name="SettingsScrim" Background="{DynamicResource Gauge.Scrim}" />
       <Panel Name="SettingsHost" Background="Transparent">
         <Border Name="SettingsCard" Classes="card" Width="760" MaxHeight="680" Margin="24,32,24,28" HorizontalAlignment="Center"
-                BoxShadow="0 12 40 0 #24000000">
+                BoxShadow="0 12 32 0 #88000000">
           <views:SettingsView />
         </Border>
       </Panel>
