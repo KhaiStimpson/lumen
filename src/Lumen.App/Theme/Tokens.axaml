@@ -63,15 +63,15 @@
       <SolidColorBrush x:Key="Accent.Soft" Color="#1A0A64C8" />
       <SolidColorBrush x:Key="Accent.OnAccent" Color="#FFFFFF" />
 
-      <SolidColorBrush x:Key="Diff.Added.Bg" Color="#E9F0EB" />
-      <SolidColorBrush x:Key="Diff.Added.Gutter" Color="#DBE8DF" />
+      <SolidColorBrush x:Key="Diff.Added.Bg" Color="#EBF3ED" />
+      <SolidColorBrush x:Key="Diff.Added.Gutter" Color="#E4EFE7" />
       <SolidColorBrush x:Key="Diff.Added.Sign" Color="#1D7A3A" />
-      <SolidColorBrush x:Key="Diff.Removed.Bg" Color="#F5E9E8" />
-      <SolidColorBrush x:Key="Diff.Removed.Gutter" Color="#F0DCDA" />
+      <SolidColorBrush x:Key="Diff.Removed.Bg" Color="#FAF0EF" />
+      <SolidColorBrush x:Key="Diff.Removed.Gutter" Color="#F8E9E8" />
       <SolidColorBrush x:Key="Diff.Removed.Sign" Color="#B42318" />
       <SolidColorBrush x:Key="Diff.Hunk.Bg" Color="#F3F3F3" />
       <SolidColorBrush x:Key="Diff.Hunk.Text" Color="#6B6B6B" />
-      <SolidColorBrush x:Key="Diff.Focus.Bg" Color="#E2EBF5" />
+      <SolidColorBrush x:Key="Diff.Focus.Bg" Color="#E3EDF9" />
       <SolidColorBrush x:Key="Diff.Focus.Edge" Color="#0A64C8" />
       <SolidColorBrush x:Key="Find.Match" Color="#55E9B44C" />
       <SolidColorBrush x:Key="Find.Current" Color="#AAE0A020" />
@@ -165,15 +165,15 @@
       <SolidColorBrush x:Key="Accent.Soft" Color="#227CC0FF" />
       <SolidColorBrush x:Key="Accent.OnAccent" Color="#06263F" />
 
-      <SolidColorBrush x:Key="Diff.Added.Bg" Color="#2E3A33" />
-      <SolidColorBrush x:Key="Diff.Added.Gutter" Color="#304036" />
+      <SolidColorBrush x:Key="Diff.Added.Bg" Color="#28342D" />
+      <SolidColorBrush x:Key="Diff.Added.Gutter" Color="#2B3931" />
       <SolidColorBrush x:Key="Diff.Added.Sign" Color="#6FCF97" />
-      <SolidColorBrush x:Key="Diff.Removed.Bg" Color="#3F2F2E" />
-      <SolidColorBrush x:Key="Diff.Removed.Gutter" Color="#47302F" />
+      <SolidColorBrush x:Key="Diff.Removed.Bg" Color="#402C2B" />
+      <SolidColorBrush x:Key="Diff.Removed.Gutter" Color="#482F2E" />
       <SolidColorBrush x:Key="Diff.Removed.Sign" Color="#FF7B72" />
       <SolidColorBrush x:Key="Diff.Hunk.Bg" Color="#2B2B2B" />
       <SolidColorBrush x:Key="Diff.Hunk.Text" Color="#9E9E9E" />
-      <SolidColorBrush x:Key="Diff.Focus.Bg" Color="#313A42" />
+      <SolidColorBrush x:Key="Diff.Focus.Bg" Color="#2D3741" />
       <SolidColorBrush x:Key="Diff.Focus.Edge" Color="#7CC0FF" />
       <SolidColorBrush x:Key="Find.Match" Color="#44E9B44C" />
       <SolidColorBrush x:Key="Find.Current" Color="#99E9B44C" />
