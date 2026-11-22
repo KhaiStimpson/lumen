@@ -62,16 +62,7 @@ public sealed class RepositoryTypeIndex
         return FromSources(sources);
     }
 
-    public static bool IsTestPath(string path)
-    {
-        var segments = path.Split('/');
-        return segments.Any(s =>
-                   s.Equals("tests", StringComparison.OrdinalIgnoreCase) ||
-                   s.Equals("test", StringComparison.OrdinalIgnoreCase) ||
-                   s.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase) ||
-                   s.EndsWith(".Test", StringComparison.OrdinalIgnoreCase)) ||
-               path.EndsWith("Tests.cs", StringComparison.Ordinal);
-    }
+    public static bool IsTestPath(string path) => TestPaths.IsTest(path);
 
     public IEnumerable<TypeFacts> TypesIn(string path) => Types.Where(t => t.Path == path);
 

@@ -18,6 +18,9 @@ public sealed partial class PullRequestSessionManager(
     InvestigationCoordinator investigations,
     ReviewSettingsStore reviewSettings,
     TriageRunner triage,
+    IPullRequestVisitStore visits,
+    EngineOptions options,
+    TimeProvider time,
     ILogger<PullRequestSessionManager> logger) : IDisposable
 {
     private readonly ConcurrentDictionary<PullRequestKey, PullRequestSession> _sessions = new();
@@ -51,7 +54,8 @@ public sealed partial class PullRequestSessionManager(
         try
         {
             Progress(session, "github", "Fetching pull request…");
-            var (info, viewer, threads, viewed) = await LoadFromGitHubAsync(key, ct).ConfigureAwait(false);
+            var (info, viewer, reviewState, viewed) = await LoadFromGitHubAsync(key, ct).ConfigureAwait(false);
+            var threads = reviewState.Threads;
 
             var checkout = await workspace.CheckoutAsync(
                 key,
@@ -67,8 +71,15 @@ public sealed partial class PullRequestSessionManager(
             var files = ChangedFiles.FromUnifiedDiff(await checkout.GetDiffAsync(ct).ConfigureAwait(false), settings.MechanicalPaths);
             var snapshot = new Domain.PullRequestSnapshot(key, info.BaseSha, info.HeadSha, checkout.MergeBaseSha, info.Metadata, files, threads);
             session.SetSnapshot(snapshot, checkout);
+            session.ViewerLogin = viewer;
             session.Publish(new PullRequestEvent { Snapshot = ProtoMapper.ToProto(snapshot, viewer, viewed) });
+            session.SetReviewState(reviewState, force: true);
             LogSnapshotReady(logger, key, files.Count, stopwatch.ElapsedMilliseconds);
+            await RecordOpenedAsync(session, info.HeadSha, ct).ConfigureAwait(false);
+
+            // The conversation, commits and checks come separately: the diff never waits for them.
+            _ = Task.Run(() => FollowAsync(session), CancellationToken.None);
+            SessionReady?.Invoke(session);
 
             // Triage runs before detectors (it needs only the snapshot) and never blocks the review: null means unavailable.
             Progress(session, "triage", "Separating mechanical changes from real ones…");
@@ -132,8 +143,87 @@ public sealed partial class PullRequestSessionManager(
         }
     }
 
+    /// <summary>Raised once a session's snapshot is published (the walkthrough starts from here).</summary>
+    public event Action<PullRequestSession>? SessionReady;
+
+    /// <summary>Remembers the previous visit (for "since last review"), then records this one.</summary>
+    private async Task RecordOpenedAsync(PullRequestSession session, string headSha, CancellationToken ct)
+    {
+        try
+        {
+            session.PreviousVisit = await visits.GetVisitAsync(session.Key, ct).ConfigureAwait(false);
+            await visits.RecordOpenedAsync(session.Key, headSha, time.GetUtcNow(), ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogVisitNotRecorded(logger, ex, session.Key);
+        }
+    }
+
+    /// <summary>
+    /// Loads details at once, then keeps details, threads and the pending review fresh while anyone watches, so new
+    /// comments, checks and pushes show up without a reload.
+    /// </summary>
+    private async Task FollowAsync(PullRequestSession session)
+    {
+        var ct = session.Cancellation;
+        await RefreshDetailsAsync(session, ct).ConfigureAwait(false);
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(options.FollowInterval, time, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            if (session.SubscriberCount == 0)
+            {
+                continue;
+            }
+
+            if (gitHub.RateLimit is { Remaining: < 100 } limit && limit.ResetAt > time.GetUtcNow())
+            {
+                continue;
+            }
+
+            await RefreshDetailsAsync(session, ct).ConfigureAwait(false);
+            await RefreshReviewStateAsync(session, ct).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Best effort: a failure leaves the previous details in place.</summary>
+    public async Task<bool> RefreshDetailsAsync(PullRequestSession session, CancellationToken ct)
+    {
+        try
+        {
+            session.SetDetails(await gitHub.GetPullRequestDetailsAsync(session.Key, ct).ConfigureAwait(false));
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogDetailsUnavailable(logger, ex, session.Key);
+            return false;
+        }
+    }
+
+    /// <summary>Re-reads threads and the pending review from GitHub; best effort.</summary>
+    public async Task RefreshReviewStateAsync(PullRequestSession session, CancellationToken ct)
+    {
+        try
+        {
+            session.SetReviewState(await gitHub.GetReviewThreadsAsync(session.Key, ct).ConfigureAwait(false));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogThreadsUnavailable(logger, ex, session.Key);
+        }
+    }
+
     /// <summary>Loads PR data, falling back to the last cached copy when GitHub is unreachable (TDD §55).</summary>
-    private async Task<(PullRequestInfo Info, string Viewer, IReadOnlyList<ReviewThread> Threads, IReadOnlySet<string> Viewed)> LoadFromGitHubAsync(
+    private async Task<(PullRequestInfo Info, string Viewer, ReviewThreadsResult ReviewState, IReadOnlySet<string> Viewed)> LoadFromGitHubAsync(
         PullRequestKey key,
         CancellationToken ct)
     {
@@ -142,13 +232,13 @@ public sealed partial class PullRequestSessionManager(
         {
             var infoTask = gitHub.GetPullRequestAsync(key, ct);
             var viewerTask = gitHub.GetViewerLoginAsync(ct);
-            var threadsTask = gitHub.GetReviewCommentsAsync(key, ct);
+            var threadsTask = GetReviewStateAsync(key, ct);
             var viewedTask = GetViewedFilesAsync(key, ct);
             await Task.WhenAll(infoTask, viewerTask, threadsTask, viewedTask).ConfigureAwait(false);
-            var (info, viewer, threads) = (await infoTask.ConfigureAwait(false), await viewerTask.ConfigureAwait(false), await threadsTask.ConfigureAwait(false));
-            var cached = new CachedPullRequest(info, viewer, [.. threads]);
+            var (info, viewer, state) = (await infoTask.ConfigureAwait(false), await viewerTask.ConfigureAwait(false), await threadsTask.ConfigureAwait(false));
+            var cached = new CachedPullRequest(info, viewer, [.. state.Threads]);
             await store.SetCacheAsync(cacheKey, JsonSerializer.Serialize(cached), ct).ConfigureAwait(false);
-            return (info, viewer, threads, await viewedTask.ConfigureAwait(false));
+            return (info, viewer, state, await viewedTask.ConfigureAwait(false));
         }
         catch (Exception ex) when (ex is HttpRequestException
             || ex is GitHubApiException { StatusCode: { } status } && (int)status >= 500
@@ -162,8 +252,22 @@ public sealed partial class PullRequestSessionManager(
 
             LogUsingCachedPullRequest(logger, ex, key);
 
-            // Viewed state isn't cached: a stale tick is worse than none.
-            return (cached.Info, cached.Viewer, cached.Threads, new HashSet<string>());
+            // Viewed state isn't cached: a stale tick is worse than none. Neither is a pending review.
+            return (cached.Info, cached.Viewer, new ReviewThreadsResult(cached.Threads, null), new HashSet<string>());
+        }
+    }
+
+    /// <summary>Best-effort: the review works without threads (e.g. a token that can't use GraphQL).</summary>
+    private async Task<ReviewThreadsResult> GetReviewStateAsync(PullRequestKey key, CancellationToken ct)
+    {
+        try
+        {
+            return await gitHub.GetReviewThreadsAsync(key, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not HttpRequestException)
+        {
+            LogThreadsUnavailable(logger, ex, key);
+            return new ReviewThreadsResult([], null);
         }
     }
 
@@ -208,7 +312,7 @@ public sealed partial class PullRequestSessionManager(
         public void Report(string value) => report(value);
     }
 
-    private sealed record CachedPullRequest(PullRequestInfo Info, string Viewer, List<ReviewThread> Threads);
+    private sealed record CachedPullRequest(PullRequestInfo Info, string Viewer, List<Domain.ReviewThread> Threads);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{PullRequest}: snapshot ready ({Files} files) in {Elapsed} ms")]
     private static partial void LogSnapshotReady(ILogger logger, PullRequestKey pullRequest, int files, long elapsed);
@@ -218,6 +322,15 @@ public sealed partial class PullRequestSessionManager(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "{PullRequest}: couldn't read the Viewed checkboxes from GitHub")]
     private static partial void LogViewedFilesUnavailable(ILogger logger, Exception exception, PullRequestKey pullRequest);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "{PullRequest}: couldn't read review threads from GitHub")]
+    private static partial void LogThreadsUnavailable(ILogger logger, Exception exception, PullRequestKey pullRequest);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "{PullRequest}: couldn't read the conversation, commits or checks from GitHub")]
+    private static partial void LogDetailsUnavailable(ILogger logger, Exception exception, PullRequestKey pullRequest);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "{PullRequest}: couldn't record the visit")]
+    private static partial void LogVisitNotRecorded(ILogger logger, Exception exception, PullRequestKey pullRequest);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "{PullRequest}: analysis failed")]
     private static partial void LogAnalysisFailed(ILogger logger, Exception exception, PullRequestKey pullRequest);

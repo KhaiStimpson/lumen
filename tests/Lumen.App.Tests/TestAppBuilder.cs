@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Headless;
 
 [assembly: AvaloniaTestApplication(typeof(Lumen.App.Tests.TestAppBuilder))]
+[assembly: AvaloniaTestIsolation(AvaloniaTestIsolationLevel.PerAssembly)]
 
 namespace Lumen.App.Tests;
 

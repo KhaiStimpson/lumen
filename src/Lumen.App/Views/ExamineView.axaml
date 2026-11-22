@@ -234,13 +234,13 @@
               <!-- Comment -->
               <StackPanel Spacing="8" IsVisible="{Binding IsCommentTab}">
                 <TextBlock Classes="caption" TextWrapping="Wrap">
-                  <Run Text="Posts a review comment on GitHub at " /><Run Text="{Binding CurrentPoint.FileName, FallbackValue=''}" FontWeight="Medium" /><Run Text=":" /><Run Text="{Binding CurrentPoint.Line, FallbackValue=''}" FontWeight="Medium" /><Run Text=". Edit freely — it's your comment." />
+                  <Run Text="A review comment at " /><Run Text="{Binding CurrentPoint.FileName, FallbackValue=''}" FontWeight="Medium" /><Run Text=":" /><Run Text="{Binding CurrentPoint.Line, FallbackValue=''}" FontWeight="Medium" /><Run Text=". Edit freely — it's your comment. Ctrl+Enter adds it to your review; Ctrl+Shift+Enter posts it now." />
                 </TextBlock>
                 <TextBox Classes="composer" Text="{Binding CurrentPoint.CommentDraft, FallbackValue=''}" AcceptsReturn="True" TextWrapping="Wrap"
                          MinHeight="110" FontSize="12.5" IsEnabled="{Binding CurrentPoint.IsOpen, FallbackValue=False}" />
                 <TextBlock Classes="caption" Foreground="{DynamicResource Severity.High}" Text="{Binding CurrentPoint.PostError, FallbackValue=''}"
                            TextWrapping="Wrap" IsVisible="{Binding CurrentPoint.PostError, FallbackValue={x:Null}, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                <TextBlock Classes="caption" Foreground="{DynamicResource Marker.Verified}" Text="Posted to GitHub."
+                <TextBlock Classes="caption" Foreground="{DynamicResource Marker.Verified}" Text="Commented."
                            IsVisible="{Binding CurrentPoint.IsCommented, FallbackValue=False}" />
               </StackPanel>
             </StackPanel>
@@ -266,10 +266,17 @@
             <Border Classes="kbd"><TextBlock Text="C" /></Border>
           </StackPanel>
         </Button>
-        <Button Classes="primary" Command="{Binding PostCommentCommand}" CommandParameter="{x:Null}" IsVisible="{Binding IsCommentTab}"
+        <Button Classes="subtle" Command="{Binding PostCommentCommand}" CommandParameter="{x:Null}" IsVisible="{Binding IsCommentTab}"
                 IsEnabled="{Binding CurrentPoint.IsOpen, FallbackValue=False}">
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="Post comment" Foreground="{DynamicResource Accent.OnAccent}" />
+            <TextBlock Text="Post now" />
+            <TextBlock Text="Ctrl ⇧ ↵" FontSize="10.5" Opacity="0.7" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button Classes="primary" Command="{Binding AddPointCommentToReviewCommand}" CommandParameter="{x:Null}" IsVisible="{Binding IsCommentTab}"
+                IsEnabled="{Binding CurrentPoint.IsOpen, FallbackValue=False}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Add to review" Foreground="{DynamicResource Accent.OnAccent}" />
             <TextBlock Text="Ctrl ↵" FontSize="10.5" Opacity="0.75" Foreground="{DynamicResource Accent.OnAccent}" VerticalAlignment="Center" />
           </StackPanel>
         </Button>

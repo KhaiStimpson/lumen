@@ -1,0 +1,705 @@
+<title>Diff Ruler and Renames</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a design-review page. Each proposal is a live, app-faithful pane built from Lumen's own Theme/Tokens.axaml,
+   with the spec notes beside it. Colours below are copied from the app's Light / Dark theme dictionaries. */
+:root {
+  --window: #F4F5F7; --pane: #FFFFFF; --raised: #FFFFFF; --sunken: #F7F8FA; --hover: #F0F2F5; --selected: #EAF1FE;
+  --border: #E7E9ED; --border-strong: #D5D9E0;
+  --text: #171A1F; --text-2: #59616E; --text-3: #8B929E;
+  --accent: #2F6BE8; --accent-soft: #EAF1FE;
+  --add-bg: #EAF7EE; --add-gutter: #D5F0DD; --add-sign: #1F883D;
+  --rem-bg: #FDEEEE; --rem-gutter: #F9DADA; --rem-sign: #CF222E;
+  --hunk-bg: #EEF3FC; --hunk-text: #5C6F96;
+  --focus-bg: #FFF6DD; --focus-edge: #F0B429;
+  --find: #F5D76E; --lineno: #A3A9B4;
+  --m-deviation: #F0A020; --m-behaviour: #3E7BFA; --m-correctness: #E5484D;
+  --card-dev-border: #F2C46B; --card-dev-bg: #FFFCF5;
+  --thumb: rgba(23, 26, 31, .07); --thumb-edge: rgba(23, 26, 31, .22);
+  --shadow: 0 1px 2px rgba(26, 29, 36, .06), 0 8px 24px rgba(26, 29, 36, .06);
+  --ui: "Inter", "Segoe UI", "Helvetica Neue", sans-serif;
+  --code: "Cascadia Mono", "JetBrains Mono", Consolas, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --window: #0E1014; --pane: #15181D; --raised: #1B1F25; --sunken: #111317; --hover: #1F242B; --selected: #1A2740;
+  --border: #23272F; --border-strong: #323844;
+  --text: #E8EAED; --text-2: #A0A7B2; --text-3: #6D7481;
+  --accent: #5B8DF5; --accent-soft: #1A2740;
+  --add-bg: #0E1F16; --add-gutter: #12281C; --add-sign: #4CC47A;
+  --rem-bg: #2A1416; --rem-gutter: #3A1A1D; --rem-sign: #F0676E;
+  --hunk-bg: #161F30; --hunk-text: #8497BD;
+  --focus-bg: #2A2412; --focus-edge: #D99A1C;
+  --find: #E3B341; --lineno: #555C68;
+  --m-deviation: #E7A93C; --m-behaviour: #5B8DF5; --m-correctness: #F0676E;
+  --card-dev-border: #6B4E17; --card-dev-bg: #1C1912;
+  --thumb: rgba(232, 234, 237, .07); --thumb-edge: rgba(232, 234, 237, .25);
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.3);
+  color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --window: #0E1014; --pane: #15181D; --raised: #1B1F25; --sunken: #111317; --hover: #1F242B; --selected: #1A2740;
+  --border: #23272F; --border-strong: #323844;
+  --text: #E8EAED; --text-2: #A0A7B2; --text-3: #6D7481;
+  --accent: #5B8DF5; --accent-soft: #1A2740;
+  --add-bg: #0E1F16; --add-gutter: #12281C; --add-sign: #4CC47A;
+  --rem-bg: #2A1416; --rem-gutter: #3A1A1D; --rem-sign: #F0676E;
+  --hunk-bg: #161F30; --hunk-text: #8497BD;
+  --focus-bg: #2A2412; --focus-edge: #D99A1C;
+  --find: #E3B341; --lineno: #555C68;
+  --m-deviation: #E7A93C; --m-behaviour: #5B8DF5; --m-correctness: #F0676E;
+  --card-dev-border: #6B4E17; --card-dev-bg: #1C1912;
+  --thumb: rgba(232, 234, 237, .07); --thumb-edge: rgba(232, 234, 237, .25);
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.3);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--window); color: var(--text); font: 14px/1.5 var(--ui); padding-inline: 16px; padding-block: 32px 64px; }
+.page { max-width: 1180px; margin: 0 auto; display: grid; gap: 56px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; }
+h2 { font-size: 20px; font-weight: 650; letter-spacing: -.005em; }
+h3 { font-size: 14px; font-weight: 600; }
+p { margin: 0; max-width: 68ch; color: var(--text-2); }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.intro { display: grid; gap: 10px; }
+.intro p { font-size: 15px; }
+section { display: grid; gap: 20px; }
+.sec-head { display: grid; gap: 6px; }
+code, .mono { font-family: var(--code); font-size: 12.5px; }
+p code, li code { background: var(--sunken); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: 12px; color: var(--text); }
+kbd { font-family: var(--ui); font-size: 11px; font-weight: 600; color: var(--text-2); background: var(--pane); border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; min-width: 18px; display: inline-block; text-align: center; line-height: 16px; }
+
+/* ---------- App frame ---------- */
+.frame { background: var(--pane); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; display: grid; grid-template-columns: 250px minmax(0, 1fr); min-width: 0; }
+.tree { border-right: 1px solid var(--border); background: var(--pane); padding: 12px 8px; display: grid; align-content: start; gap: 2px; font-size: 13px; min-width: 0; }
+.tree-title { padding: 0 8px 8px; font-weight: 600; font-size: 12px; color: var(--text-2); display: flex; justify-content: space-between; }
+.node { display: grid; grid-template-columns: 16px minmax(0,1fr) auto; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 7px; color: var(--text); cursor: default; }
+.node.sel { background: var(--selected); }
+.node .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node .sub { display: block; font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
+.node.folder { color: var(--text-2); }
+.node .ic { width: 14px; height: 14px; color: var(--text-3); }
+.counts { font-family: var(--code); font-size: 11px; display: flex; gap: 6px; font-variant-numeric: tabular-nums; }
+.plus { color: var(--add-sign); } .minus { color: var(--rem-sign); }
+.zero { color: var(--text-3); }
+.indent1 { padding-left: 22px; } .indent2 { padding-left: 36px; }
+.rn-badge { font-size: 10px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 0 6px; line-height: 16px; }
+
+.main { display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-width: 0; }
+.fhead { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 14px; border-bottom: 1px solid var(--border); min-width: 0; }
+.fpath { font-family: var(--code); font-size: 12.5px; color: var(--text-2); min-width: 0; overflow-wrap: anywhere; }
+.fpath b { color: var(--text); font-weight: 500; }
+.spacer { flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 7px; overflow: hidden; }
+.seg button { font: 500 12px var(--ui); color: var(--text-2); background: transparent; border: 0; padding: 4px 10px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.seg button + button { border-left: 1px solid var(--border-strong); }
+button:focus-visible, .ruler:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.nav { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.nav button { width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid var(--border-strong); background: var(--pane); color: var(--text-2); border-radius: 7px; cursor: pointer; }
+.nav button:hover { background: var(--hover); color: var(--text); }
+.nav .label { min-width: 92px; text-align: center; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 7px 14px; border-bottom: 1px solid var(--border); background: var(--sunken); font-size: 11.5px; color: var(--text-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+.diffwrap { position: relative; display: grid; grid-template-columns: minmax(0,1fr) 18px; height: 520px; min-width: 0; }
+.diff { overflow-y: scroll; overflow-x: auto; scrollbar-width: none; font-family: var(--code); font-size: 12.5px; line-height: 20px; }
+.diff::-webkit-scrollbar { display: none; }
+.row { display: grid; grid-template-columns: 44px 44px 18px max-content; min-width: 100%; white-space: pre; }
+.row .n { color: var(--lineno); text-align: right; padding-right: 8px; user-select: none; }
+.row .s { text-align: center; user-select: none; }
+.row .c { padding-right: 24px; }
+.row.add { background: var(--add-bg); } .row.add .n { background: var(--add-gutter); } .row.add .s { color: var(--add-sign); }
+.row.rem { background: var(--rem-bg); } .row.rem .n { background: var(--rem-gutter); } .row.rem .s { color: var(--rem-sign); }
+.row.hunk { background: var(--hunk-bg); color: var(--hunk-text); }
+.row.flash { animation: flash 1.1s ease-out; }
+@keyframes flash { 0% { box-shadow: inset 3px 0 0 var(--focus-edge); background: var(--focus-bg); } 100% { box-shadow: inset 3px 0 0 transparent; } }
+.row .find { background: color-mix(in srgb, var(--find) 55%, transparent); border-radius: 2px; }
+.kw { color: #CF222E; } .ty { color: #8250DF; } .st { color: #0A3069; } .cm { color: var(--text-3); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kw { color: #FF7B72; } :root:not([data-theme="light"]) .ty { color: #D2A8FF; } :root:not([data-theme="light"]) .st { color: #A5D6FF; } }
+:root[data-theme="dark"] .kw { color: #FF7B72; } :root[data-theme="dark"] .ty { color: #D2A8FF; } :root[data-theme="dark"] .st { color: #A5D6FF; }
+
+.card { margin: 6px 14px 6px 106px; border: 1px solid var(--card-dev-border); background: var(--card-dev-bg); border-radius: 10px; padding: 10px 12px; font-family: var(--ui); font-size: 13px; white-space: normal; display: grid; gap: 2px; max-width: 560px; }
+.card.thread { border-color: var(--border-strong); background: var(--raised); }
+.card .t { font-weight: 600; }
+.card .b { color: var(--text-2); }
+
+/* ---------- The ruler (replaces the scrollbar) ---------- */
+.ruler { position: relative; border-left: 1px solid var(--border); background: var(--sunken); cursor: pointer; }
+.ruler .mk { position: absolute; border-radius: 1px; }
+.ruler .lane-a { left: 3px; width: 5px; }
+.ruler .lane-b { left: 10px; width: 5px; }
+.ruler .add { background: var(--add-sign); opacity: .85; }
+.ruler .rem { background: var(--rem-sign); opacity: .85; }
+.ruler .find { left: 2px; right: 2px; height: 2px; background: var(--find); }
+.ruler .pt { width: 7px; height: 7px; left: 9px; transform: translateY(-3px); }
+.ruler .pt.dev { background: var(--m-deviation); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.ruler .pt.thr { background: var(--m-behaviour); border-radius: 50%; }
+.ruler .thumb { position: absolute; left: 0; right: 0; background: var(--thumb); border-top: 1px solid var(--thumb-edge); border-bottom: 1px solid var(--thumb-edge); pointer-events: none; }
+.ruler .mk.cur { outline: 1.5px solid var(--text); outline-offset: 1px; }
+.tip { position: absolute; right: 26px; z-index: 5; pointer-events: none; background: var(--raised); color: var(--text); border: 1px solid var(--border-strong); border-radius: 7px; padding: 6px 9px; font-size: 12px; box-shadow: var(--shadow); white-space: nowrap; }
+.tip .code { font-family: var(--code); font-size: 11.5px; color: var(--text-2); display: block; max-width: 340px; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Spec notes ---------- */
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 32px; }
+.note { display: grid; gap: 8px; align-content: start; }
+.note ul { margin: 0; padding-left: 18px; color: var(--text-2); display: grid; gap: 4px; }
+.note li b { color: var(--text); font-weight: 600; }
+
+/* ---------- Rename states ---------- */
+.states { display: grid; gap: 16px; }
+.state { background: var(--pane); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; min-width: 0; }
+.state-tag { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px 0; flex-wrap: wrap; }
+.state-tag .eyebrow { color: var(--accent); }
+.rhead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.pathdiff { font-family: var(--code); font-size: 12.5px; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.pathdiff .old { color: var(--text-3); }
+.pathdiff .old del { text-decoration: line-through; text-decoration-color: var(--rem-sign); background: var(--rem-bg); color: var(--rem-sign); border-radius: 3px; padding: 0 2px; }
+.pathdiff .new ins { text-decoration: none; background: var(--add-bg); color: var(--add-sign); border-radius: 3px; padding: 0 2px; font-weight: 500; }
+.pathdiff .arrow { color: var(--text-3); }
+.pathdiff .new { color: var(--text); }
+.pill { font: 600 11px var(--ui); border-radius: 999px; padding: 1px 8px; }
+.pill.rn { background: var(--accent-soft); color: var(--accent); }
+.pill.sim { background: var(--sunken); color: var(--text-2); border: 1px solid var(--border); }
+.empty { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 18px 14px; background: var(--sunken); color: var(--text-2); font-size: 13px; }
+.empty .ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); flex: none; }
+.linkbtn { font: 500 12.5px var(--ui); color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; }
+.linkbtn:hover { text-decoration: underline; }
+.static-diff { font-family: var(--code); font-size: 12.5px; line-height: 20px; overflow-x: auto; }
+.before-after { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.mini { background: var(--pane); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; min-width: 0; }
+.mini .cap { padding: 8px 12px; font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 8px; }
+.mini .cap.bad { color: var(--rem-sign); } .mini .cap.good { color: var(--add-sign); }
+.mini .static-diff { max-height: 180px; overflow: hidden; position: relative; }
+.mini .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 60px; background: linear-gradient(transparent, var(--pane)); }
+.group { display: grid; gap: 0; }
+.group .gh { display: flex; align-items: center; gap: 10px; padding: 10px 14px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+.group .gl { padding: 6px 14px 10px 40px; font-family: var(--code); font-size: 12px; color: var(--text-2); display: grid; gap: 2px; }
+.rules { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rules th, .rules td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.rules th { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+.rules td:first-child { font-weight: 500; white-space: nowrap; }
+.rules td { color: var(--text-2); }
+.tablewrap { overflow-x: auto; background: var(--pane); border: 1px solid var(--border); border-radius: 10px; }
+.cause { background: var(--pane); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: grid; gap: 8px; }
+.qs { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--text-2); max-width: 80ch; }
+.qs b { color: var(--text); }
+
+@media (max-width: 860px) {
+  .frame { grid-template-columns: minmax(0, 1fr); }
+  .tree { border-right: 0; border-bottom: 1px solid var(--border); }
+  .two, .before-after { grid-template-columns: minmax(0, 1fr); }
+  .diffwrap { height: 420px; }
+  .card { margin-left: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .row.flash { animation: none; background: var(--focus-bg); } }
+</style>
+
+<div class="page">
+  <header class="intro">
+    <div class="eyebrow">Lumen · Files tab · design mockup</div>
+    <h1>Diff ruler and rename handling</h1>
+    <p>Two changes to the diff pane. The scrollbar becomes a <b>change ruler</b> that marks where every change, review point and thread sits in the file, so you can see the shape of the diff and jump straight to a spot. Renamed files stop showing as a wall of green and instead show the <b>path change</b>, plus only the lines that actually changed.</p>
+  </header>
+
+  <!-- ===================== 1. Ruler ===================== -->
+  <section aria-labelledby="s1">
+    <div class="sec-head">
+      <div class="eyebrow">Proposal 1</div>
+      <h2 id="s1">The scrollbar shows where the changes are</h2>
+      <p>This pane works. Scroll it, click or drag on the ruler at the right, hover a mark to preview it, or press <kbd>]</kbd> and <kbd>[</kbd> to step through changes. Try both <b>Full file</b> and <b>Changes only</b>.</p>
+    </div>
+
+    <div class="frame">
+      <aside class="tree" aria-label="Changed files">
+        <div class="tree-title"><span>Files changed</span><span>6</span></div>
+        <div class="node folder"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M1.5 4.5h5l1.5 1.5h6.5v7.5h-13z"/></svg><span class="name">src/Billing/Workers</span><span></span></div>
+        <div class="node sel indent1"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg><span class="name">InvoiceRetryWorker.cs</span><span class="counts"><span class="plus">+24</span><span class="minus">−9</span></span></div>
+        <div class="node indent1"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg><span class="name">WorkerRegistration.cs</span><span class="counts"><span class="plus">+8</span><span class="minus">−4</span></span></div>
+        <div class="node folder"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M1.5 4.5h5l1.5 1.5h6.5v7.5h-13z"/></svg><span class="name">src/Billing/Services</span><span></span></div>
+        <div class="node indent1"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg><span class="name">InvoiceService.cs</span><span class="counts"><span class="plus">+18</span><span class="minus">−6</span></span></div>
+        <div class="node indent1"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg><span class="name">RetryPolicy.cs</span><span class="counts"><span class="plus">+52</span><span class="minus">−8</span></span></div>
+      </aside>
+
+      <div class="main">
+        <div class="fhead">
+          <span class="fpath">src/Billing/Workers/<b>InvoiceRetryWorker.cs</b></span>
+          <span class="counts"><span class="plus">+24</span><span class="minus">−9</span></span>
+          <span class="spacer"></span>
+          <div class="seg" role="group" aria-label="View">
+            <button id="mode-full" aria-pressed="true">Full file</button>
+            <button id="mode-hunks" aria-pressed="false">Changes only</button>
+          </div>
+          <div class="nav" aria-label="Change navigation">
+            <button id="prev" title="Previous change ( [ )" aria-label="Previous change"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10l5-5 5 5"/></svg></button>
+            <span class="label" id="navlabel">7 changes</span>
+            <button id="next" title="Next change ( ] )" aria-label="Next change"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6l5 5 5-5"/></svg></button>
+          </div>
+        </div>
+        <div class="legend" aria-hidden="true">
+          <span><i class="sw" style="background:var(--add-sign)"></i>Added</span>
+          <span><i class="sw" style="background:var(--rem-sign)"></i>Removed</span>
+          <span><i class="sw" style="background:var(--m-deviation);clip-path:polygon(50% 0,100% 100%,0 100%)"></i>Review point</span>
+          <span><i class="sw" style="background:var(--m-behaviour);border-radius:50%"></i>Thread</span>
+          <span><i class="sw" style="background:var(--find);height:3px"></i>Find match “logger”</span>
+          <span><i class="sw" style="background:var(--thumb);outline:1px solid var(--thumb-edge)"></i>Visible area</span>
+        </div>
+        <div class="diffwrap" id="diffwrap">
+          <div class="diff" id="diff" tabindex="0" aria-label="Diff"></div>
+          <div class="ruler" id="ruler" tabindex="0" role="scrollbar" aria-controls="diff" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Change ruler"></div>
+          <div class="tip" id="tip" hidden></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="two">
+      <div class="note">
+        <h3>What the ruler shows</h3>
+        <ul>
+          <li><b>Two lanes.</b> Removed lines on the left lane, added lines on the right, so a modification reads as a red and green pair and a pure addition reads as green only.</li>
+          <li><b>Markers on top.</b> Review points use their existing shape (deviation triangle, correctness octagon and so on), threads a blue dot. Shapes match the gutter markers so meaning never depends on colour alone.</li>
+          <li><b>Find matches</b> appear as thin yellow ticks while the find bar is open, the same way editors do it.</li>
+          <li><b>Minimum mark height</b> of 3 px, so a one-line change in a 2,000-line file is still visible and clickable. Marks closer than 2 px merge.</li>
+          <li><b>The visible area</b> is a soft band. It replaces the scrollbar thumb and can still be dragged.</li>
+        </ul>
+      </div>
+      <div class="note">
+        <h3>How you move with it</h3>
+        <ul>
+          <li><b>Click a mark</b> to jump. The change lands a quarter of the way down the viewport (same placement as <code>ScrollToLine</code> today) and flashes with the focus colour.</li>
+          <li><b>Click empty track</b> to scroll there. <b>Drag</b> anywhere to scrub.</li>
+          <li><b>Hover</b> to see the line range, counts and the first changed line before jumping.</li>
+          <li><b><kbd>]</kbd> / <kbd>[</kbd></b> step to the next or previous change and show “Change 3 of 7” in the header. At the last change, <kbd>]</kbd> moves to the next file. <kbd>J</kbd>/<kbd>K</kbd> (review points) and <kbd>N</kbd> (threads) stay as they are.</li>
+          <li><b>Split view:</b> one ruler at the far right, covering both sides.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 2. Renames ===================== -->
+  <section aria-labelledby="s2">
+    <div class="sec-head">
+      <div class="eyebrow">Proposal 2</div>
+      <h2 id="s2">A rename shows the path change, not the whole file</h2>
+      <p>Today a moved file can show up with every line as added. The file should instead show where it moved from and to, and the diff should show only edits made to the content.</p>
+    </div>
+
+    <div class="before-after">
+      <div class="mini">
+        <div class="cap bad"><span>Today</span><span class="counts"><span class="plus">+212</span><span class="minus">−0</span></span></div>
+        <div class="static-diff" id="today"></div>
+      </div>
+      <div class="mini">
+        <div class="cap good"><span>Proposed</span><span class="counts"><span class="zero">+0</span><span class="zero">−0</span></span></div>
+        <div class="rhead" style="border-bottom:0">
+          <span class="pathdiff"><span class="old">src/Billing/<del>Retry</del>/</span><span class="arrow">→</span><span class="new">src/Billing/<ins>Policies</ins>/RetryPolicy.cs</span></span>
+        </div>
+        <div class="empty"><span class="ic"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8h10M9 4l4 4-4 4"/></svg></span><span>Moved without changes.</span></div>
+      </div>
+    </div>
+
+    <div class="states">
+      <div class="state">
+        <div class="state-tag"><span class="eyebrow">Case A · pure rename</span><span class="eyebrow" style="color:var(--text-3)">100% similar</span></div>
+        <div class="rhead">
+          <span class="pathdiff"><span class="old">src/Billing/<del>Retry</del>/RetryPolicy.cs</span><span class="arrow">→</span><span class="new">src/Billing/<ins>Policies</ins>/RetryPolicy.cs</span></span>
+          <span class="pill rn">Renamed</span>
+          <span class="spacer"></span>
+          <span class="counts"><span class="zero">+0</span><span class="zero">−0</span></span>
+        </div>
+        <div class="empty">
+          <span class="ic"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8h10M9 4l4 4-4 4"/></svg></span>
+          <span>File moved without changes. 212 lines, identical content.</span>
+          <span class="spacer"></span>
+          <button class="linkbtn" type="button">Show file</button>
+        </div>
+      </div>
+
+      <div class="state">
+        <div class="state-tag"><span class="eyebrow">Case B · rename with edits</span><span class="eyebrow" style="color:var(--text-3)">94% similar</span></div>
+        <div class="rhead">
+          <span class="pathdiff"><span class="old">src/Billing/Services/<del>InvoiceRetryHelper</del>.cs</span><span class="arrow">→</span><span class="new">src/Billing/Services/<ins>InvoiceRetryScheduler</ins>.cs</span></span>
+          <span class="pill rn">Renamed</span>
+          <span class="pill sim" title="Git's similarity index between the old and new file">94% similar</span>
+          <span class="spacer"></span>
+          <span class="counts"><span class="plus">+3</span><span class="minus">−3</span></span>
+        </div>
+        <div class="static-diff" id="caseb"></div>
+      </div>
+
+      <div class="state">
+        <div class="state-tag"><span class="eyebrow">Case C · folder move (optional)</span><span class="eyebrow" style="color:var(--text-3)">6 files, no content changes</span></div>
+        <div class="group">
+          <div class="gh">
+            <span class="pathdiff"><span class="old">src/Billing/<del>Legacy</del>/</span><span class="arrow">→</span><span class="new">src/Billing/<ins>Archive</ins>/</span></span>
+            <span class="pill rn">6 files moved</span>
+            <span class="spacer"></span>
+            <button class="linkbtn" type="button">Expand</button>
+          </div>
+          <div class="gl">
+            <span>LegacyInvoiceMapper.cs</span><span>LegacyInvoiceMapperTests.cs</span><span>LegacyPaymentGateway.cs</span><span>… 3 more</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="two">
+      <div class="note">
+        <h3>In the files tree</h3>
+        <div class="tree" style="border:1px solid var(--border);border-radius:10px;padding:10px 8px">
+          <div class="node folder"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M1.5 4.5h5l1.5 1.5h6.5v7.5h-13z"/></svg><span class="name">src/Billing/Policies</span><span></span></div>
+          <div class="node indent1"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h9M8 4.5l3.5 3.5L8 11.5"/></svg><span class="name">RetryPolicy.cs<span class="sub">from Billing/Retry/</span></span><span class="counts"><span class="rn-badge">moved</span></span></div>
+          <div class="node folder"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M1.5 4.5h5l1.5 1.5h6.5v7.5h-13z"/></svg><span class="name">src/Billing/Services</span><span></span></div>
+          <div class="node indent1 sel"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h9M8 4.5l3.5 3.5L8 11.5"/></svg><span class="name">InvoiceRetryScheduler.cs<span class="sub">was InvoiceRetryHelper.cs</span></span><span class="counts"><span class="plus">+3</span><span class="minus">−3</span></span></div>
+          <div class="node indent1"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M3.5 1.5h6l3 3v10h-9z"/></svg><span class="name">InvoiceService.cs</span><span class="counts"><span class="plus">+18</span><span class="minus">−6</span></span></div>
+        </div>
+        <ul>
+          <li>Listed at the <b>new</b> path, with a move icon and a second line naming the old folder (“from …”) or old name (“was …”).</li>
+          <li>A pure rename shows a <b>moved</b> badge instead of <code>+0 −0</code>.</li>
+        </ul>
+      </div>
+      <div class="note">
+        <h3>Behaviour</h3>
+        <ul>
+          <li><b>Path diff:</b> only the path segments that differ are highlighted, so a folder move and a class rename read differently at a glance.</li>
+          <li><b>Pure renames</b> are counted with mechanical changes: they don’t ask for review and they sort after real changes, like other mechanical files today.</li>
+          <li><b>Show file</b> opens the content read-only, with no diff colouring.</li>
+          <li><b>Comments</b> on a renamed file go to the new path. Threads left on the old path before the move stay attached to this file.</li>
+          <li><b>Folder move</b> (Case C) groups files that moved from the same folder to the same folder with no content changes. This is optional and can come later.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="tablewrap">
+      <table class="rules">
+        <thead><tr><th>Case</th><th>Header</th><th>Body</th><th>Tree</th><th>Ruler</th></tr></thead>
+        <tbody>
+          <tr><td>Pure rename</td><td>Old → new path, Renamed</td><td>“Moved without changes”, Show file</td><td>moved badge</td><td>Empty</td></tr>
+          <tr><td>Rename with edits</td><td>Old → new path, Renamed, N% similar</td><td>Only the changed hunks</td><td>+/− of the real edits</td><td>Marks for those edits</td></tr>
+          <tr><td>Below git’s 50% threshold</td><td>Shown as delete + add, as git reports</td><td>Unchanged from today</td><td>Two entries</td><td>Whole file</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="cause">
+      <h3>Why the whole file shows today</h3>
+      <p>The full-PR diff already passes <code>-M</code>, so git detects renames there. The whitespace-ignoring per-file diff (<code>ReviewActions.cs:98</code>) passes only the new path to <code>git diff</code>. Git never sees the old path, so it can’t pair the files and reports the file as added from scratch. The fix is to pass both paths (old and new) for a renamed file, and to keep <code>-M</code> on every diff call, including commit-range views.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="s3">
+    <div class="sec-head">
+      <div class="eyebrow">Before building</div>
+      <h2 id="s3">Open questions</h2>
+    </div>
+    <ol class="qs">
+      <li><b>Keys:</b> <kbd>]</kbd> / <kbd>[</kbd> for next and previous change, moving on to the next file at the end. Or should it stop at the end of the file?</li>
+      <li><b>Ruler width:</b> 18 px, two lanes. Wide enough to hit easily without taking space from the code. Too wide?</li>
+      <li><b>Pure renames as mechanical:</b> should they be auto-marked Viewed, or only sorted to the end?</li>
+      <li><b>Folder move grouping (Case C):</b> include it now, or ship cases A and B first?</li>
+    </ol>
+  </section>
+</div>
+
+<script>
+(() => {
+  // ---------- Sample file: InvoiceRetryWorker.cs, full-file model ----------
+  // Each entry: [kind, text]; kind: ' ' context, '+' added, '-' removed.
+  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const L = [];
+  const ctx = t => L.push([" ", t]), add = t => L.push(["+", t]), rem = t => L.push(["-", t]);
+  const method = (name, body) => { ctx(""); ctx(`    private async Task ${name}(CancellationToken ct)`); ctx("    {"); body.forEach(ctx); ctx("    }"); };
+
+  ctx("using System.Threading;");
+  ctx("using System.Threading.Tasks;");
+  add("using Acme.Billing.Invoices;");
+  add("using Microsoft.Extensions.Logging;");
+  ctx("using Acme.Infrastructure.Workers;");
+  ctx("");
+  ctx("namespace Acme.Billing.Workers;");
+  ctx("");
+  ctx("/// <summary>Retries invoices whose first charge attempt failed.</summary>");
+  ctx("public sealed class InvoiceRetryWorker : BackgroundService");
+  ctx("{");
+  ctx("    private readonly IServiceScopeFactory _scopeFactory;");
+  add("    private readonly IInvoiceService _invoiceService;");
+  add("    private readonly ILogger<InvoiceRetryWorker> _logger;");
+  ctx("");
+  rem("    public InvoiceRetryWorker(IServiceScopeFactory scopeFactory)");
+  add("    public InvoiceRetryWorker(");
+  add("        IServiceScopeFactory scopeFactory,");
+  add("        IInvoiceService invoiceService,");
+  add("        ILogger<InvoiceRetryWorker> logger)");
+  ctx("    {");
+  ctx("        _scopeFactory = scopeFactory;");
+  add("        _invoiceService = invoiceService;");
+  add("        _logger = logger;");
+  ctx("    }");
+  const names = ["LoadScheduleAsync", "WarmCacheAsync", "RefreshCurrencyRatesAsync", "SyncCustomerFlagsAsync", "PruneDeadLettersAsync", "RecordHeartbeatAsync"];
+  method(names[0], ["        var schedule = await _store.GetScheduleAsync(ct);", "        _window = schedule.Window;", "        _maxAttempts = schedule.MaxAttempts;", "        _backoff = schedule.Backoff;"]);
+  method(names[1], ["        using var scope = _scopeFactory.CreateScope();", "        var cache = scope.ServiceProvider.GetRequiredService<IInvoiceCache>();", "        await cache.WarmAsync(ct);"]);
+  ctx("");
+  ctx("    protected override async Task ExecuteAsync(CancellationToken stoppingToken)");
+  ctx("    {");
+  rem("        while (!stoppingToken.IsCancellationRequested)");
+  add("        await foreach (var invoice in GetPendingInvoicesAsync(stoppingToken))");
+  ctx("        {");
+  rem("            var invoices = await _invoiceService.GetPendingInvoicesAsync(stoppingToken);");
+  rem("            foreach (var invoice in invoices)");
+  rem("            {");
+  rem("                await RetryAsync(invoice, stoppingToken);");
+  rem("            }");
+  add("            await RetryAsync(invoice, stoppingToken);");
+  ctx("        }");
+  ctx("    }");
+  method(names[2], ["        var rates = await _rates.FetchAsync(ct);", "        foreach (var (currency, rate) in rates)", "        {", "            _rateTable[currency] = rate;", "        }"]);
+  method(names[3], ["        var flags = await _customers.GetFlagsAsync(ct);", "        _flags = flags.ToDictionary(f => f.CustomerId);"]);
+  method(names[4], ["        var cutoff = _clock.UtcNow - _retention;", "        await _deadLetters.DeleteOlderThanAsync(cutoff, ct);"]);
+  ctx("");
+  ctx("    private async Task RetryAsync(Invoice invoice, CancellationToken ct)");
+  ctx("    {");
+  ctx("        var attempt = invoice.Attempts + 1;");
+  rem("        Console.WriteLine($\"Retrying invoice {invoice.Id}\");");
+  add("        _logger.LogInformation(\"Retrying invoice {InvoiceId}, attempt {Attempt}\", invoice.Id, attempt);");
+  ctx("        var result = await _gateway.ChargeAsync(invoice, ct);");
+  ctx("        if (result.Succeeded)");
+  ctx("        {");
+  ctx("            await _store.MarkPaidAsync(invoice.Id, ct);");
+  ctx("            return;");
+  ctx("        }");
+  ctx("");
+  ctx("        await _store.RecordFailureAsync(invoice.Id, result.Error, ct);");
+  ctx("    }");
+  method(names[5], ["        await _health.BeatAsync(nameof(InvoiceRetryWorker), ct);"]);
+  for (let i = 0; i < 6; i++) method("Placeholder" + (i + 1) + "Async", ["        await Task.Yield();", "        _metrics.Increment(\"worker.tick\");", "        await _store.FlushAsync(ct);"]);
+  ctx("");
+  ctx("    private async IAsyncEnumerable<Invoice> GetPendingInvoicesAsync(");
+  ctx("        [EnumeratorCancellation] CancellationToken ct)");
+  ctx("    {");
+  add("        await foreach (var claim in _claims.ClaimAsync(\"invoice-retry\", ct))");
+  add("        {");
+  add("            yield return await _invoiceService.GetAsync(claim.InvoiceId, ct);");
+  add("        }");
+  ctx("    }");
+  ctx("}");
+
+  // Rename the placeholder methods into plausible ones so the sample reads like real code.
+  const extra = ["ReconcileLedgerAsync", "EmitMetricsAsync", "RotateKeysAsync", "CompactQueueAsync", "ExpireHoldsAsync", "AuditTrailAsync"];
+  L.forEach((r, i) => { const m = r[1].match(/Placeholder(\d)Async/); if (m) L[i] = [r[0], r[1].replace(m[0], extra[+m[1] - 1])]; });
+
+  // Number lines.
+  let o = 0, n = 0;
+  const rows = L.map(([k, t]) => {
+    if (k === " ") { o++; n++; return { k, t, o, n }; }
+    if (k === "+") { n++; return { k, t, o: 0, n }; }
+    o++; return { k, t, o, n: 0 };
+  });
+
+  // Cards: anchored after the row whose new line number matches.
+  const cards = [
+    { afterNew: rows.find(r => r.t.includes("await foreach (var invoice")).n, cls: "", kind: "dev", title: "Pattern deviation", body: "Bypasses QueueClaimService. 14 other workers claim work through it for idempotency and concurrency limits." },
+    { afterNew: rows.find(r => r.t.includes("_logger.LogInformation")).n, cls: "thread", kind: "thr", title: "sarah-chen · 1 reply", body: "Should the attempt number go on a scope instead, so the gateway logs pick it up too?" },
+  ];
+
+  // Highlighting (tiny, enough for the mockup).
+  const KW = /\b(using|namespace|public|private|protected|sealed|class|readonly|async|await|var|foreach|while|in|if|return|override|new|yield|nameof)\b/g;
+  const TY = /\b(Task|CancellationToken|IServiceScopeFactory|IInvoiceService|ILogger|InvoiceRetryWorker|BackgroundService|Invoice|IAsyncEnumerable|IInvoiceCache|Console)\b/g;
+  const hl = t => {
+    if (/^\s*\/\/\//.test(t)) return `<span class="cm">${esc(t)}</span>`;
+    let s = esc(t);
+    s = s.replace(/("[^"]*")/g, "\u0001$1\u0002");
+    s = s.replace(KW, '<span class="kw">$1</span>').replace(TY, '<span class="ty">$1</span>');
+    s = s.replace(/\u0001([^\u0002]*)\u0002/g, (_, q) => `<span class="st">${q.replace(/<[^>]+>/g, "")}</span>`);
+    return s;
+  };
+  const FIND = "logger";
+  const withFind = (html, raw) => raw.toLowerCase().includes(FIND) ? html.replace(/(>[^<]*)/g, seg => seg.replace(/logger/gi, m => `<mark class="find">${m}</mark>`)).replace(/<mark class="find">/g, '<span class="find">').replace(/<\/mark>/g, "</span>") : html;
+
+  // ---------- Build views ----------
+  const diff = document.getElementById("diff"), ruler = document.getElementById("ruler"), tip = document.getElementById("tip");
+  let mode = "full", items = [], changes = [], current = -1;
+
+  function build() {
+    // items: { type: 'row'|'hunk'|'card', row?, card? }
+    items = [];
+    const keep = new Set();
+    if (mode === "hunks") {
+      rows.forEach((r, i) => { if (r.k !== " ") for (let j = Math.max(0, i - 3); j <= Math.min(rows.length - 1, i + 3); j++) keep.add(j); });
+    }
+    let prevKept = -2;
+    rows.forEach((r, i) => {
+      if (mode === "hunks") {
+        if (!keep.has(i)) return;
+        if (i !== prevKept + 1) {
+          let j = i, oc = 0, nc = 0; while (j < rows.length && keep.has(j)) { if (rows[j].k !== "+") oc++; if (rows[j].k !== "-") nc++; j++; }
+          const os = rows.slice(i).find(x => x.o)?.o ?? 0, ns = rows.slice(i).find(x => x.n)?.n ?? 0;
+          items.push({ type: "hunk", text: `@@ -${os},${oc} +${ns},${nc} @@` });
+        }
+        prevKept = i;
+      }
+      items.push({ type: "row", row: r });
+      cards.filter(c => c.afterNew === r.n && r.n).forEach(c => items.push({ type: "card", card: c }));
+    });
+
+    diff.innerHTML = items.map((it, idx) => {
+      if (it.type === "hunk") return `<div class="row hunk" data-i="${idx}"><span class="n"></span><span class="n"></span><span class="s"></span><span class="c">${it.text}</span></div>`;
+      if (it.type === "card") return `<div class="card ${it.card.cls}" data-i="${idx}"><span class="t">${it.card.title}</span><span class="b">${it.card.body}</span></div>`;
+      const r = it.row, cls = r.k === "+" ? "add" : r.k === "-" ? "rem" : "";
+      return `<div class="row ${cls}" data-i="${idx}"><span class="n">${r.o || ""}</span><span class="n">${r.n || ""}</span><span class="s">${r.k === " " ? "" : r.k === "-" ? "−" : "+"}</span><span class="c">${withFind(hl(r.t), r.t)}</span></div>`;
+    }).join("");
+
+    // Change blocks: consecutive +/− rows (a card between them doesn't split them).
+    changes = [];
+    let cur = null;
+    items.forEach((it, idx) => {
+      const isChange = it.type === "row" && it.row.k !== " ";
+      if (isChange) {
+        if (!cur) cur = { start: idx, end: idx, add: 0, rem: 0, first: it.row, lines: [] };
+        cur.end = idx; it.row.k === "+" ? cur.add++ : cur.rem++;
+        cur.lines.push(it.row);
+      } else if (it.type !== "card" && cur) { changes.push(cur); cur = null; }
+    });
+    if (cur) changes.push(cur);
+    current = -1;
+    updateLabel();
+    requestAnimationFrame(drawRuler);
+  }
+
+  function drawRuler() {
+    const total = diff.scrollHeight, h = ruler.clientHeight, els = [...diff.children];
+    const y = idx => els[idx].offsetTop / total * h;
+    const hgt = (a, b) => Math.max(3, (els[b].offsetTop + els[b].offsetHeight - els[a].offsetTop) / total * h);
+    let html = "";
+    // Lanes: removed left, added right. Within a block, draw each run separately.
+    changes.forEach((c, ci) => {
+      let runStart = c.start, runKind = null;
+      const flush = (endIdx) => {
+        if (runKind == null) return;
+        html += `<div class="mk ${runKind === "+" ? "lane-b add" : "lane-a rem"} ${ci === current ? "cur" : ""}" data-c="${ci}" style="top:${y(runStart)}px;height:${hgt(runStart, endIdx)}px"></div>`;
+      };
+      for (let idx = c.start; idx <= c.end; idx++) {
+        const it = items[idx]; if (it.type !== "row") continue;
+        if (it.row.k !== runKind) { flush(idx - 1); runStart = idx; runKind = it.row.k; }
+      }
+      flush(c.end);
+    });
+    // Find matches.
+    items.forEach((it, idx) => { if (it.type === "row" && it.row.t.toLowerCase().includes(FIND)) html += `<div class="mk find" style="top:${y(idx) + 1}px"></div>`; });
+    // Cards.
+    items.forEach((it, idx) => { if (it.type === "card") html += `<div class="mk pt ${it.card.kind}" data-card="${idx}" style="top:${y(idx) + 6}px"></div>`; });
+    html += `<div class="thumb" id="thumb"></div>`;
+    ruler.innerHTML = html;
+    syncThumb();
+  }
+
+  function syncThumb() {
+    const t = document.getElementById("thumb"); if (!t) return;
+    const h = ruler.clientHeight, total = diff.scrollHeight;
+    t.style.top = (diff.scrollTop / total * h) + "px";
+    t.style.height = Math.max(12, diff.clientHeight / total * h) + "px";
+    ruler.setAttribute("aria-valuenow", Math.round(diff.scrollTop / Math.max(1, total - diff.clientHeight) * 100));
+  }
+
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function goToIndex(idx, flashTo) {
+    const el = diff.children[idx];
+    diff.scrollTo({ top: Math.max(0, el.offsetTop - diff.clientHeight / 4), behavior: reduced ? "auto" : "smooth" });
+    for (let i = idx; i <= (flashTo ?? idx); i++) { const r = diff.children[i]; r.classList.remove("flash"); void r.offsetWidth; r.classList.add("flash"); }
+  }
+  function goToChange(ci) {
+    if (!changes.length) return;
+    current = (ci + changes.length) % changes.length;
+    goToIndex(changes[current].start, changes[current].end);
+    updateLabel(); drawRuler();
+  }
+  function updateLabel() {
+    document.getElementById("navlabel").textContent = current < 0 ? `${changes.length} changes` : `Change ${current + 1} of ${changes.length}`;
+  }
+
+  // Ruler interaction: click a mark → jump; click/drag track → scrub.
+  let dragging = false;
+  const scrubTo = clientY => {
+    const r = ruler.getBoundingClientRect();
+    const f = Math.min(1, Math.max(0, (clientY - r.top) / r.height));
+    diff.scrollTop = f * diff.scrollHeight - diff.clientHeight / 2;
+  };
+  ruler.addEventListener("pointerdown", e => {
+    const mk = e.target.closest("[data-c],[data-card]");
+    if (mk?.dataset.c) { goToChange(+mk.dataset.c); return; }
+    if (mk?.dataset.card) { goToIndex(+mk.dataset.card); return; }
+    dragging = true; ruler.setPointerCapture(e.pointerId); scrubTo(e.clientY);
+  });
+  ruler.addEventListener("pointermove", e => {
+    if (dragging) { scrubTo(e.clientY); tip.hidden = true; return; }
+    const mk = e.target.closest("[data-c],[data-card]");
+    if (!mk) { tip.hidden = true; return; }
+    const wrap = document.getElementById("diffwrap").getBoundingClientRect();
+    if (mk.dataset.c) {
+      const c = changes[+mk.dataset.c];
+      const nums = c.lines.map(r => r.n || r.o);
+      const label = `Lines ${Math.min(...nums)}–${Math.max(...nums)}`;
+      tip.innerHTML = `${label} · <span class="plus">+${c.add}</span> <span class="minus">−${c.rem}</span><span class="code">${esc(c.first.t.trim())}</span>`;
+    } else {
+      const card = items[+mk.dataset.card].card;
+      tip.innerHTML = `<b>${card.title}</b><span class="code" style="font-family:var(--ui)">${card.body}</span>`;
+    }
+    tip.hidden = false;
+    tip.style.top = Math.min(wrap.height - 56, Math.max(4, e.clientY - wrap.top - 20)) + "px";
+  });
+  ruler.addEventListener("pointerup", () => dragging = false);
+  ruler.addEventListener("pointerleave", () => { if (!dragging) tip.hidden = true; });
+  diff.addEventListener("scroll", syncThumb, { passive: true });
+  addEventListener("resize", () => requestAnimationFrame(drawRuler));
+
+  document.getElementById("next").onclick = () => goToChange(current + 1);
+  document.getElementById("prev").onclick = () => goToChange(current < 0 ? changes.length - 1 : current - 1);
+  addEventListener("keydown", e => {
+    if (e.target.closest("input,textarea")) return;
+    if (e.key === "]") { e.preventDefault(); goToChange(current + 1); }
+    if (e.key === "[") { e.preventDefault(); goToChange(current < 0 ? changes.length - 1 : current - 1); }
+  });
+  const setMode = m => {
+    mode = m;
+    document.getElementById("mode-full").setAttribute("aria-pressed", m === "full");
+    document.getElementById("mode-hunks").setAttribute("aria-pressed", m === "hunks");
+    diff.scrollTop = 0; build();
+  };
+  document.getElementById("mode-full").onclick = () => setMode("full");
+  document.getElementById("mode-hunks").onclick = () => setMode("hunks");
+
+  build();
+
+  // ---------- Static rename samples ----------
+  const policy = [
+    "namespace Acme.Billing.Retry;", "", "/// <summary>How often and how long a failed charge is retried.</summary>",
+    "public sealed class RetryPolicy", "{", "    public int MaxAttempts { get; init; } = 5;", "    public TimeSpan Window { get; init; } = TimeSpan.FromDays(7);",
+    "    public TimeSpan Backoff { get; init; } = TimeSpan.FromHours(6);", "", "    public TimeSpan DelayFor(int attempt) =>", "        Backoff * Math.Pow(2, attempt - 1);",
+  ];
+  document.getElementById("today").innerHTML = policy.map((t, i) =>
+    `<div class="row add"><span class="n"></span><span class="n">${i + 1}</span><span class="s">+</span><span class="c">${hl(t)}</span></div>`).join("") + `<div class="fade"></div>`;
+
+  const b = [
+    ["@@", "@@ -1,9 +1,9 @@"],
+    [" ", "namespace Acme.Billing.Services;", 1, 1], [" ", "", 2, 2],
+    ["-", "public sealed class InvoiceRetryHelper", 3, 0], ["+", "public sealed class InvoiceRetryScheduler", 0, 3],
+    [" ", "{", 4, 4], [" ", "    private readonly RetryPolicy _policy;", 5, 5], [" ", "", 6, 6],
+    ["-", "    public InvoiceRetryHelper(RetryPolicy policy) => _policy = policy;", 7, 0],
+    ["+", "    public InvoiceRetryScheduler(RetryPolicy policy) => _policy = policy;", 0, 7],
+    ["hidden", "205 unchanged lines"],
+    ["@@", "@@ -215,4 +215,4 @@ public DateTimeOffset NextAttempt(Invoice invoice)"],
+    [" ", "    {", 215, 215], ["-", "        return InvoiceRetryHelper.Clamp(next, _policy.Window);", 216, 0],
+    ["+", "        return InvoiceRetryScheduler.Clamp(next, _policy.Window);", 0, 216], [" ", "    }", 217, 217],
+  ];
+  document.getElementById("caseb").innerHTML = b.map(([k, t, o, n]) => {
+    if (k === "@@") return `<div class="row hunk"><span class="n"></span><span class="n"></span><span class="s"></span><span class="c">${esc(t)}</span></div>`;
+    if (k === "hidden") return `<div class="row" style="color:var(--text-3);background:var(--sunken)"><span class="n"></span><span class="n"></span><span class="s">⋯</span><span class="c" style="font-family:var(--ui);font-size:12px">${t}</span></div>`;
+    const cls = k === "+" ? "add" : k === "-" ? "rem" : "";
+    return `<div class="row ${cls}"><span class="n">${o || ""}</span><span class="n">${n || ""}</span><span class="s">${k === " " ? "" : k === "-" ? "−" : "+"}</span><span class="c">${hl(t)}</span></div>`;
+  }).join("");
+})();
+</script>

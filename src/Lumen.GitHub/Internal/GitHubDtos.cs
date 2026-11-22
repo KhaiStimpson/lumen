@@ -18,17 +18,18 @@ internal sealed record PullRequestDto(
     string? Body,
     DateTimeOffset UpdatedAt);
 
-internal sealed record ReviewCommentDto(
-    long Id,
-    string Path,
-    int? Line,
-    int? OriginalLine,
-    UserDto? User,
+internal sealed record NewReviewCommentDto(
     string Body,
-    DateTimeOffset CreatedAt,
-    string HtmlUrl);
+    string CommitId,
+    string Path,
+    int Line,
+    string Side,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? StartLine,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? StartSide);
 
-internal sealed record NewReviewCommentDto(string Body, string CommitId, string Path, int Line, string Side);
+internal sealed record IssueCommentDto(long Id, string NodeId, UserDto? User, string Body, DateTimeOffset CreatedAt, string HtmlUrl);
+
+internal sealed record NewIssueCommentDto(string Body);
 
 internal sealed record PostedCommentDto(long Id, string HtmlUrl);
 
@@ -37,7 +38,8 @@ internal sealed record ErrorDto(string? Message);
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
 [JsonSerializable(typeof(UserDto))]
 [JsonSerializable(typeof(PullRequestDto))]
-[JsonSerializable(typeof(List<ReviewCommentDto>))]
+[JsonSerializable(typeof(IssueCommentDto))]
+[JsonSerializable(typeof(NewIssueCommentDto))]
 [JsonSerializable(typeof(NewReviewCommentDto))]
 [JsonSerializable(typeof(PostedCommentDto))]
 [JsonSerializable(typeof(ErrorDto))]

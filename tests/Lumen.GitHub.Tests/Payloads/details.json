@@ -1,0 +1,37 @@
+{
+  "data": {
+    "viewer": { "login": "mona" },
+    "rateLimit": { "remaining": 4970, "resetAt": "2026-10-12T21:00:00Z" },
+    "repository": {
+      "pullRequest": {
+        "id": "PR_kw42", "title": "Add sprockets", "body": "Adds **sprockets**.", "url": "https://github.com/octo/widgets/pull/42",
+        "state": "OPEN", "isDraft": false, "merged": false, "createdAt": "2026-10-01T09:00:00Z",
+        "mergeable": "CONFLICTING", "mergeStateStatus": "DIRTY",
+        "baseRefName": "main", "headRefName": "feature/sprockets", "headRefOid": "head333",
+        "author": { "login": "hubot" },
+        "labels": { "nodes": [ { "name": "enhancement", "color": "a2eeef" } ] },
+        "reviewRequests": { "nodes": [
+          { "requestedReviewer": { "__typename": "User", "login": "octocat" } },
+          { "requestedReviewer": { "__typename": "Team", "slug": "core", "organization": { "login": "octo" } } }
+        ] },
+        "latestOpinionatedReviews": { "nodes": [ { "author": { "login": "mona" }, "state": "CHANGES_REQUESTED", "commit": { "oid": "head222" } } ] },
+        "timelineItems": { "nodes": [
+          { "__typename": "IssueComment", "id": "IC_1", "author": { "login": "octocat" }, "body": "Looks big.", "createdAt": "2026-10-02T09:00:00Z", "url": "https://github.com/octo/widgets/pull/42#issuecomment-1" },
+          { "__typename": "PullRequestReview", "id": "PRR_1", "author": { "login": "mona" }, "body": "Please split.", "state": "CHANGES_REQUESTED", "createdAt": "2026-10-03T09:00:00Z", "submittedAt": "2026-10-03T09:05:00Z", "url": "https://github.com/octo/widgets/pull/42#pullrequestreview-1", "commit": { "oid": "head222" }, "comments": { "totalCount": 2 } },
+          { "__typename": "PullRequestReview", "id": "PRR_2", "author": { "login": "mona" }, "body": "", "state": "PENDING", "createdAt": "2026-10-04T09:00:00Z", "submittedAt": null, "url": "", "commit": { "oid": "head333" }, "comments": { "totalCount": 1 } },
+          { "__typename": "PullRequestReview", "id": "PRR_3", "author": null, "body": "", "state": "COMMENTED", "createdAt": "2026-10-04T10:00:00Z", "submittedAt": "2026-10-04T10:00:00Z", "url": "", "commit": null, "comments": { "totalCount": 1 } }
+        ] },
+        "commits": { "nodes": [
+          { "commit": { "oid": "c1", "messageHeadline": "Add sprocket", "message": "Add sprocket\n\nBody", "authoredDate": "2026-10-01T08:00:00Z", "author": { "name": "Hu Bot", "user": { "login": "hubot" } } } },
+          { "commit": { "oid": "c2", "messageHeadline": "Fix", "message": "Fix", "authoredDate": "2026-10-02T08:00:00Z", "author": { "name": "Someone", "user": null } } }
+        ] },
+        "head": { "nodes": [ { "commit": { "statusCheckRollup": { "contexts": { "nodes": [
+          { "__typename": "CheckRun", "name": "build", "status": "COMPLETED", "conclusion": "SUCCESS", "startedAt": "2026-10-02T08:01:00Z", "completedAt": "2026-10-02T08:05:00Z", "detailsUrl": "https://ci/1" },
+          { "__typename": "CheckRun", "name": "test", "status": "IN_PROGRESS", "conclusion": null, "startedAt": "2026-10-02T08:01:00Z", "completedAt": null, "detailsUrl": "https://ci/2" },
+          { "__typename": "CheckRun", "name": "lint", "status": "COMPLETED", "conclusion": "TIMED_OUT", "startedAt": null, "completedAt": null, "detailsUrl": "" },
+          { "__typename": "StatusContext", "context": "deploy/preview", "state": "ERROR", "targetUrl": "https://preview", "createdAt": "2026-10-02T08:02:00Z", "description": "Preview failed" }
+        ] } } } } ] }
+      }
+    }
+  }
+}

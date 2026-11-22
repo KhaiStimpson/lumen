@@ -31,6 +31,7 @@
     <None Include="..\fixtures\andrew-crm-58\**" LinkBase="fixtures/andrew-crm-58" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\fixtures\andrew-crm-refactor\**" LinkBase="fixtures/andrew-crm-refactor" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\fixtures\andrew-crm-audit\**" LinkBase="fixtures/andrew-crm-audit" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\inbox\**" LinkBase="fixtures/inbox" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

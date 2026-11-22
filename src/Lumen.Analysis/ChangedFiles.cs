@@ -17,7 +17,7 @@ public static class ChangedFiles
                 f.Deletions,
                 f.IsBinary,
                 MechanicalClassifier.Classify(f.Path, f.Hunks, mechanicalPaths),
-                f.Hunks))
+                f.Hunks) { Similarity = f.Similarity })
             .OrderBy(f => f.Path, StringComparer.Ordinal),
     ];
 }

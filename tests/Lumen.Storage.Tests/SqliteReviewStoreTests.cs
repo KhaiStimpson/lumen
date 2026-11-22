@@ -54,8 +54,8 @@ public sealed class SqliteReviewStoreTests : IDisposable
         versions.CommandText = "SELECT COUNT(*), MAX(Version) FROM SchemaVersion;";
         using var reader = await versions.ExecuteReaderAsync(Ct);
         Assert.True(await reader.ReadAsync(Ct));
-        Assert.Equal(3L, reader.GetInt64(0));
-        Assert.Equal(3L, reader.GetInt64(1));
+        Assert.Equal(4L, reader.GetInt64(0));
+        Assert.Equal(4L, reader.GetInt64(1));
 
         using var journal = connection.CreateCommand();
         journal.CommandText = "PRAGMA journal_mode;";
@@ -191,7 +191,34 @@ public sealed class SqliteReviewStoreTests : IDisposable
         await connection.OpenAsync(Ct);
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT COUNT(*) FROM SchemaVersion;";
-        Assert.Equal(3L, (long?)await command.ExecuteScalarAsync(Ct));
+        Assert.Equal(4L, (long?)await command.ExecuteScalarAsync(Ct));
+    }
+
+    [Fact]
+    public async Task ADatabaseFromTheTriageBranchsMigrationThreeGainsTheVisitAndWalkthroughTables()
+    {
+        // The review-triage branch shipped TriageResults as migration 3 before main's migration 3 (visits, walkthroughs)
+        // existed. Such a database is at version 3 without main's tables; migration 4 must create them.
+        await using (var first = new SqliteReviewStore(DatabasePath))
+        {
+            await first.SetCacheAsync("k", "v", Ct);
+        }
+
+        using (var connection = new SqliteConnection($"Data Source={DatabasePath}"))
+        {
+            await connection.OpenAsync(Ct);
+            using var rewind = connection.CreateCommand();
+            rewind.CommandText = "DROP TABLE PullRequestVisits; DROP TABLE Walkthroughs; DELETE FROM SchemaVersion WHERE Version = 4;";
+            await rewind.ExecuteNonQueryAsync(Ct);
+        }
+
+        SqliteConnection.ClearAllPools();
+        await using var store = new SqliteReviewStore(DatabasePath);
+        await store.RecordOpenedAsync(Pr1, "abc", DateTimeOffset.UnixEpoch, Ct);
+        await store.SaveWalkthroughAsync(Pr1, "abc", "pr", "s", "{}", Ct);
+
+        Assert.Equal("abc", (await store.GetVisitAsync(Pr1, Ct))?.LastOpenedHead);
+        Assert.Equal("{}", await store.FindWalkthroughAsync(Pr1, "abc", "pr", "s", Ct));
     }
 
     private static ReviewInteraction Interaction(

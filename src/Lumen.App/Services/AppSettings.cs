@@ -20,6 +20,9 @@ public sealed class AppSettings
 
     public double? RightPaneWidth { get; set; }
 
+    /// <summary>Side-by-side diffs (plan v2 M6), remembered per user.</summary>
+    public bool SplitView { get; set; }
+
     public static string DefaultPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lumen", "app.json");
 

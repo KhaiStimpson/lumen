@@ -19,7 +19,7 @@ public sealed class PlanNavigationTests
             pr.PlanNavigationRequested += (_, target) => navigation = target;
             var group = pr.PlanStops().OfType<TriageGroupViewModel>().First();
 
-            await pr.SelectGroupAsync(group);
+            await pr.SelectTriageGroupAsync(group);
 
             Assert.False(pr.IsExamining);
             Assert.Null(pr.CurrentPoint);

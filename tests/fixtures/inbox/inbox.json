@@ -1,0 +1,118 @@
+{
+ "sections": [
+  {
+   "id": "review-requested",
+   "title": "Review requested",
+   "items": [
+    {
+     "pullRequest": {
+      "owner": "KhaiStimpson",
+      "name": "andrew-crm",
+      "number": 58
+     },
+     "title": "Contact data enrichment: external data into fields, AI context, and signals",
+     "author": "KhaiStimpson",
+     "createdAt": "2026-10-01T09:00:00Z",
+     "updatedAt": "2026-10-12T08:30:00Z",
+     "additions": 19700,
+     "deletions": 120,
+     "changedFiles": 60,
+     "checks": "INBOX_CHECK_STATE_FAILURE",
+     "review": "INBOX_REVIEW_STATE_AWAITING",
+     "url": "https://github.com/KhaiStimpson/andrew-crm/pull/58",
+     "headSha": "0000000000000000000000000000000000000000",
+     "unread": true
+    },
+    {
+     "pullRequest": {
+      "owner": "KhaiStimpson",
+      "name": "andrew-crm",
+      "number": 61
+     },
+     "title": "Fix timezone handling in recurring jobs",
+     "author": "sam-ops",
+     "createdAt": "2026-10-01T09:00:00Z",
+     "updatedAt": "2026-10-11T16:02:00Z",
+     "additions": 48,
+     "deletions": 12,
+     "changedFiles": 3,
+     "checks": "INBOX_CHECK_STATE_SUCCESS",
+     "review": "INBOX_REVIEW_STATE_AWAITING",
+     "url": "https://github.com/KhaiStimpson/andrew-crm/pull/61",
+     "headSha": "0000000000000000000000000000000000000000",
+     "unread": true,
+     "isNew": true
+    }
+   ]
+  },
+  {
+   "id": "mine",
+   "title": "My open pull requests",
+   "items": [
+    {
+     "pullRequest": {
+      "owner": "KhaiStimpson",
+      "name": "lumen",
+      "number": 12
+     },
+     "title": "Inbox and review tray",
+     "author": "KhaiStimpson",
+     "createdAt": "2026-10-01T09:00:00Z",
+     "updatedAt": "2026-10-12T07:10:00Z",
+     "additions": 2140,
+     "deletions": 310,
+     "changedFiles": 41,
+     "checks": "INBOX_CHECK_STATE_PENDING",
+     "review": "INBOX_REVIEW_STATE_NONE",
+     "url": "https://github.com/KhaiStimpson/lumen/pull/12",
+     "headSha": "0000000000000000000000000000000000000000",
+     "isDraft": true
+    }
+   ]
+  },
+  {
+   "id": "watched",
+   "title": "Watched repositories",
+   "items": [
+    {
+     "pullRequest": {
+      "owner": "KhaiStimpson",
+      "name": "andrew-crm",
+      "number": 57
+     },
+     "title": "Design brief: contact data enrichment",
+     "author": "KhaiStimpson",
+     "createdAt": "2026-10-01T09:00:00Z",
+     "updatedAt": "2026-10-09T10:00:00Z",
+     "additions": 200,
+     "deletions": 0,
+     "changedFiles": 2,
+     "checks": "INBOX_CHECK_STATE_SUCCESS",
+     "review": "INBOX_REVIEW_STATE_APPROVED",
+     "url": "https://github.com/KhaiStimpson/andrew-crm/pull/57",
+     "headSha": "0000000000000000000000000000000000000000"
+    },
+    {
+     "pullRequest": {
+      "owner": "KhaiStimpson",
+      "name": "andrew-crm",
+      "number": 55
+     },
+     "title": "Retire the legacy SMS gateway",
+     "author": "andrew-reviewer",
+     "createdAt": "2026-10-01T09:00:00Z",
+     "updatedAt": "2026-10-06T14:20:00Z",
+     "additions": 35,
+     "deletions": 410,
+     "changedFiles": 9,
+     "checks": "INBOX_CHECK_STATE_NONE",
+     "review": "INBOX_REVIEW_STATE_CHANGES_REQUESTED",
+     "url": "https://github.com/KhaiStimpson/andrew-crm/pull/55",
+     "headSha": "0000000000000000000000000000000000000000"
+    }
+   ]
+  }
+ ],
+ "viewerLogin": "KhaiStimpson",
+ "fetchedAt": "2026-10-12T09:00:00Z"
+}

@@ -1,0 +1,124 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             xmlns:map="using:Lumen.App.Map"
+             x:Class="Lumen.App.Views.MapView"
+             x:DataType="vm:PullRequestViewModel">
+  <!-- The Map (plan v3): the change as the system it builds. Blueprint (B) places components by how they use each
+       other; Terrain (T) sizes them by lines. L cycles the lens, Enter opens the selected file in the diff. -->
+  <Grid RowDefinitions="Auto,*" Margin="16,12,16,14">
+    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+      <StackPanel Spacing="2" VerticalAlignment="Center">
+        <TextBlock Name="MapTitle" Classes="h3" Text="{Binding Map.Title}" />
+        <!-- Two lines whatever the layout, so switching never resizes the map mid-morph -->
+        <TextBlock Classes="caption secondary" TextWrapping="Wrap" MaxLines="2" Height="32" TextTrimming="WordEllipsis" Text="{Binding Map.Hint}" />
+      </StackPanel>
+      <Border Grid.Column="1" Classes="segmented" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <RadioButton Name="MapBlueprint" Classes="segment" GroupName="MapLayout" Content="Blueprint" ToolTip.Tip="How the components use each other (B)"
+                       IsChecked="{Binding Map.IsBlueprint, Mode=OneWay}" IsEnabled="{Binding Map.CanShowBlueprint}"
+                       Command="{Binding Map.ShowBlueprintCommand}" />
+          <RadioButton Name="MapTerrain" Classes="segment" GroupName="MapLayout" Content="Terrain" ToolTip.Tip="Sized by lines added (T)"
+                       IsChecked="{Binding Map.IsTerrain, Mode=OneWay}" Command="{Binding Map.ShowTerrainCommand}" />
+        </StackPanel>
+      </Border>
+      <Border Grid.Column="2" Classes="segmented" VerticalAlignment="Center" ToolTip.Tip="Colour the files by… (L)">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <RadioButton Classes="segment" GroupName="MapLens" Content="Attention"
+                       IsChecked="{Binding Map.Lens, Mode=OneWay, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Attention}"
+                       Command="{Binding Map.SetLensCommand}" CommandParameter="{x:Static vm:MapLens.Attention}" />
+          <RadioButton Classes="segment" GroupName="MapLens" Content="Since my review" IsEnabled="{Binding Map.CanShowSince}"
+                       IsChecked="{Binding Map.Lens, Mode=OneWay, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=SinceReview}"
+                       Command="{Binding Map.SetLensCommand}" CommandParameter="{x:Static vm:MapLens.SinceReview}" />
+          <RadioButton Classes="segment" GroupName="MapLens" Content="Tests"
+                       IsChecked="{Binding Map.Lens, Mode=OneWay, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Tests}"
+                       Command="{Binding Map.SetLensCommand}" CommandParameter="{x:Static vm:MapLens.Tests}" />
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <Grid Grid.Row="1" ColumnDefinitions="*,300" ColumnSpacing="14" Margin="0,12,0,0">
+      <Border Classes="card" ClipToBounds="True">
+        <Grid RowDefinitions="*,Auto">
+          <map:MapCanvas Name="MapCanvas" Map="{Binding Map}" />
+          <TextBlock Classes="caption tertiary" HorizontalAlignment="Center" VerticalAlignment="Center" Text="Nothing to map yet."
+                     IsVisible="{Binding Map.IsEmpty}" />
+          <Grid Grid.Row="1" ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="14,0,14,10">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Classes="caption tertiary" Text="Off the map:" VerticalAlignment="Center" />
+              <Border Classes="pill" IsVisible="{Binding Map.TestsLabel, Converter={x:Static views:Converters.NotEmpty}}">
+                <TextBlock Text="{Binding Map.TestsLabel}" />
+              </Border>
+              <Border Classes="pill" IsVisible="{Binding Map.GeneratedLabel, Converter={x:Static views:Converters.NotEmpty}}">
+                <TextBlock Text="{Binding Map.GeneratedLabel}" />
+              </Border>
+            </StackPanel>
+            <TextBlock Grid.Column="1" Classes="caption tertiary" HorizontalAlignment="Right" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" Text="{Binding Map.LegendText}" />
+          </Grid>
+        </Grid>
+      </Border>
+
+      <!-- The selected file, in its component -->
+      <Border Grid.Column="1" Classes="card" Padding="16,14">
+        <Grid RowDefinitions="*,Auto">
+          <ScrollViewer>
+            <StackPanel Spacing="10" IsVisible="{Binding Map.HasSelection}">
+              <StackPanel Spacing="3">
+                <TextBlock Classes="section">
+                  <Run Text="{Binding Map.SelectedComponent.LayerLabel, FallbackValue=''}" /><Run Text=" · " /><Run Text="{Binding Map.SelectedComponent.Title, FallbackValue=''}" />
+                </TextBlock>
+                <TextBlock Classes="caption secondary" TextWrapping="Wrap" Text="{Binding Map.SelectedComponent.Role, FallbackValue=''}"
+                           IsVisible="{Binding Map.SelectedComponent.Role, Converter={x:Static views:Converters.NotEmpty}, FallbackValue=False}" />
+              </StackPanel>
+              <TextBlock Name="MapSelectedPath" Classes="mono" FontSize="12" TextWrapping="Wrap" Text="{Binding Map.SelectedFile.Path, FallbackValue=''}" />
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Classes="added" Text="{Binding Map.SelectedFile.Entry.AdditionsLabel, FallbackValue=''}" />
+                <TextBlock Classes="removed" Text="{Binding Map.SelectedFile.Entry.DeletionsLabel, FallbackValue=''}" />
+                <Border Classes="pill open" IsVisible="{Binding Map.SelectedFile.IsSinceReview, FallbackValue=False}">
+                  <TextBlock Text="since your last review" />
+                </Border>
+              </StackPanel>
+              <Grid ColumnDefinitions="64,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
+                <TextBlock Classes="caption tertiary" Text="Uses" />
+                <TextBlock Grid.Column="1" Classes="caption" TextWrapping="Wrap" Text="{Binding Map.UsesLabel}" />
+                <TextBlock Grid.Row="1" Classes="caption tertiary" Text="Used by" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Classes="caption" TextWrapping="Wrap" Text="{Binding Map.UsedByLabel}" />
+                <TextBlock Grid.Row="2" Classes="caption tertiary" Text="Tested by" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Classes="caption" TextWrapping="Wrap" Text="{Binding Map.TestedByLabel}" />
+              </Grid>
+              <ItemsControl ItemsSource="{Binding Map.SelectedRisks}" IsVisible="{Binding Map.HasSelectedRisks}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:RiskViewModel">
+                    <Button Classes="row" Margin="-8,0" Padding="8,6"
+                            Command="{Binding $parent[views:MapView].((vm:PullRequestViewModel)DataContext).OpenMapRiskCommand}" CommandParameter="{Binding}">
+                      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                        <Path Data="{StaticResource Icon.Risk}" Stroke="{Binding Category, Converter={x:Static views:Converters.RiskToBrush}}" Classes="stroke"
+                              Width="12" Height="12" VerticalAlignment="Top" Margin="0,2,0,0" />
+                        <StackPanel Grid.Column="1" Spacing="1">
+                          <TextBlock Text="{Binding Reason}" FontSize="12" TextWrapping="Wrap" />
+                          <TextBlock Classes="caption tertiary">
+                            <Run Text="{Binding CategoryLabel}" /><Run Text=" · " /><Run Text="{Binding LocationLabel}" />
+                          </TextBlock>
+                        </StackPanel>
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding Map.HasThreads}">
+                <Path Data="{StaticResource Icon.Comment}" Stroke="{DynamicResource Accent}" Classes="stroke" Width="12" Height="12" VerticalAlignment="Center" />
+                <TextBlock Classes="caption" Text="{Binding Map.ThreadsLabel}" VerticalAlignment="Center" />
+              </StackPanel>
+            </StackPanel>
+          </ScrollViewer>
+          <Button Grid.Row="1" Name="MapOpen" Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,10,0,0"
+                  Command="{Binding Map.OpenCommand}" IsEnabled="{Binding Map.HasSelection}">
+            <TextBlock Text="Open in diff  ↵" />
+          </Button>
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

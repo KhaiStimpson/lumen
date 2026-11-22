@@ -58,7 +58,7 @@ public sealed class DiffFoldTests
         try
         {
             var group = pr.ReviewPlan.Groups.Single(g => g.Title == "Renamed `RedactedAiAuditEntry`→`AiAuditEntry`");
-            await pr.SelectGroupAsync(group);
+            await pr.SelectTriageGroupAsync(group);
             var first = pr.SelectedFile!.Path;
             var badge = pr.CurrentDiff!.Rows.First(r => r.CardId?.StartsWith(DiffFold.CardPrefix, StringComparison.Ordinal) == true);
             var fold = pr.ResolveFold(badge.CardId!)!;

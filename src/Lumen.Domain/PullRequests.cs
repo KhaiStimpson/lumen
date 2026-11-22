@@ -89,12 +89,3 @@ public sealed record PullRequestSnapshot(
     public ChangedFile? FindFile(string path) =>
         Files.FirstOrDefault(f => string.Equals(f.Path, path, StringComparison.Ordinal));
 }
-
-public sealed record ReviewThread(
-    long Id,
-    string Path,
-    int? Line,
-    string Author,
-    string Body,
-    DateTimeOffset CreatedAt,
-    string Url);

@@ -12,7 +12,7 @@ internal sealed class FakeHttpMessageHandler : HttpMessageHandler
 
     public List<RecordedRequest> Requests { get; } = [];
 
-    public FakeHttpMessageHandler Respond(HttpStatusCode status, string json, string? link = null)
+    public FakeHttpMessageHandler Respond(HttpStatusCode status, string json, string? link = null, (int Remaining, long Reset)? rateLimit = null)
     {
         _responses.Enqueue(() =>
         {
@@ -23,6 +23,12 @@ internal sealed class FakeHttpMessageHandler : HttpMessageHandler
             if (link is not null)
             {
                 response.Headers.Add("Link", link);
+            }
+
+            if (rateLimit is { } limit)
+            {
+                response.Headers.Add("X-RateLimit-Remaining", limit.Remaining.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                response.Headers.Add("X-RateLimit-Reset", limit.Reset.ToString(System.Globalization.CultureInfo.InvariantCulture));
             }
 
             return response;

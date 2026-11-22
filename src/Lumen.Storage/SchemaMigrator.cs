@@ -65,7 +65,29 @@ internal static class SchemaMigrator
             ON Investigations (Repository, PullRequest, HeadSha, CandidateKey, Type);
         """,
         """
-        CREATE TABLE TriageResults (
+        CREATE TABLE PullRequestVisits (
+            Repository TEXT NOT NULL,
+            PullRequest INTEGER NOT NULL,
+            LastOpenedAt TEXT NULL,
+            LastOpenedHead TEXT NULL,
+            LastReviewedAt TEXT NULL,
+            LastReviewedHead TEXT NULL,
+            PRIMARY KEY (Repository, PullRequest));
+
+        CREATE TABLE Walkthroughs (
+            Repository TEXT NOT NULL,
+            PullRequest INTEGER NOT NULL,
+            HeadSha TEXT NOT NULL,
+            Scope TEXT NOT NULL,
+            SettingsHash TEXT NOT NULL,
+            Result TEXT NOT NULL,
+            At TEXT NOT NULL,
+            PRIMARY KEY (Repository, PullRequest, HeadSha, Scope, SettingsHash));
+        """,
+        """
+        -- Triage results. The integration branch once shipped this as migration 3, so the tables of both
+        -- migration 3s are created here if missing: a database from either line ends up with all of them.
+        CREATE TABLE IF NOT EXISTS TriageResults (
             Repository TEXT NOT NULL,
             PullRequest INTEGER NOT NULL,
             HeadSha TEXT NOT NULL,
@@ -73,6 +95,25 @@ internal static class SchemaMigrator
             Result TEXT NOT NULL,
             At TEXT NOT NULL,
             PRIMARY KEY (Repository, PullRequest, HeadSha, Version));
+
+        CREATE TABLE IF NOT EXISTS PullRequestVisits (
+            Repository TEXT NOT NULL,
+            PullRequest INTEGER NOT NULL,
+            LastOpenedAt TEXT NULL,
+            LastOpenedHead TEXT NULL,
+            LastReviewedAt TEXT NULL,
+            LastReviewedHead TEXT NULL,
+            PRIMARY KEY (Repository, PullRequest));
+
+        CREATE TABLE IF NOT EXISTS Walkthroughs (
+            Repository TEXT NOT NULL,
+            PullRequest INTEGER NOT NULL,
+            HeadSha TEXT NOT NULL,
+            Scope TEXT NOT NULL,
+            SettingsHash TEXT NOT NULL,
+            Result TEXT NOT NULL,
+            At TEXT NOT NULL,
+            PRIMARY KEY (Repository, PullRequest, HeadSha, Scope, SettingsHash));
         """,
     ];
 

@@ -32,6 +32,8 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 {
     private readonly IReviewSource _source;
     private readonly CancellationTokenSource _lifetime = new();
+
+    // Keyed by scope, whitespace mode and path (see DiffKey).
     private readonly Dictionary<string, FileDiff> _diffCache = new(StringComparer.Ordinal);
 
     // Head-side file text for the full-file view; null when the file has none (deleted) or couldn't be loaded.
@@ -47,6 +49,8 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         Ref = pullRequest;
         Title = $"{pullRequest.Owner}/{pullRequest.Name} #{pullRequest.Number}";
         Status = "Connecting…";
+        Map.OpenRequested += (_, _) => _ = OpenMapSelectionAsync();
+        Map.PropertyChanged += OnMapPropertyChanged;
     }
 
     public PullRequestRef Ref { get; }
@@ -235,7 +239,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         group is null ? Task.CompletedTask : SetTriageGroupAcknowledgedAsync(group.Id, !group.Acknowledged);
 
     [RelayCommand]
-    public Task SelectGroupAsync(TriageGroupViewModel? group)
+    public Task SelectTriageGroupAsync(TriageGroupViewModel? group)
     {
         if (group?.Target is not { } target)
         {
@@ -488,6 +492,12 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         OnPropertyChanged(nameof(ViewedSummary));
         OnPropertyChanged(nameof(GeneratedSummary));
         Error = null;
+        NewHeadLabel = null;
+        Scope = null;
+        ScopeFiles.Clear();
+        Timeline.Clear();
+        Checks.Clear();
+        ResetReviewClientState();
     }
 
     private async Task WatchAsync(bool refresh)
@@ -619,6 +629,30 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
             case PullRequestEvent.EventOneofCase.Failed:
                 Fail(evt.Failed.Message, evt.Failed.IsAuthentication);
                 break;
+
+            case PullRequestEvent.EventOneofCase.TimelineUpdated:
+                ApplyTimeline(evt.TimelineUpdated.Timeline);
+                break;
+
+            case PullRequestEvent.EventOneofCase.ChecksUpdated:
+                ApplyChecks(evt.ChecksUpdated.Checks);
+                break;
+
+            case PullRequestEvent.EventOneofCase.HeadChanged:
+                ApplyHeadChanged(evt.HeadChanged);
+                break;
+
+            case PullRequestEvent.EventOneofCase.ThreadsUpdated:
+                ApplyThreads(evt.ThreadsUpdated.Threads);
+                break;
+
+            case PullRequestEvent.EventOneofCase.PendingReviewUpdated:
+                ApplyPendingReview(evt.PendingReviewUpdated);
+                break;
+
+            case PullRequestEvent.EventOneofCase.WalkthroughUpdated:
+                ApplyWalkthrough(evt.WalkthroughUpdated.Walkthrough);
+                break;
         }
     }
 
@@ -646,7 +680,16 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         BranchLabel = $"{snapshot.HeadRef} → {snapshot.BaseRef}";
         Additions = snapshot.Files.Sum(f => f.Additions);
         Deletions = snapshot.Files.Sum(f => f.Deletions);
+        _headSha = snapshot.HeadSha;
+        _snapshotBody = snapshot.Body;
+        OnPropertyChanged(nameof(Description));
+        OnPropertyChanged(nameof(HasDescription));
+        _mergeBaseSha = snapshot.MergeBaseSha.Length > 0 ? snapshot.MergeBaseSha : snapshot.BaseSha;
         OnPropertyChanged(nameof(ViewerIsAuthor));
+        OnPropertyChanged(nameof(CanApprove));
+        OnPropertyChanged(nameof(ApproveHint));
+        OnPropertyChanged(nameof(WalkthroughTitle));
+        _ = LoadDetailsAsync();
 
         Files.Clear();
         GeneratedFiles.Clear();
@@ -665,6 +708,8 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         RebuildTree();
         OnPropertyChanged(nameof(GeneratedSummary));
         OnPropertyChanged(nameof(ViewedSummary));
+        _mapSincePaths = null;
+        RebuildMap();
         IsLoading = false;
 
         var firstReviewable = Tree.SelectMany(n => n.Descendants().Prepend(n)).FirstOrDefault(n => n.File is not null)?.File ?? Files.FirstOrDefault();
@@ -679,8 +724,9 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         Tree.Clear();
         _nodes.Clear();
         var filter = FileFilter.Trim();
-        var visible = Files.Where(f => !f.IsMechanical && (filter.Length == 0 || f.Path.Contains(filter, StringComparison.OrdinalIgnoreCase)));
-        foreach (var node in FileTreeNode.Build(visible))
+        var source = Scope is null ? (IEnumerable<FileEntryViewModel>)Files : ScopeFiles;
+        var visible = source.Where(f => !f.IsMechanical && (filter.Length == 0 || f.Path.Contains(filter, StringComparison.OrdinalIgnoreCase)));
+        foreach (var node in TreeNodes(visible))
         {
             Tree.Add(node);
         }
@@ -773,18 +819,25 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         var reload = _watchCts;
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, reload.Token);
 
-        if (!_diffCache.TryGetValue(file.Path, out var diff))
+        if (!_diffCache.TryGetValue(DiffKey(file.Path), out var diff))
         {
             IsDiffLoading = true;
             try
             {
-                diff = await _source.GetFileDiffAsync(Ref, file.Path, linked.Token).ConfigureAwait(true);
+                var key = DiffKey(file.Path);
+                var request = new GetFileDiffRequest { PullRequest = Ref, Path = file.Path, IgnoreWhitespace = IgnoreWhitespace };
+                if (Scope is { } scope)
+                {
+                    request.Range = new CommitRange { FromSha = scope.FromSha, ToSha = scope.ToSha };
+                }
+
+                diff = await _source.GetFileDiffAsync(request, linked.Token).ConfigureAwait(true);
                 if (linked.IsCancellationRequested)
                 {
                     return;
                 }
 
-                _diffCache[file.Path] = diff;
+                _diffCache[key] = diff;
             }
             catch (OperationCanceledException) when (linked.IsCancellationRequested)
             {
@@ -888,7 +941,8 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         }
 
         var viewed = !file.IsViewed;
-        file.IsViewed = viewed;
+        var twins = Files.Concat(ScopeFiles).Where(f => f.Path == file.Path).Append(file).Distinct().ToList();
+        twins.ForEach(f => f.IsViewed = viewed);
         OnPropertyChanged(nameof(ViewedSummary));
         UpdateCoverage();
         try
@@ -897,27 +951,40 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         }
         catch (RpcException ex) when (!(ex.StatusCode == StatusCode.Cancelled && _lifetime.IsCancellationRequested))
         {
-            file.IsViewed = !viewed;
+            twins.ForEach(f => f.IsViewed = !viewed);
             OnPropertyChanged(nameof(ViewedSummary));
             UpdateCoverage();
             Toast = $"Couldn't mark {file.Name} as {(viewed ? "viewed" : "not viewed")}: {ex.Status.Detail}";
         }
     }
 
+    private string DiffKey(string path) => $"{Scope?.Key ?? "pr"}|{(IgnoreWhitespace ? "w" : "")}|{path}";
+
     private void RebuildCurrentDiff()
     {
-        if (SelectedFile is null || !_diffCache.TryGetValue(SelectedFile.Path, out var diff))
+        if (SelectedFile is null || !_diffCache.TryGetValue(DiffKey(SelectedFile.Path), out var diff))
         {
             return;
         }
 
         var path = SelectedFile.Path;
-        var cards = ReviewPoints
-            .SelectMany(p => p.Locations.Where(l => l.Path == path).Select(l => (Id: CardId(p, l), NewLine: l.Line)));
-        var head = ShowFullFile ? _headCache.GetValueOrDefault(path) : null;
-        CurrentDiff = DiffDocument.Build(diff, cards, head, DiffFolds.For(Triage, path, _expandedFolds));
+        var anchors = ScopeEndsAtHead ? CardAnchors(path) : CommitCardAnchors(path);
+
+        // The full file is the head's; a range that ends earlier shows its hunks only.
+        var head = ShowFullFile && ScopeEndsAtHead ? _headCache.GetValueOrDefault(path) : null;
+        // Triage spans are lines of the whole pull request's diff, so folds apply only when no range is chosen.
+        var folds = Scope is null ? DiffFolds.For(Triage, path, _expandedFolds) : null;
+        CurrentDiff = DiffDocument.Build(diff, anchors, head, folds);
         UpdateMarkers();
     }
+
+    /// <summary>Everything that sits under a line of this file: review points, threads, drafts, risks.</summary>
+    private IEnumerable<CardAnchor> CardAnchors(string path) =>
+        ReviewPoints
+            .SelectMany(p => p.Locations.Where(l => l.Path == path).Select(l => new CardAnchor(CardId(p, l), LineSide.Right, l.Line)))
+            .Concat(ThreadAnchors(path))
+            .Concat(DraftAnchors(path))
+            .Concat(OutdatedAnchors(path));
 
     /// <summary>The primary location gets the full card; other locations get a compact reference card.</summary>
     public static string CardId(ReviewPointViewModel point, LocationViewModel location) =>
@@ -940,12 +1007,13 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         }
 
         var path = SelectedFile.Path;
-        Markers =
+        Markers = !ScopeEndsAtHead ? [] :
         [
             .. ReviewPoints
                 .Where(p => !p.IsDismissed)
                 .SelectMany(p => p.Locations.Where(l => l.Path == path).Select(l => new GutterMarker(
                     p.Id, l.Line, p.Kind, p == CurrentPoint, p.IsCommented, _arrived.Remove(p.Id)))),
+            .. RiskMarkers(path),
         ];
 
         FocusRange = CurrentPoint?.Locations.FirstOrDefault(l => l.Path == path) is { } focus
@@ -983,7 +1051,8 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         var stops = PlanStops();
         if (stops.Count == 0)
         {
-            return Task.CompletedTask;
+            // With nothing flagged, J / K walk the walkthrough's change groups instead (plan v2 M8).
+            return WalksGroups ? StepGroupAsync(direction) : Task.CompletedTask;
         }
 
         var index = CurrentStop is { } current ? stops.IndexOf(current) : -1;
@@ -993,7 +1062,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         return next switch
         {
             ReviewPointViewModel point => GoToAsync(point, direction > 0 ? NavigationReason.Next : NavigationReason.Previous),
-            TriageGroupViewModel group => SelectGroupAsync(group),
+            TriageGroupViewModel group => SelectTriageGroupAsync(group),
             _ => Task.CompletedTask,
         };
     }
@@ -1189,16 +1258,17 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
                     PullRequest = Ref,
                     ReviewPointId = point.Id,
                     Path = point.Path,
-                    Line = point.Line,
+                    Line = PointRange(point).Line,
+                    StartLine = PointRange(point).StartLine,
                     Body = point.CommentDraft.Trim(),
                 },
                 _lifetime.Token).ConfigureAwait(true);
 
-            point.PostedUrl = reply.Url;
+            point.PostedUrl = reply.Url.Length > 0 ? reply.Url : null;
             point.State = ReviewPointState.Commented;
             point.IsComposing = false;
             RefreshPointDerivedState();
-            Toast = "Comment posted to GitHub";
+            Toast = PostedToast(reply);
         }
         catch (RpcException ex)
         {

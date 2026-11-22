@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             x:Class="Lumen.App.Views.CommitsView"
+             x:DataType="vm:PullRequestViewModel">
+  <!-- Commits (plan v2 M2): pick one to see only its changes; shift-click a second for a range. -->
+  <ScrollViewer>
+    <StackPanel Margin="22,16,22,24" Spacing="10" MaxWidth="860" HorizontalAlignment="Left">
+      <TextBlock Classes="caption" TextWrapping="Wrap"
+                 Text="Choose a commit to limit the Files tab to its changes. Shift-click another to choose a range." />
+      <ItemsControl Name="CommitList" ItemsSource="{Binding Commits}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:CommitViewModel">
+            <Button Classes="row commit" Classes.current="{Binding IsSelected}" Margin="-8,0" Padding="10,8" Click="OnCommitClicked" Tag="{Binding}">
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <Path Data="{StaticResource Icon.Commit}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="14" Height="14" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Spacing="2">
+                  <TextBlock Text="{Binding Headline}" FontSize="12.5" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Classes="caption">
+                    <Run Text="{Binding Author}" /><Run Text=" · " /><Run Text="{Binding AgeLabel}" />
+                  </TextBlock>
+                </StackPanel>
+                <TextBlock Grid.Column="2" Text="{Binding ShortSha}" FontFamily="{StaticResource CodeFont}" FontSize="11.5" Classes="secondary" VerticalAlignment="Center" />
+              </Grid>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Classes="caption tertiary" Text="Loading commits…" IsVisible="{Binding !HasDetails}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

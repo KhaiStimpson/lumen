@@ -1,0 +1,117 @@
+{
+ "pullRequest": {
+  "owner": "KhaiStimpson",
+  "name": "andrew-crm",
+  "number": 58
+ },
+ "title": "Contact data enrichment: external data into fields, AI context, and signals",
+ "author": "KhaiStimpson",
+ "state": "open",
+ "baseRef": "dev",
+ "headRef": "claude/contact-enrichment",
+ "headSha": "2baaca76d26ccd0b73159e1e9c11a97dc73c360d",
+ "mergeability": "MERGEABILITY_MERGEABLE",
+ "mergeState": "BLOCKED",
+ "labels": [
+  {
+   "name": "enhancement",
+   "color": "a2eeef"
+  },
+  {
+   "name": "needs review",
+   "color": "fbca04"
+  }
+ ],
+ "reviewers": [
+  {
+   "login": "andrew-reviewer",
+   "isRequested": true
+  },
+  {
+   "login": "sam-ops",
+   "verdict": "REVIEW_VERDICT_COMMENTED",
+   "hasVerdict": true
+  }
+ ],
+ "timeline": [
+  {
+   "id": "IC_1",
+   "kind": "TIMELINE_ITEM_KIND_COMMENT",
+   "author": "sam-ops",
+   "body": "Heads up: the **ABR GUID** needs to be in Key Vault before this ships. Is `Enrichment:AbrGuid` read anywhere at startup?",
+   "createdAt": "2026-07-19T09:12:00Z",
+   "url": "https://github.com/KhaiStimpson/andrew-crm/pull/58#issuecomment-1"
+  },
+  {
+   "id": "PRR_1",
+   "kind": "TIMELINE_ITEM_KIND_REVIEW",
+   "author": "sam-ops",
+   "body": "A couple of questions on the scheduler \u2014 see inline.",
+   "createdAt": "2026-07-19T11:40:00Z",
+   "url": "https://github.com/KhaiStimpson/andrew-crm/pull/58#pullrequestreview-1",
+   "verdict": "REVIEW_VERDICT_COMMENTED",
+   "reviewCommentCount": 2
+  },
+  {
+   "id": "IC_2",
+   "kind": "TIMELINE_ITEM_KIND_COMMENT",
+   "author": "KhaiStimpson",
+   "body": "Yes \u2014 it's optional; providers stay inert without it:\n\n```csharp\nif (string.IsNullOrWhiteSpace(guid)) return EnrichmentResult.Empty;\n```",
+   "createdAt": "2026-07-19T12:05:00Z",
+   "url": "https://github.com/KhaiStimpson/andrew-crm/pull/58#issuecomment-2"
+  }
+ ],
+ "commits": [
+  {
+   "sha": "9f1e2d3c4b5a69788796a5b4c3d2e1f00a1b2c3d",
+   "headline": "Design brief: contact data enrichment",
+   "message": "Design brief: contact data enrichment",
+   "author": "KhaiStimpson",
+   "authoredAt": "2026-07-18T22:10:00Z"
+  },
+  {
+   "sha": "4c8e1a7b2d9f3e6a5b0c7d8e9f1a2b3c4d5e6f70",
+   "headline": "Enrichment providers, ingestion pipeline and migrations",
+   "message": "Enrichment providers, ingestion pipeline and migrations\n\nAdds the IEnrichmentProvider seam, five providers and the ingestion service.",
+   "author": "KhaiStimpson",
+   "authoredAt": "2026-07-19T03:36:00Z"
+  },
+  {
+   "sha": "2baaca76d26ccd0b73159e1e9c11a97dc73c360d",
+   "headline": "Signals, scheduler and settings UI",
+   "message": "Signals, scheduler and settings UI",
+   "author": "KhaiStimpson",
+   "authoredAt": "2026-07-20T03:39:00Z"
+  }
+ ],
+ "checks": [
+  {
+   "name": "build",
+   "state": "CHECK_STATE_SUCCESS",
+   "detail": "SUCCESS",
+   "startedAt": "2026-07-20T03:40:00Z",
+   "completedAt": "2026-07-20T03:44:12Z",
+   "url": "https://github.com/KhaiStimpson/andrew-crm/actions/runs/1"
+  },
+  {
+   "name": "test",
+   "state": "CHECK_STATE_FAILURE",
+   "detail": "FAILURE",
+   "startedAt": "2026-07-20T03:40:00Z",
+   "completedAt": "2026-07-20T03:47:31Z",
+   "url": "https://github.com/KhaiStimpson/andrew-crm/actions/runs/2"
+  },
+  {
+   "name": "codeql",
+   "state": "CHECK_STATE_PENDING",
+   "detail": "IN_PROGRESS",
+   "startedAt": "2026-07-20T03:40:00Z",
+   "url": "https://github.com/KhaiStimpson/andrew-crm/actions/runs/3"
+  }
+ ],
+ "viewerLogin": "KhaiStimpson",
+ "lastReviewedSha": "4c8e1a7b2d9f3e6a5b0c7d8e9f1a2b3c4d5e6f70",
+ "url": "https://github.com/KhaiStimpson/andrew-crm/pull/58",
+ "createdAt": "2026-07-18T22:12:00Z",
+ "body": "Implements the contact data enrichment feature end to end, per the design brief in `docs/specs/contact-data-enrichment.md`. External data (company website, news, AU/NZ registries, optional paid person data) enriches contacts through **one ingestion pipeline with three sinks** \u2014 all gated by a per-tenant admin opt-in, all sourced, and nothing touches a contact field without human confirmation.\n\n> Consolidates the earlier design-brief PR (#57, now closed) \u2014 the brief and its housekeeping are included here, so this is the single PR for the feature.\n\n## What it does\n\n- **Free-first providers** behind a common `IEnrichmentProvider` seam:\n  - `CompanyWebsiteEnrichmentProvider` \u2014 OG/meta from the email domain \u2192 company, logo, description.\n  - `NewsSignalProvider` \u2014 Google News RSS by company, with a headline-match relevance gate.\n  - `AbrAbnProvider` (AU) / `NzbnProvider` (NZ) \u2014 official business registries, matched by company name with a conservative confidence gate. **Config-gated** (`Enrichment:Abr:Guid` / `Enrichment:Nzbn:ApiKey`): inert until their credential is set.\n  - `PeopleDataLabsProvider` \u2014 optional paid person-level enrichment via a per-tenant **BYO key** (stored DataProtection-encrypted).\n- **Three sinks:** field findings \u2192 `EnrichmentSuggestion` (suggest-then-confirm, mirroring `Commitment`); knowledge \u2192 `ExternalKnowledge`, a citable AI retrieval source (`AiSourceKind.ExternalKnowledge`); signals \u2192 a timeline `Activity` **and** knowledge, with notable ones also becoming a Today-digest `RecommendationKind.EnrichmentSignal`.\n- **Surfaces:** an \"Enrich\" button + review panel on the contact page; signals in the relationship timeline; notable signals in the Today digest; an admin opt-in toggle on both the General and AI-governance settings tabs, plus the BYO-key field.\n- **Automation:** auto-enrich on contact create and CSV/vCard import (Hangfire, gated + bounded); a daily scheduled refresh that re-enriches a bounded, stalest-first slice per tenant.\n- **AI integration:** enriched knowledge flows into the Relationship Brief through the existing PII gateway and is authorized by `AiSourceAuthorizationService`. Selection is factored behind `IExternalKnowledgeSelector` (the RAG seam) so a future vector top-k selector can replace today's bounded recency inclusion without touching treatments.\n\n## Privacy & governance\n\nOff by default; explicit tenant-admin opt-in, re-checked before every fetch; every run audited (`EnrichmentAuditEvent`). Field changes only apply on human accept. External knowledge is tokenised by the PII gateway like any other source. BYO keys are encrypted at rest.\n\n## Testing\n\n~150 enrichment unit tests (parsers, provider mapping, relevance/confidence gates, fail-soft, routing/dedupe, opt-in gating, scheduler selection, RAG seam). Full suite: **307 passing**. The only failures are 4 pre-existing Playwright browser-binary tests, unchanged by this branch. Key flows were also driven end-to-end in the running app (Enrich \u2192 accept, timeline signal, Today digest, BYO-key encryption).\n\n## Notes for reviewers\n\n- Dual Sqlite + SqlServer EF migrations included for each schema change.\n- New config keys documented in the README.\n- **NZBN** parser is verified field-by-field against the official OpenAPI spec (`/entities` search: `nzbn`, `entityName`, `entityTypeDescription`, `entityStatusDescription`; `Ocp-Apim-Subscription-Key` header) \u2014 ready to go live once the key is set.\n- **ABR** is built to the documented JSONP `*.aspx` endpoints (callback param sent, envelope unwrapped); a live smoke is pending the GUID being provisioned, and a small field-name tweak may be needed at first real call.\n- Deferred by design: a per-tenant enrichment spend governor (v1 uses a slow rolling cadence + per-run cap instead) and the vector RAG selector (seam is in place).\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)"
+}

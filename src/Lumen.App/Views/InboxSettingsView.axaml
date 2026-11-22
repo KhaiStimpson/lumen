@@ -1,0 +1,58 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             x:Class="Lumen.App.Views.InboxSettingsView"
+             x:DataType="vm:InboxSettingsViewModel">
+  <!-- Settings → Inbox: settings.json → inbox.watchedRepositories (plan v2 M1). -->
+  <UserControl.Styles>
+    <Style Selector="Button.remove">
+      <Setter Property="Padding" Value="5" />
+      <Setter Property="Margin" Value="4,0,0,0" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+  </UserControl.Styles>
+  <StackPanel Spacing="18">
+    <StackPanel Spacing="2">
+      <TextBlock Classes="h3" Text="Inbox" />
+      <TextBlock Classes="caption secondary" TextWrapping="Wrap"
+                 Text="Review requests and your own pull requests are always listed. Add repositories to also see their other open pull requests." />
+    </StackPanel>
+
+    <StackPanel Spacing="8">
+      <TextBlock Classes="body" FontWeight="SemiBold" Text="Watched repositories" />
+      <ItemsControl Name="WatchedRepositories" ItemsSource="{Binding WatchedRepositories}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <Border Classes="entry">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding}" />
+                <Button Classes="ghost remove" ToolTip.Tip="Stop watching"
+                        Command="{Binding $parent[ItemsControl].((vm:InboxSettingsViewModel)DataContext).RemoveCommand, FallbackValue={x:Null}}"
+                        CommandParameter="{Binding}">
+                  <Path Data="{StaticResource Icon.Close}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="8" Height="8" />
+                </Button>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Classes="caption tertiary" Text="None yet." IsVisible="{Binding !WatchedRepositories.Count}" />
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <TextBox Name="NewRepository" Text="{Binding NewRepository}" PlaceholderText="owner/name or a GitHub URL" MinHeight="32" VerticalContentAlignment="Center">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button Grid.Column="1" Classes="subtle" Content="Watch" Command="{Binding AddCommand}" MinHeight="32" />
+      </Grid>
+      <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                 Text="The inbox checks GitHub every two minutes while it's on screen, and when you come back to the window." />
+    </StackPanel>
+
+    <TextBlock Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+               Foreground="{DynamicResource Severity.High}" FontSize="12" TextWrapping="Wrap" />
+  </StackPanel>
+</UserControl>

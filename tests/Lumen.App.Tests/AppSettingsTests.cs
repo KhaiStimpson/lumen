@@ -1,5 +1,4 @@
 using Lumen.App.Services;
-using Lumen.App.ViewModels;
 
 namespace Lumen.App.Tests;
 
@@ -18,8 +17,6 @@ public sealed class AppSettingsTests
             Assert.NotNull(settings.RecentPullRequests);
             Assert.All(settings.RecentPullRequests, entry => Assert.False(string.IsNullOrWhiteSpace(entry)));
             Assert.Equal(settings.RecentPullRequests.Count, settings.RecentPullRequests.Distinct().Count());
-            var home = new OpenPullRequestViewModel(settings.RecentPullRequests, _ => Task.CompletedTask);
-            Assert.NotNull(home.Reference);
         }
         finally
         {

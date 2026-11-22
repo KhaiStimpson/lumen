@@ -23,4 +23,8 @@
     <ProjectReference Include="..\..\src\Lumen.Domain\Lumen.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Payloads\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

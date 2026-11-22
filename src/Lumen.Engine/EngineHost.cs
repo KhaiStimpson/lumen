@@ -4,6 +4,9 @@ using Lumen.Agents.Execution;
 using Lumen.Agents.Investigations;
 using Lumen.Analysis;
 using Lumen.Jev;
+using Lumen.Models;
+using Lumen.Models.Cloudflare;
+using Lumen.Engine.Walkthroughs;
 using Lumen.Contracts;
 using Lumen.Domain;
 using Lumen.Engine.Hosting;
@@ -26,6 +29,9 @@ public sealed record EngineOptions
 
     public string DataDirectory { get; init; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lumen");
+
+    /// <summary>How often an open pull request's conversation, checks and threads are re-read while watched.</summary>
+    public TimeSpan FollowInterval { get; init; } = TimeSpan.FromSeconds(90);
 
     public static EngineOptions FromArgs(string[] args)
     {
@@ -83,6 +89,8 @@ public static class EngineHost
         services.AddSingleton<IAttentionEvaluationStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
         services.AddSingleton<IInvestigationStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
         services.AddSingleton<ITriageStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
+        services.AddSingleton<IPullRequestVisitStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
+        services.AddSingleton<IWalkthroughStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
 
         services.AddSingleton(_ => EngineSettings.Load(options.DataDirectory));
         services.AddSingleton(sp => new EngineSettingsStore(sp.GetRequiredService<EngineSettings>(), options.DataDirectory));
@@ -96,13 +104,18 @@ public static class EngineHost
         services.AddSingleton<ReviewPointPipeline>();
         AddAgents(services, options);
         services.AddSingleton<TriageRunner>();
+        AddFastModel(services, options);
         services.AddSingleton<PullRequestSessionManager>();
+        services.AddSingleton<ReviewActions>();
+        services.AddSingleton<Inbox.InboxService>();
         services.AddTransient(sp => new ConnectionsProbe(
             sp.GetRequiredService<EngineSettingsStore>(),
             options.DataDirectory,
             sp.GetRequiredService<ISecretStore>(),
             sp.GetRequiredService<IOpenRouterKeyCheck>(),
-            sp.GetRequiredService<IAgentProvider>()));
+            sp.GetRequiredService<IAgentProvider>(),
+            sp.GetRequiredService<IModelProvider>(),
+            sp.GetRequiredService<IModelUsageMeter>()));
 
         if (options.ParentProcessId is { } parent)
         {
@@ -116,6 +129,9 @@ public static class EngineHost
 
         var app = builder.Build();
         app.MapGrpcService<ReviewEngineService>();
+
+        // Created eagerly so it hears every session that becomes ready.
+        _ = app.Services.GetRequiredService<WalkthroughCoordinator>();
         return app;
     }
 
@@ -150,7 +166,35 @@ public static class EngineHost
                 sp.GetRequiredService<TimeProvider>(),
                 sp.GetRequiredService<ILogger<JevAttentionPolicy>>());
         });
-        services.AddSingleton<IAttentionPolicy>(sp => sp.GetRequiredService<JevAttentionPolicy>());
+        // Plan v2: JEV is legacy and unregistered unless switched on at start; the rules alone decide otherwise.
+        services.AddSingleton<IAttentionPolicy>(sp => sp.GetRequiredService<EngineSettingsStore>().Current.Jev.Enabled
+            ? sp.GetRequiredService<JevAttentionPolicy>()
+            : sp.GetRequiredService<RuleBasedAttentionPolicy>());
+    }
+
+    /// <summary>The fast model (plan v2 M7) and the walkthrough built on it (M8). Read live, like JEV's settings.</summary>
+    internal static void AddFastModel(IServiceCollection services, EngineOptions options)
+    {
+        services.AddSingleton<IModelUsageMeter>(sp =>
+        {
+            var settings = sp.GetRequiredService<EngineSettingsStore>();
+            return new DailyUsageMeter(options.DataDirectory, () => settings.Current.FastModel.DailyRequestCap, sp.GetRequiredService<TimeProvider>());
+        });
+        services.AddHttpClient<IModelProvider, CloudflareWorkersAiProvider>((http, sp) =>
+        {
+            var settings = sp.GetRequiredService<EngineSettingsStore>();
+            return new CloudflareWorkersAiProvider(
+                http,
+                sp.GetRequiredService<ISecretStore>(),
+                () => new CloudflareOptions
+                {
+                    Model = settings.Current.FastModel.Model,
+                    Gateway = settings.Current.FastModel.Gateway,
+                    Timeout = TimeSpan.FromSeconds(settings.Current.FastModel.TimeoutSeconds),
+                },
+                sp.GetRequiredService<IModelUsageMeter>());
+        });
+        services.AddSingleton<WalkthroughCoordinator>();
     }
 
     /// <summary>Investigation agents (TDD §11–13, §35–37), sandboxed to the engine's data directory (§41).</summary>

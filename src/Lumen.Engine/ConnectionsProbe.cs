@@ -15,17 +15,21 @@ public sealed class ConnectionsProbe(
     string dataDirectory,
     ISecretStore secrets,
     IOpenRouterKeyCheck keyCheck,
-    IAgentProvider agent)
+    IAgentProvider agent,
+    Models.IModelProvider fastModel,
+    Models.IModelUsageMeter usage)
 {
     public async Task<Connections> GetAsync(CancellationToken cancellationToken)
     {
         var settings = store.Current;
         var jev = JevAsync(settings, cancellationToken);
         var claude = ClaudeAsync(settings, cancellationToken);
+        var fast = FastModelAsync(settings, cancellationToken);
         return new Connections
         {
             Jev = await jev.ConfigureAwait(false),
             Claude = await claude.ConfigureAwait(false),
+            FastModel = await fast.ConfigureAwait(false),
             SettingsPath = EngineSettings.PathIn(dataDirectory),
             Settings = new ConnectionSettings
             {
@@ -39,8 +43,69 @@ public sealed class ConnectionsProbe(
                 MaxInvestigationsPerPullRequest = settings.Agents.MaxInvestigationsPerPullRequest,
                 MaxConcurrentInvestigations = settings.Agents.MaxConcurrent,
                 AllowMeteredUsage = settings.Agents.AllowMeteredUsage,
+                AllowCodeToFastModel = settings.Privacy.AllowCodeToFastModel,
+                FastModelId = settings.FastModel.Model,
+                FastModelTimeoutSeconds = settings.FastModel.TimeoutSeconds,
+                FastModelMaxDiffKb = settings.FastModel.MaxDiffKb,
+                FastModelDailyRequestCap = settings.FastModel.DailyRequestCap,
+                FastModelGateway = settings.FastModel.Gateway,
             },
         };
+    }
+
+    private async Task<FastModelConnection> FastModelAsync(EngineSettings settings, CancellationToken cancellationToken)
+    {
+        var connection = new FastModelConnection
+        {
+            Model = settings.FastModel.Model,
+            CredentialsStored = fastModel.HasCredentials,
+            CanStoreCredentials = secrets.IsAvailable,
+            Sends = "The pull request's diff, title, description and commit messages (generated files by path and size only)",
+            RequestsToday = usage.UsedToday,
+        };
+
+        if (!settings.Privacy.AllowCloudReasoning || settings.Privacy.LocalModelsOnly)
+        {
+            connection.State = ConnectionState.Off;
+            connection.Detail = "Off: cloud AI is turned off";
+        }
+        else if (!fastModel.HasCredentials)
+        {
+            connection.State = ConnectionState.NotConnected;
+            connection.Detail = secrets.IsAvailable ? "No Cloudflare account id and API token" : "No secure credential store on this platform yet";
+        }
+        else
+        {
+            var check = await fastModel.CheckAsync(cancellationToken).ConfigureAwait(false);
+            connection.State = !check.Valid ? ConnectionState.Error : settings.Privacy.AllowCodeToFastModel ? ConnectionState.Connected : ConnectionState.Off;
+            connection.Detail = !check.Valid ? check.Detail : settings.Privacy.AllowCodeToFastModel ? check.Detail : "Connected · walkthrough off until you allow the diff to be sent";
+        }
+
+        return connection;
+    }
+
+    /// <exception cref="ArgumentException">The account id or token is blank.</exception>
+    /// <exception cref="PlatformNotSupportedException">There is no secure credential store on this platform.</exception>
+    public void SetCloudflareCredentials(string accountId, string apiToken)
+    {
+        if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(apiToken))
+        {
+            throw new ArgumentException("Enter both the Cloudflare account id and an API token.", nameof(apiToken));
+        }
+
+        if (!secrets.IsAvailable)
+        {
+            throw new PlatformNotSupportedException("No secure credential store is available on this platform yet.");
+        }
+
+        secrets.Write(SecretNames.CloudflareAccountId, accountId.Trim());
+        secrets.Write(SecretNames.CloudflareApiToken, apiToken.Trim());
+    }
+
+    public void RemoveCloudflareCredentials()
+    {
+        secrets.Delete(SecretNames.CloudflareAccountId);
+        secrets.Delete(SecretNames.CloudflareApiToken);
     }
 
     /// <summary>
@@ -56,6 +121,11 @@ public sealed class ConnectionsProbe(
             throw new ArgumentException("Enter a JEV model, e.g. typesafe/jev-1.13.", nameof(changes));
         }
 
+        if (changes.HasFastModelId && string.IsNullOrWhiteSpace(changes.FastModelId))
+        {
+            throw new ArgumentException("Enter a Workers AI model, e.g. @cf/zai-org/glm-5.3-flash.", nameof(changes));
+        }
+
         store.Update(current => current with
         {
             Privacy = current.Privacy with
@@ -63,6 +133,15 @@ public sealed class ConnectionsProbe(
                 AllowCloudReasoning = changes.AllowCloudReasoning,
                 AllowCodeSnippetsToJev = changes.AllowCodeSnippetsToJev,
                 AllowCodeToAgents = changes.InvestigationsEnabled,
+                AllowCodeToFastModel = changes.HasAllowCodeToFastModel ? changes.AllowCodeToFastModel : current.Privacy.AllowCodeToFastModel,
+            },
+            FastModel = current.FastModel with
+            {
+                Model = changes.HasFastModelId ? changes.FastModelId.Trim() : current.FastModel.Model,
+                Gateway = changes.HasFastModelGateway ? changes.FastModelGateway.Trim() : current.FastModel.Gateway,
+                TimeoutSeconds = changes.HasFastModelTimeoutSeconds ? Math.Clamp(changes.FastModelTimeoutSeconds, 5, 120) : current.FastModel.TimeoutSeconds,
+                MaxDiffKb = changes.HasFastModelMaxDiffKb ? Math.Clamp(changes.FastModelMaxDiffKb, 16, 4096) : current.FastModel.MaxDiffKb,
+                DailyRequestCap = changes.HasFastModelDailyRequestCap ? Math.Clamp(changes.FastModelDailyRequestCap, 0, 100_000) : current.FastModel.DailyRequestCap,
             },
             Jev = current.Jev with
             {

@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             x:Class="Lumen.App.Views.ChecksView"
+             x:DataType="vm:PullRequestViewModel">
+  <!-- Checks (plan v2 M2): check runs and statuses for the head commit, with a link out. No log viewer in v2. -->
+  <ScrollViewer>
+    <StackPanel Margin="22,16,22,24" Spacing="10" MaxWidth="860" HorizontalAlignment="Left">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Ellipse Width="9" Height="9" VerticalAlignment="Center" Fill="{Binding MergeabilityKind, Converter={x:Static views:Converters.CheckToBrush}}" />
+        <TextBlock Classes="body" Text="{Binding MergeabilityLabel}" />
+      </StackPanel>
+      <TextBlock Classes="caption tertiary" Text="No checks reported for the head commit." IsVisible="{Binding !Checks.Count}" />
+      <ItemsControl Name="CheckList" ItemsSource="{Binding Checks}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:CheckViewModel">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,4">
+              <Ellipse Width="9" Height="9" VerticalAlignment="Center" Fill="{Binding StateKind, Converter={x:Static views:Converters.CheckToBrush}}" />
+              <StackPanel Grid.Column="1" Spacing="1">
+                <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Medium" />
+                <TextBlock Classes="caption" Text="{Binding StateLabel}" />
+              </StackPanel>
+              <TextBlock Grid.Column="2" Classes="caption tertiary" Text="{Binding KindLabel}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="3" Classes="caption tertiary" Text="{Binding DurationLabel}" VerticalAlignment="Center" />
+              <Button Grid.Column="4" Classes="link" Content="Details" IsVisible="{Binding HasUrl}" Click="OnOpen" Tag="{Binding Url}" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

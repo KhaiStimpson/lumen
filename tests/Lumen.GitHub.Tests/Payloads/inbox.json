@@ -1,0 +1,29 @@
+{
+  "data": {
+    "viewer": { "login": "mona" },
+    "rateLimit": { "remaining": 4980, "resetAt": "2026-10-12T21:00:00Z" },
+    "s0": {
+      "nodes": [
+        {
+          "number": 58, "title": "Contact data enrichment", "url": "https://github.com/octo/crm/pull/58", "isDraft": false,
+          "createdAt": "2026-10-10T09:00:00Z", "updatedAt": "2026-10-12T08:30:00Z", "additions": 19700, "deletions": 120,
+          "changedFiles": 60, "headRefOid": "aaaa", "reviewDecision": "REVIEW_REQUIRED",
+          "author": { "login": "hubot" }, "repository": { "name": "crm", "owner": { "login": "octo" } },
+          "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "FAILURE" } } } ] }
+        },
+        {}
+      ]
+    },
+    "s1": {
+      "nodes": [
+        {
+          "number": 7, "title": "Tidy logging", "url": "https://github.com/octo/tools/pull/7", "isDraft": true,
+          "createdAt": "2026-10-11T09:00:00Z", "updatedAt": "2026-10-11T10:00:00Z", "additions": 12, "deletions": 3,
+          "changedFiles": 2, "headRefOid": "bbbb", "reviewDecision": null,
+          "author": { "login": "mona" }, "repository": { "name": "tools", "owner": { "login": "octo" } },
+          "commits": { "nodes": [ { "commit": { "statusCheckRollup": null } } ] }
+        }
+      ]
+    }
+  }
+}

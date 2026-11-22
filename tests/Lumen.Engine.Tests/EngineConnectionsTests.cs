@@ -27,7 +27,7 @@ public sealed class EngineConnectionsTests : IAsyncDisposable
             services =>
             {
                 services.RemoveAll<EngineSettings>();
-                services.AddSingleton(settings ?? new EngineSettings());
+                services.AddSingleton(settings ?? new EngineSettings { Jev = new JevSettings { Enabled = true } });
                 services.RemoveAll<ISecretStore>();
                 services.AddSingleton(secrets ?? _secrets);
                 services.RemoveAll<IOpenRouterKeyCheck>();

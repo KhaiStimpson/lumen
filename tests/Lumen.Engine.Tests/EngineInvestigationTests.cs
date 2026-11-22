@@ -61,10 +61,12 @@ public sealed class EngineInvestigationTests : IAsyncDisposable
         }
     }
 
+    // JEV is legacy and off by default (plan v2); these tests exercise it, so switch it on.
     private static EngineSettings AgentsOn => new()
     {
         Privacy = new PrivacySettings { AllowCodeToAgents = true },
         Agents = new AgentSettings { Enabled = true },
+        Jev = new JevSettings { Enabled = true },
     };
 
     [Fact]
@@ -111,7 +113,7 @@ public sealed class EngineInvestigationTests : IAsyncDisposable
     public async Task AgentsStayOffUntilTheUserAllowsSendingCode()
     {
         var provider = new FakeAgentProvider("{}");
-        await StartAsync(new EngineSettings { Agents = new AgentSettings { Enabled = true } }, provider, new RoutingEvaluator());
+        await StartAsync(new EngineSettings { Agents = new AgentSettings { Enabled = true }, Jev = new JevSettings { Enabled = true } }, provider, new RoutingEvaluator());
 
         var events = await CollectAsync(e => e.Complete is not null);
         await Task.Delay(200);

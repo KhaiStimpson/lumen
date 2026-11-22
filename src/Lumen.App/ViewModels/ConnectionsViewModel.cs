@@ -7,8 +7,8 @@ using Lumen.Contracts;
 namespace Lumen.App.ViewModels;
 
 /// <summary>
-/// The Connections panel (TDD §39): each service with its own status and billing. The OpenRouter key passes straight
-/// through to the engine's credential store; this view model drops it as soon as it has been handed over.
+/// The Connections panel (TDD §39): each service with its own status and billing. Keys and tokens pass straight
+/// through to the engine's credential store; this view model drops them as soon as they have been handed over.
 /// </summary>
 public sealed partial class ConnectionsViewModel(IReviewSource source) : ObservableObject
 {
@@ -22,15 +22,119 @@ public sealed partial class ConnectionsViewModel(IReviewSource source) : Observa
     [NotifyPropertyChangedFor(
         nameof(IsLoaded), nameof(JevState), nameof(JevStatus), nameof(JevModel), nameof(JevSends), nameof(IsKeyStored), nameof(KeyLabel),
         nameof(CanStoreKey), nameof(ClaudeState), nameof(ClaudeStatus), nameof(ClaudeBilling), nameof(InvestigationsStatus),
-        nameof(SettingsPath))]
+        nameof(SettingsPath), nameof(FastModelState), nameof(FastModelStatus), nameof(FastModelName), nameof(FastModelSends),
+        nameof(IsCloudflareStored), nameof(CanStoreCloudflare), nameof(RequestsTodayLabel), nameof(CloudflareLabel))]
     public partial Connections? Status { get; private set; }
+
+    // Fast model (plan v2 M7) ------------------------------------------------------------------------
+
+    /// <summary>privacy.allowCodeToFastModel: the diff goes to the fast model for the walkthrough.</summary>
+    [ObservableProperty]
+    public partial bool AllowCodeToFastModel { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCloudflareCommand))]
+    public partial string CloudflareAccountInput { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCloudflareCommand))]
+    public partial string CloudflareTokenInput { get; set; } = "";
+
+    /// <summary>Saved on Enter or when the box loses focus.</summary>
+    [ObservableProperty]
+    public partial string FastModelInput { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string FastModelGatewayInput { get; set; } = "";
+
+    [ObservableProperty]
+    public partial decimal FastModelTimeoutSeconds { get; set; } = 30;
+
+    [ObservableProperty]
+    public partial decimal FastModelMaxDiffKb { get; set; } = 512;
+
+    [ObservableProperty]
+    public partial decimal FastModelDailyCap { get; set; } = 500;
+
+    /// <summary>JEV is legacy (plan v2): its controls sit behind a disclosure.</summary>
+    [ObservableProperty]
+    public partial bool ShowLegacy { get; set; }
+
+    public ConnectionState FastModelState => Status?.FastModel?.State ?? ConnectionState.Off;
+
+    public string FastModelStatus => Status?.FastModel is not { } fast
+        ? "Checking…"
+        : fast.State == ConnectionState.Connected ? $"Cloudflare Workers AI · {fast.Detail}" : fast.Detail;
+
+    public string FastModelName => Status?.FastModel?.Model ?? "";
+
+    public string FastModelSends => Status?.FastModel?.Sends ?? "";
+
+    public bool IsCloudflareStored => Status?.FastModel?.CredentialsStored ?? false;
+
+    public bool CanStoreCloudflare => Status?.FastModel?.CanStoreCredentials ?? false;
+
+    public string CloudflareLabel => IsCloudflareStored ? "REPLACE CLOUDFLARE CREDENTIALS" : "CLOUDFLARE ACCOUNT ID AND API TOKEN";
+
+    public string RequestsTodayLabel => Status?.FastModel is { } fast ? $"{fast.RequestsToday} requests today" : "";
+
+    [RelayCommand(CanExecute = nameof(CanSaveCloudflare))]
+    private async Task SaveCloudflareAsync()
+    {
+        var (account, token) = (CloudflareAccountInput.Trim(), CloudflareTokenInput.Trim());
+        CloudflareTokenInput = "";
+        await RunAsync(ct => source.SetCloudflareCredentialsAsync(account, token, ct)).ConfigureAwait(true);
+        if (Error is null)
+        {
+            CloudflareAccountInput = "";
+        }
+    }
+
+    private bool CanSaveCloudflare() => !IsBusy && CloudflareAccountInput.Trim().Length > 0 && CloudflareTokenInput.Trim().Length > 0;
+
+    [RelayCommand]
+    private Task RemoveCloudflareAsync() => RunAsync(source.RemoveCloudflareCredentialsAsync);
+
+    partial void OnAllowCodeToFastModelChanged(bool value) => SaveSettings();
+
+    [RelayCommand]
+    private void ToggleLegacy() => ShowLegacy = !ShowLegacy;
+
+    partial void OnFastModelTimeoutSecondsChanged(decimal value) => SaveSettings();
+
+    partial void OnFastModelMaxDiffKbChanged(decimal value) => SaveSettings();
+
+    partial void OnFastModelDailyCapChanged(decimal value) => SaveSettings();
+
+    partial void OnFastModelGatewayInputChanged(string value)
+    {
+        if (value.Trim() != Status?.Settings?.FastModelGateway)
+        {
+            SaveSettings();
+        }
+    }
+
+    partial void OnFastModelInputChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            if (Status?.Settings is { } saved)
+            {
+                FastModelInput = saved.FastModelId;
+            }
+        }
+        else if (value.Trim() != Status?.Settings?.FastModelId)
+        {
+            SaveSettings();
+        }
+    }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveKeyCommand))]
     public partial string KeyInput { get; set; } = "";
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SaveKeyCommand), nameof(RemoveKeyCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SaveKeyCommand), nameof(RemoveKeyCommand), nameof(SaveCloudflareCommand))]
     public partial bool IsBusy { get; private set; }
 
     [ObservableProperty]
@@ -177,6 +281,12 @@ public sealed partial class ConnectionsViewModel(IReviewSource source) : Observa
             MaxInvestigationsPerPullRequest = settings.MaxInvestigationsPerPullRequest;
             MaxConcurrentInvestigations = settings.MaxConcurrentInvestigations;
             AllowMeteredUsage = settings.AllowMeteredUsage;
+            AllowCodeToFastModel = settings.AllowCodeToFastModel;
+            FastModelInput = settings.FastModelId;
+            FastModelGatewayInput = settings.FastModelGateway;
+            FastModelTimeoutSeconds = (decimal)settings.FastModelTimeoutSeconds;
+            FastModelMaxDiffKb = settings.FastModelMaxDiffKb;
+            FastModelDailyCap = settings.FastModelDailyRequestCap;
         }
         finally
         {
@@ -202,7 +312,17 @@ public sealed partial class ConnectionsViewModel(IReviewSource source) : Observa
             MaxInvestigationsPerPullRequest = (int)MaxInvestigationsPerPullRequest,
             MaxConcurrentInvestigations = (int)MaxConcurrentInvestigations,
             AllowMeteredUsage = AllowMeteredUsage,
+            AllowCodeToFastModel = AllowCodeToFastModel,
+            FastModelTimeoutSeconds = (double)FastModelTimeoutSeconds,
+            FastModelMaxDiffKb = (int)FastModelMaxDiffKb,
+            FastModelDailyRequestCap = (int)FastModelDailyCap,
+            FastModelGateway = FastModelGatewayInput.Trim(),
         };
+
+        if (!string.IsNullOrWhiteSpace(FastModelInput))
+        {
+            settings.FastModelId = FastModelInput.Trim();
+        }
 
         // A blank model would be refused; leave the saved one alone until a real name is entered.
         if (!string.IsNullOrWhiteSpace(JevModelInput))

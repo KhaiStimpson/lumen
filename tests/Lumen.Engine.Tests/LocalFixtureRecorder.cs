@@ -5,6 +5,11 @@ using Lumen.Contracts;
 using Lumen.Domain;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using InboxItem = Lumen.Domain.InboxItem;
+using PullRequestDetails = Lumen.Domain.PullRequestDetails;
+using ReviewEvent = Lumen.Domain.ReviewEvent;
+using ThreadComment = Lumen.Domain.ThreadComment;
+using TimelineItem = Lumen.Domain.TimelineItem;
 
 namespace Lumen.Engine.Tests;
 
@@ -118,8 +123,8 @@ public sealed class LocalFixtureRecorder
                 baseSha,
                 headSha));
 
-        public Task<IReadOnlyList<ReviewThread>> GetReviewCommentsAsync(PullRequestKey k, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ReviewThread>>([]);
+        public Task<ReviewThreadsResult> GetReviewThreadsAsync(PullRequestKey k, CancellationToken cancellationToken) =>
+            Task.FromResult(new ReviewThreadsResult([], null));
 
         public Task<PostedComment> PostReviewCommentAsync(NewReviewComment comment, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
@@ -129,6 +134,29 @@ public sealed class LocalFixtureRecorder
 
         public Task SetFileViewedAsync(PullRequestKey k, string path, bool viewed, CancellationToken cancellationToken) =>
             Task.CompletedTask;
+
+        public Task<InboxSearchResult> SearchInboxAsync(IReadOnlyList<InboxQuery> queries, CancellationToken cancellationToken) =>
+            Task.FromResult(new InboxSearchResult("reviewer", queries.ToDictionary(q => q.Id, _ => (IReadOnlyList<InboxItem>)[])));
+
+        public Task<PullRequestDetails> GetPullRequestDetailsAsync(PullRequestKey k, CancellationToken cancellationToken) =>
+            Task.FromResult(new PullRequestDetails { Key = key, Title = title, Author = "author", Body = "", HeadSha = headSha, ViewerLogin = "reviewer" });
+
+        // A local recording never writes back to GitHub.
+        public Task<TimelineItem> PostIssueCommentAsync(PullRequestKey k, string body, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<ThreadComment> ReplyToThreadAsync(string threadId, string body, string? pendingReviewId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task SetThreadResolvedAsync(string threadId, bool resolved, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<string> StartPendingReviewAsync(PullRequestKey k, string commitSha, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<string> AddPendingThreadAsync(string reviewId, NewReviewComment comment, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task UpdatePendingCommentAsync(string commentId, string body, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task DeletePendingCommentAsync(string commentId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<SubmittedReview> SubmitReviewAsync(string reviewId, ReviewEvent reviewEvent, string body, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     /// <summary>The commit's tree on disk (for the repository index) with base/head reads and the diff from git.</summary>
