@@ -75,6 +75,18 @@ public sealed class RepositoryTypeIndex
 
     public IEnumerable<TypeFacts> TypesIn(string path) => Types.Where(t => t.Path == path);
 
+    /// <summary>Uses the supplied revision's text for snippets while retaining the indexed head facts.</summary>
+    public RepositoryTypeIndex WithSourceOverrides(IReadOnlyDictionary<string, string> sources)
+    {
+        var lines = new Dictionary<string, string[]>(_lines, StringComparer.Ordinal);
+        foreach (var (path, text) in sources)
+        {
+            lines[path] = text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        }
+
+        return new RepositoryTypeIndex(Types, lines, DeclaredTypeNames.ToHashSet(StringComparer.Ordinal));
+    }
+
     /// <summary>Lines [start..end] (1-based, inclusive) of a file, clamped to the file.</summary>
     public (string Snippet, int StartLine) Snippet(string path, int start, int end)
     {

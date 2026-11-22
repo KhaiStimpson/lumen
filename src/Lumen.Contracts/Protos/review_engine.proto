@@ -269,6 +269,8 @@ message FileDiff {
 message GetSourceFileRequest {
   PullRequestRef pull_request = 1;
   string path = 2;
+  // Precedent examples are rooted at the merge-base; the full-file diff viewer uses head by default.
+  bool from_base = 3;
 }
 
 message SourceFile {

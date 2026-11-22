@@ -56,8 +56,8 @@ public static partial class UnifiedDiffParser
                 var m = DiffGitHeader().Match(line);
                 if (m.Success)
                 {
-                    file.OldPath = Unquote(m.Groups["a"].Value);
-                    file.Path = Unquote(m.Groups["b"].Value);
+                    file.OldPath = StripPrefix(Unquote(m.Groups["a"].Value));
+                    file.Path = StripPrefix(Unquote(m.Groups["b"].Value));
                 }
 
                 continue;
@@ -117,11 +117,11 @@ public static partial class UnifiedDiffParser
         else if (line.StartsWith("rename from ", StringComparison.Ordinal))
         {
             file.Kind = FileChangeKind.Renamed;
-            file.OldPath = line["rename from ".Length..];
+            file.OldPath = Unquote(line["rename from ".Length..]);
         }
         else if (line.StartsWith("rename to ", StringComparison.Ordinal))
         {
-            file.Path = line["rename to ".Length..];
+            file.Path = Unquote(line["rename to ".Length..]);
         }
         else if (line.StartsWith("Binary files ", StringComparison.Ordinal) || line.StartsWith("GIT binary patch", StringComparison.Ordinal))
         {
@@ -184,7 +184,7 @@ public static partial class UnifiedDiffParser
 
     private static int Int(string s) => int.Parse(s, CultureInfo.InvariantCulture);
 
-    [GeneratedRegex(@"^diff --git ""?a/(?<a>.+?)""? ""?b/(?<b>.+?)""?$")]
+    [GeneratedRegex(@"^diff --git (?<a>""a/(?:\\.|[^""])*""|a/.+?) (?<b>""b/(?:\\.|[^""])*""|b/.+)$")]
     private static partial Regex DiffGitHeader();
 
     [GeneratedRegex(@"^@@ -(?<os>\d+)(,(?<oc>\d+))? \+(?<ns>\d+)(,(?<nc>\d+))? @@")]

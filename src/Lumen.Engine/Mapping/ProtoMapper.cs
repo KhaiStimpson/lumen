@@ -281,6 +281,7 @@ public static class ProtoMapper
         Contracts.ReviewPointState.Dismissed => ReviewAction.Dismissed,
         Contracts.ReviewPointState.Commented => ReviewAction.Commented,
         Contracts.ReviewPointState.Examined => ReviewAction.Examined,
+        Contracts.ReviewPointState.Resolved => ReviewAction.Resolved,
         _ => ReviewAction.Restored,
     };
 

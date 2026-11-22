@@ -27,6 +27,7 @@ public sealed class CommentsOnlyClassifier : IHunkClassifier
 /// <summary>
 /// Proves a hunk only adds, removes or reorders plain <c>using Namespace;</c> directives. Aliases, <c>using static</c>
 /// and <c>global using</c> are not plain: they change what a name binds to, so a change to one is never imports-only.
+/// Adding or removing a plain import can also change name or extension-method resolution; only reordering is Skip.
 /// </summary>
 public sealed class ImportsOnlyClassifier : IHunkClassifier
 {
@@ -53,7 +54,9 @@ public sealed class ImportsOnlyClassifier : IHunkClassifier
             (0, _) => "usings removed: " + string.Join(", ", removed),
             _ => $"usings changed: +{string.Join(", ", added)} −{string.Join(", ", removed)}",
         };
-        return new(ChangeClass.ImportsOnly, TriageTier.Skip, [reason]);
+        return added.Count == 0 && removed.Count == 0
+            ? new(ChangeClass.ImportsOnly, TriageTier.Skip, [reason])
+            : new(ChangeClass.ImportsOnly, TriageTier.Skim, [reason, "name binding may change"]);
     }
 
     private static (List<SyntaxToken> Code, List<string> Imports) Split(SyntaxNode root)

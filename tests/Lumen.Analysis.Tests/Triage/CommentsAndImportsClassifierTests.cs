@@ -1,5 +1,8 @@
 using Lumen.Analysis.Tests.Support;
 using Lumen.Domain;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Lumen.Analysis.Tests.Triage;
 
@@ -63,8 +66,8 @@ public class CommentsAndImportsClassifierTests
         var hunk = TriageHarness.Single(Base, Base.Replace("using System.Linq;", "using System.Linq;\nusing System.Text;", StringComparison.Ordinal));
 
         Assert.Equal(ChangeClass.ImportsOnly, hunk.Class);
-        Assert.Equal(TriageTier.Skip, hunk.Tier);
-        Assert.Equal(["usings added: System.Text"], hunk.Reasons);
+        Assert.Equal(TriageTier.Skim, hunk.Tier);
+        Assert.Equal(["usings added: System.Text", "name binding may change"], hunk.Reasons);
     }
 
     [Fact]
@@ -73,7 +76,8 @@ public class CommentsAndImportsClassifierTests
         var hunk = TriageHarness.Single(Base, Base.Replace("using System;\n", "", StringComparison.Ordinal));
 
         Assert.Equal(ChangeClass.ImportsOnly, hunk.Class);
-        Assert.Equal(["usings removed: System"], hunk.Reasons);
+        Assert.Equal(TriageTier.Skim, hunk.Tier);
+        Assert.Equal(["usings removed: System", "name binding may change"], hunk.Reasons);
     }
 
     [Fact]
@@ -84,7 +88,36 @@ public class CommentsAndImportsClassifierTests
         var hunk = TriageHarness.Single(Base, head);
 
         Assert.Equal(ChangeClass.ImportsOnly, hunk.Class);
+        Assert.Equal(TriageTier.Skip, hunk.Tier);
         Assert.Equal(["usings reordered"], hunk.Reasons);
+    }
+
+    [Fact]
+    public void AddedImportThatChangesExtensionResolutionCannotBeSkipped()
+    {
+        const string before = """
+            using A;
+            class C { public int Result() => "value".Value(); }
+            namespace A { public static class Extensions { public static int Value<T>(this T value) => 1; } }
+            namespace B { public static class Extensions { public static int Value(this string value) => 2; } }
+            """;
+        var after = "using B;\n" + before;
+
+        static string BoundNamespace(string text)
+        {
+            var tree = CSharpSyntaxTree.ParseText(text);
+            var compilation = CSharpCompilation.Create("ImportProof", [tree], [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)]);
+            var call = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+            var symbol = Assert.IsAssignableFrom<IMethodSymbol>(compilation.GetSemanticModel(tree).GetSymbolInfo(call).Symbol);
+            return symbol.ContainingNamespace.ToDisplayString();
+        }
+
+        Assert.Equal("A", BoundNamespace(before));
+        Assert.Equal("B", BoundNamespace(after));
+        var hunk = TriageHarness.Single(before, after);
+        Assert.Equal(ChangeClass.ImportsOnly, hunk.Class);
+        Assert.Equal(TriageTier.Skim, hunk.Tier);
+        Assert.Contains("name binding may change", hunk.Reasons);
     }
 
     [Fact]

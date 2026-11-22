@@ -148,4 +148,12 @@ public class RenameClassifierTests
 
         Assert.Equal(ChangeClass.BehaviourChange, TriageHarness.Single(before, before.Replace("Out", "Error", StringComparison.Ordinal)).Class);
     }
+
+    [Theory]
+    [InlineData("class C { void M() { int count = 1; System.Console.WriteLine(nameof(count)); } }", "count", "total")]
+    [InlineData("class Old { string Name() => typeof(Old).Name; }", "Old", "New")]
+    public void RenameThatChangesAnObservedNameStaysReviewable(string before, string from, string to)
+    {
+        Assert.Equal(ChangeClass.BehaviourChange, TriageHarness.Single(before, Rename(before, from, to)).Class);
+    }
 }

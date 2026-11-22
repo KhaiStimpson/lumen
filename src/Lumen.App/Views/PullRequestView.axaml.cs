@@ -80,6 +80,7 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         if (_viewModel is not null)
         {
             _viewModel.NavigationRequested -= OnNavigationRequested;
+            _viewModel.PlanNavigationRequested -= OnPlanNavigationRequested;
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         }
 
@@ -87,6 +88,7 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         if (_viewModel is not null)
         {
             _viewModel.NavigationRequested += OnNavigationRequested;
+            _viewModel.PlanNavigationRequested += OnPlanNavigationRequested;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
             // The session may already have arrived at a point before this view existed; catch up.
@@ -146,6 +148,34 @@ public sealed partial class PullRequestView : UserControl, IDisposable
             if (Editor.CardFor(request.Point.Id) is ReviewCardView arriving && request.Reason != NavigationReason.Refocus)
             {
                 await motion.RevealAsync(arriving.CardSurface, Motion.MotionPreset.NavigateReviewPoint, token).ConfigureAwait(true);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async void OnPlanNavigationRequested(object? sender, PlanTarget target)
+    {
+        _navigation?.Cancel();
+        _navigation?.Dispose();
+        _navigation = new CancellationTokenSource();
+        var token = _navigation.Token;
+        try
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render, token);
+            if (_viewModel?.CurrentDiff is not { } diff || diff.Path != target.Path)
+            {
+                return;
+            }
+
+            var badgeLine = target.FoldId is { } id ? diff.CardLine(DiffFold.CardPrefix + id) : null;
+            var documentLine = badgeLine ?? (target.IsOldSide
+                ? diff.Rows.Select((row, index) => (row, index)).Where(x => x.row.OldNumber >= target.StartLine).Select(x => (int?)(x.index + 1)).FirstOrDefault()
+                : diff.DocumentLineForNewLine(target.StartLine));
+            if (documentLine is { } line)
+            {
+                await Editor.RevealDocumentLineAsync(line, App.Motion, token).ConfigureAwait(true);
             }
         }
         catch (OperationCanceledException)

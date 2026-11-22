@@ -91,6 +91,22 @@ public class TriageRunnerTests
     }
 
     [Fact]
+    public async Task RetargetedPullRequestDoesNotReuseTriageFromADifferentMergeBase()
+    {
+        var store = new MemoryStore();
+        var runner = new TriageRunner(store, NullLogger<TriageRunner>.Instance);
+        var firstCheckout = new Checkout("class A { }\n", "class A {  }\n");
+        await runner.RunAsync(Snapshot(), firstCheckout, ReviewSettings.Default, CancellationToken.None);
+
+        var retargeted = Snapshot() with { MergeBaseSha = new string('c', 40) };
+        var secondCheckout = new Checkout("class A { int Value; }\n", "class A {  }\n");
+        await runner.RunAsync(retargeted, secondCheckout, ReviewSettings.Default, CancellationToken.None);
+
+        Assert.Equal(2, store.Saved.Count);
+        Assert.True(secondCheckout.Reads > 0);
+    }
+
+    [Fact]
     public async Task AFailureNeverBreaksTheReview()
     {
         var runner = new TriageRunner(new MemoryStore { FailWith = new IOException("disk full") }, NullLogger<TriageRunner>.Instance);

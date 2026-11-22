@@ -3,7 +3,11 @@ using Lumen.Domain;
 namespace Lumen.Agents.Investigations;
 
 /// <summary>What an investigation starts from: a surfaced review point, its deterministic evidence and the checkout.</summary>
-public sealed record InvestigationBrief(ReviewPoint Point, string RepositoryRoot, InvestigationBudget Budget);
+public sealed record InvestigationBrief(ReviewPoint Point, string RepositoryRoot, InvestigationBudget Budget)
+{
+    /// <summary>The user's explicit billing opt-in, resolved immediately before this investigation starts.</summary>
+    public bool AllowMeteredUsage { get; init; }
+}
 
 /// <summary>Concrete limits for a budget (TDD §36). Budgets are enforced through wall-clock time and output size.</summary>
 public sealed record InvestigationLimits(TimeSpan Timeout, long MaxOutputBytes, bool IsolatedWorktree)

@@ -98,6 +98,7 @@ internal sealed class RenameIndex
     private readonly Dictionary<string, List<DeclarationKind>> declarations = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> baseIdentifiers = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> headIdentifiers = new(StringComparer.Ordinal);
+    private readonly HashSet<string> observedNames = new(StringComparer.Ordinal);
 
     private enum DeclarationKind
     {
@@ -118,6 +119,7 @@ internal sealed class RenameIndex
                 context.Workspace.GetOrAdd("fingerprint:base:" + path, () => CodeFingerprint.Of(baseText)) is { } before)
             {
                 baseIdentifiers[path] = Identifiers(before);
+                ObserveNames(before);
                 foreach (var token in before.Root.DescendantTokens().Where(t => t.IsKind(SyntaxKind.IdentifierToken)))
                 {
                     if (KindOf(token) is { } kind)
@@ -136,13 +138,15 @@ internal sealed class RenameIndex
                 context.Workspace.GetOrAdd("fingerprint:head:" + path, () => CodeFingerprint.Of(headText)) is { } after)
             {
                 headIdentifiers[path] = Identifiers(after);
+                ObserveNames(after);
             }
         }
     }
 
     public bool IsSafeRename(string path, string from, string to)
     {
-        if (!declarations.TryGetValue(from, out var kinds) || kinds.Any(k => k == DeclarationKind.Leaky))
+        if (observedNames.Contains(from) || observedNames.Contains(to) ||
+            !declarations.TryGetValue(from, out var kinds) || kinds.Any(k => k == DeclarationKind.Leaky))
         {
             return false;
         }
@@ -160,6 +164,17 @@ internal sealed class RenameIndex
 
     private static HashSet<string> Identifiers(CodeFingerprint fingerprint) =>
         fingerprint.Tokens.Where(t => t.IsKind(SyntaxKind.IdentifierToken)).Select(t => t.ValueText).ToHashSet(StringComparer.Ordinal);
+
+    private void ObserveNames(CodeFingerprint fingerprint)
+    {
+        // Token equality under a rename does not preserve nameof output or reflected type identity.
+        foreach (var node in fingerprint.Root.DescendantNodes().Where(node =>
+                     node is TypeOfExpressionSyntax ||
+                     node is InvocationExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "nameof" } }))
+        {
+            observedNames.UnionWith(node.DescendantTokens().Where(t => t.IsKind(SyntaxKind.IdentifierToken)).Select(t => t.ValueText));
+        }
+    }
 
     /// <summary>The kind of declaration <paramref name="token"/> names, or null when it is a use, not a declaration.</summary>
     private static DeclarationKind? KindOf(SyntaxToken token) => token.Parent switch

@@ -41,4 +41,14 @@
     </ItemGroup>
     <Copy SourceFiles="@(EngineFiles)" DestinationFiles="@(EngineFiles->'$(OutDir)engine\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
+
+  <Target Name="IncludeEngineInPublish" AfterTargets="ComputeFilesToPublish" DependsOnTargets="CopyEngine">
+    <ItemGroup>
+      <PublishedEngineFiles Include="$(OutDir)engine\**\*" />
+      <ResolvedFileToPublish Include="@(PublishedEngineFiles)">
+        <RelativePath>engine\%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 </Project>

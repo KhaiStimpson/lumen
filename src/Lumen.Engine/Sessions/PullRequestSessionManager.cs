@@ -150,7 +150,9 @@ public sealed partial class PullRequestSessionManager(
             await store.SetCacheAsync(cacheKey, JsonSerializer.Serialize(cached), ct).ConfigureAwait(false);
             return (info, viewer, threads, await viewedTask.ConfigureAwait(false));
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is HttpRequestException
+            || ex is GitHubApiException { StatusCode: { } status } && (int)status >= 500
+            || ex is OperationCanceledException && !ct.IsCancellationRequested)
         {
             var json = await store.GetCacheAsync(cacheKey, ct).ConfigureAwait(false);
             if (json is null || JsonSerializer.Deserialize<CachedPullRequest>(json) is not { } cached)
@@ -184,6 +186,7 @@ public sealed partial class PullRequestSessionManager(
         ReviewAction.Dismissed => Domain.ReviewPointState.Dismissed,
         ReviewAction.Commented => Domain.ReviewPointState.Commented,
         ReviewAction.Examined => Domain.ReviewPointState.Examined,
+        ReviewAction.Resolved => Domain.ReviewPointState.Resolved,
         ReviewAction.Restored => Domain.ReviewPointState.Visible,
         _ => fallback,
     };

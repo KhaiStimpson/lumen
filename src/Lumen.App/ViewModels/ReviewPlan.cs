@@ -7,7 +7,7 @@ using Lumen.Contracts;
 namespace Lumen.App.ViewModels;
 
 /// <summary>A span of the head (or, for pure deletions, the base) that a plan item points at.</summary>
-public sealed record PlanTarget(string Path, int StartLine, int EndLine);
+public sealed record PlanTarget(string Path, int StartLine, int EndLine, bool IsOldSide = false, string? FoldId = null);
 
 /// <summary>A triage group in the plan, e.g. "Renamed `Foo`→`Bar`" across 12 hunks. Acknowledging clears all of it.</summary>
 public sealed partial class TriageGroupViewModel : ObservableObject
@@ -151,6 +151,13 @@ public sealed partial class ReviewPlanViewModel : ObservableObject
 
     public IEnumerable<TriageGroupViewModel> Groups => _groups.Values;
 
+    public void Reset()
+    {
+        _groups.Clear();
+        _expanded.Clear();
+        Sections.Clear();
+    }
+
     /// <summary>Rebuilds the sections, keeping group and fold state across rebuilds.</summary>
     public void Rebuild(TriageReady? triage, IReadOnlyList<ReviewPointViewModel> points)
     {
@@ -204,8 +211,8 @@ public static class ReviewPlanBuilder
     public static bool IsConsistencyNote(ReviewPointViewModel point) => point.Kind == "PatternDeviation";
 
     public static PlanTarget TargetOf(HunkTriage hunk) => hunk.NewStart > 0
-        ? new PlanTarget(hunk.Path, hunk.NewStart, Math.Max(hunk.NewStart, hunk.NewEnd))
-        : new PlanTarget(hunk.Path, hunk.OldStart, Math.Max(hunk.OldStart, hunk.OldEnd));
+        ? new PlanTarget(hunk.Path, hunk.NewStart, Math.Max(hunk.NewStart, hunk.NewEnd), FoldId: DiffFolds.Folds(hunk) ? DiffFolds.IdFor(hunk) : null)
+        : new PlanTarget(hunk.Path, hunk.OldStart, Math.Max(hunk.OldStart, hunk.OldEnd), IsOldSide: true, FoldId: DiffFolds.Folds(hunk) ? DiffFolds.IdFor(hunk) : null);
 
     /// <summary>The tier of the hunk a point is anchored in; else the file's most demanding hunk; else Worth a look.</summary>
     public static TriageTier TierOf(ReviewPointViewModel point, TriageReady? triage)

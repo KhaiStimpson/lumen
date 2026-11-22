@@ -7,6 +7,31 @@ namespace Lumen.App.Tests;
 /// <summary>J/K walk the plan in tier order; A clears the group the reviewer is on.</summary>
 public sealed class PlanNavigationTests
 {
+    [AvaloniaFact]
+    public async Task SelectingAPlanGroupLeavesExamineAndRequestsItsLocation()
+    {
+        var pr = await Fixture.LoadAsync(Fixture.CreateRefactorSource());
+        try
+        {
+            await pr.ExamineAsync(null);
+            Assert.True(pr.IsExamining);
+            PlanTarget? navigation = null;
+            pr.PlanNavigationRequested += (_, target) => navigation = target;
+            var group = pr.PlanStops().OfType<TriageGroupViewModel>().First();
+
+            await pr.SelectGroupAsync(group);
+
+            Assert.False(pr.IsExamining);
+            Assert.Null(pr.CurrentPoint);
+            Assert.Equal(group.Target, navigation);
+            Assert.Equal(group.Target!.Path, pr.CurrentDiff?.Path);
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
     private static int SectionRank(PullRequestViewModel pr, object stop) =>
         pr.ReviewPlan.Sections.ToList().FindIndex(s => s.Items.Contains(stop));
 

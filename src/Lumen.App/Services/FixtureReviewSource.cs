@@ -61,8 +61,14 @@ public sealed class FixtureReviewSource : IReviewSource
     public Task<FileDiff> GetFileDiffAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken) =>
         Task.FromResult(_diffs.TryGetValue(path, out var diff) ? diff : new FileDiff { Path = path });
 
-    public Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken)
+    public Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken, bool fromBase = false)
     {
+        if (fromBase)
+        {
+            // The recording has no whole base files. Keep the recorded precedent snippet as the proof.
+            return Task.FromResult(new SourceFile { Path = path, Exists = false });
+        }
+
         // Reconstruct head-side text from the diff when available; precedent files usually aren't in the diff.
         if (_diffs.TryGetValue(path, out var diff))
         {

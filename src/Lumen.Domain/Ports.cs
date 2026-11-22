@@ -4,6 +4,9 @@ namespace Lumen.Domain;
 public interface IGitHubTokenSource
 {
     Task<string> GetTokenAsync(CancellationToken cancellationToken);
+
+    /// <summary>Forget rejected credentials so the next user-requested operation can pick up a fresh login.</summary>
+    Task InvalidateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 public sealed record PullRequestInfo(
@@ -93,6 +96,7 @@ public enum ReviewAction
     /// <summary>A triage group the reviewer has cleared (recorded against <see cref="TriageAcknowledgement.InteractionId"/>).</summary>
     Acknowledged,
     Unacknowledged,
+    Resolved,
 }
 
 public sealed record ReviewInteraction(

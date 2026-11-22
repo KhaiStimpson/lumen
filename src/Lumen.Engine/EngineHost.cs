@@ -176,6 +176,7 @@ public static class EngineHost
                 sp.GetRequiredService<IAgentWorktreeFactory>(),
                 () => new InvestigationSchedulerOptions
                 {
+                    Enabled = settings.Current.AgentsAllowed,
                     MaxConcurrent = settings.Current.Agents.MaxConcurrent,
                     MaxPerPullRequest = settings.Current.Agents.MaxInvestigationsPerPullRequest,
                     AllowMeteredUsage = settings.Current.Agents.AllowMeteredUsage,

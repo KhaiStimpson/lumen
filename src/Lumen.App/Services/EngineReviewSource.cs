@@ -69,9 +69,9 @@ public sealed class EngineReviewSource : IReviewSource
             .GetFileDiffAsync(new GetFileDiffRequest { PullRequest = pullRequest, Path = path }, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-    public async Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken) =>
+    public async Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken, bool fromBase = false) =>
         await (await ClientAsync(cancellationToken).ConfigureAwait(false))
-            .GetSourceFileAsync(new GetSourceFileRequest { PullRequest = pullRequest, Path = path }, cancellationToken: cancellationToken)
+            .GetSourceFileAsync(new GetSourceFileRequest { PullRequest = pullRequest, Path = path, FromBase = fromBase }, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
     public async Task SetReviewPointStateAsync(PullRequestRef pullRequest, string reviewPointId, ReviewPointState state, CancellationToken cancellationToken) =>

@@ -45,11 +45,15 @@ public sealed class ReviewEngineService(
 
     public override async Task<SourceFile> GetSourceFile(GetSourceFileRequest request, ServerCallContext context)
     {
-        var checkout = RequireSession(request.PullRequest).Checkout
+        var session = RequireSession(request.PullRequest);
+        var checkout = session.Checkout
             ?? throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pull request is still loading."));
         try
         {
-            var text = await checkout.ReadHeadFileAsync(request.Path, context.CancellationToken).ConfigureAwait(false);
+            var basePath = session.Snapshot?.FindFile(request.Path)?.OldPath ?? request.Path;
+            var text = request.FromBase
+                ? await checkout.ReadBaseFileAsync(basePath, context.CancellationToken).ConfigureAwait(false)
+                : await checkout.ReadHeadFileAsync(request.Path, context.CancellationToken).ConfigureAwait(false);
             return new SourceFile { Path = request.Path, Text = text ?? "", Exists = text is not null };
         }
         catch (ArgumentException ex)
@@ -79,6 +83,11 @@ public sealed class ReviewEngineService(
         if (snapshot.FindFile(request.Path) is not { } file || !file.ContainsNewLine(request.Line))
         {
             throw new RpcException(new Status(StatusCode.InvalidArgument, $"{request.Path}:{request.Line} is not part of the diff, so GitHub can't attach a comment there."));
+        }
+
+        if (!string.IsNullOrEmpty(request.ReviewPointId) && session.FindReviewPoint(request.ReviewPointId) is null)
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, $"Unknown review point '{request.ReviewPointId}'."));
         }
 
         var posted = await gitHub.PostReviewCommentAsync(
@@ -324,10 +333,20 @@ public sealed class ReviewEngineService(
             new ReviewInteraction(session.Key, session.Snapshot?.HeadSha ?? "", reviewPointId, ProtoMapper.ToAction(state), time.GetUtcNow(), detail),
             cancellationToken).ConfigureAwait(false);
 
-        session.Publish(new PullRequestEvent
-        {
-            ReviewPointStateChanged = new ReviewPointStateChanged { ReviewPointId = reviewPointId, State = state },
-        });
+        session.UpdateReviewPoint(
+            reviewPointId,
+            point => point with { State = state switch
+            {
+                Contracts.ReviewPointState.Dismissed => Domain.ReviewPointState.Dismissed,
+                Contracts.ReviewPointState.Commented => Domain.ReviewPointState.Commented,
+                Contracts.ReviewPointState.Examined => Domain.ReviewPointState.Examined,
+                Contracts.ReviewPointState.Resolved => Domain.ReviewPointState.Resolved,
+                _ => Domain.ReviewPointState.Visible,
+            } },
+            _ => new PullRequestEvent
+            {
+                ReviewPointStateChanged = new ReviewPointStateChanged { ReviewPointId = reviewPointId, State = state },
+            });
     }
 
     private PullRequestSession RequireSession(PullRequestRef pullRequest) =>

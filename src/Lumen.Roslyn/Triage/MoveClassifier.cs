@@ -157,7 +157,7 @@ internal sealed class MoveIndex
         {
             _ when r.Container != d.Container => (TriageTier.Skim, $"moved into `{d.Container}`: names in its body may bind differently"),
             _ when !sameFile && !r.Usings.SequenceEqual(d.Usings) => (TriageTier.Skim, "the destination file imports different namespaces: names may bind differently"),
-            _ when r.OrderSensitive => (TriageTier.Skim, "field order decides initialisation order and struct layout"),
+            _ when r.OrderSensitive => (TriageTier.Skim, "member order decides initialisation order and struct layout"),
             _ => (TriageTier.Skip, null),
         };
         var reason = sameFile ? $"moved `{r.Name}` within the file" : $"moved `{r.Name}` from {r.Path} to {d.Path}";
@@ -228,10 +228,23 @@ internal sealed class MoveIndex
                 string.Join("\u0001", node.DescendantTokens().Select(t => $"{t.RawKind}:{t.Text}")),
                 ContainerOf(node),
                 UsingsOf(root),
-                node is FieldDeclarationSyntax f && (f.Parent is StructDeclarationSyntax || f.Declaration.Variables.Any(v => v.Initializer is not null)),
+                IsOrderSensitive(node),
                 memberLines);
         }
     }
+
+    private static bool IsOrderSensitive(MemberDeclarationSyntax node) => node switch
+    {
+        FieldDeclarationSyntax f => IsStruct(f.Parent) || f.Declaration.Variables.Any(v => v.Initializer is not null),
+        EventFieldDeclarationSyntax e => IsStruct(e.Parent) || e.Declaration.Variables.Any(v => v.Initializer is not null),
+        PropertyDeclarationSyntax p => p.Initializer is not null ||
+                                       (p.AccessorList is { } accessors && accessors.Accessors.All(a => a.Body is null && a.ExpressionBody is null) &&
+                                        IsStruct(p.Parent)),
+        _ => false,
+    };
+
+    private static bool IsStruct(SyntaxNode? node) => node is StructDeclarationSyntax ||
+        node is RecordDeclarationSyntax record && record.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword);
 
     /// <summary>
     /// True when the member's lines hold nothing but the member: no other code before it on its first line, no code

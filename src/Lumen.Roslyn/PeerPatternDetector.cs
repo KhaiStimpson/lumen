@@ -106,7 +106,8 @@ public sealed class PeerPatternDetector : IChangeDetector
         ArgumentNullException.ThrowIfNull(settings);
         var sensitivity = settings.Sensitivity;
         var ignored = IgnoredNames(settings);
-        var baseFacts = await ReadBaseFactsAsync(snapshot, readBaseFile, cancellationToken).ConfigureAwait(false);
+        var baseSources = new Dictionary<string, string>(StringComparer.Ordinal);
+        var baseFacts = await ReadBaseFactsAsync(snapshot, readBaseFile, baseSources, cancellationToken).ConfigureAwait(false);
         var changed = FindChangedTypes(index, snapshot, baseFacts, settings);
         if (changed.Count == 0)
         {
@@ -179,7 +180,7 @@ public sealed class PeerPatternDetector : IChangeDetector
             }
         }
 
-        var candidates = SelectCandidates(deviations, index, snapshot, sensitivity);
+        var candidates = SelectCandidates(deviations, index, index.WithSourceOverrides(baseSources), snapshot, sensitivity);
         return new DetectionResult(
             candidates,
             [.. conventions.Values.OrderByDescending(c => (double)c.Supporting / c.PeerCount).ThenBy(c => c.Statement, StringComparer.Ordinal)]);
@@ -284,7 +285,7 @@ public sealed class PeerPatternDetector : IChangeDetector
             [.. peers.Where(p => p.Has(trait)).Take(sensitivity.MaxExamples).Select(p => new CodeLocation(p.Path, p.Traits[trait.Key].Line, p.Traits[trait.Key].Line, p.Name))]);
     }
 
-    private static List<Candidate> SelectCandidates(List<Deviation> deviations, RepositoryTypeIndex index, PullRequestSnapshot snapshot, ReviewSensitivity sensitivity)
+    private static List<Candidate> SelectCandidates(List<Deviation> deviations, RepositoryTypeIndex index, RepositoryTypeIndex precedentIndex, PullRequestSnapshot snapshot, ReviewSensitivity sensitivity)
     {
         // The same missing trait is often visible through several roles; each type is reported for a trait
         // only once, under the most convincing role.
@@ -344,7 +345,7 @@ public sealed class PeerPatternDetector : IChangeDetector
                 }
             }
 
-            candidates.Add(BuildCandidate(d, affected, changes, index, sensitivity.MaxExamples));
+            candidates.Add(BuildCandidate(d, affected, changes, index, precedentIndex, sensitivity.MaxExamples));
         }
 
         return candidates;
@@ -381,7 +382,7 @@ public sealed class PeerPatternDetector : IChangeDetector
             : new AffectedType(type, new CodeLocation(type.Path, line.Value, line.Value, type.Name), instead);
     }
 
-    private static Candidate BuildCandidate(Deviation d, List<AffectedType> affected, List<ChangedType> changes, RepositoryTypeIndex index, int maxExamples)
+    private static Candidate BuildCandidate(Deviation d, List<AffectedType> affected, List<ChangedType> changes, RepositoryTypeIndex index, RepositoryTypeIndex precedentIndex, int maxExamples)
     {
         var following = d.Peers.Where(p => p.Has(d.Trait)).OrderBy(p => p.Path, StringComparer.Ordinal).ToList();
         var notFollowing = d.Peers.Where(p => !p.Has(d.Trait)).OrderBy(p => p.Path, StringComparer.Ordinal).ToList();
@@ -389,7 +390,7 @@ public sealed class PeerPatternDetector : IChangeDetector
         var key = StableId("pp", d.Role.Key, d.Trait.Key);
         var convention = $"{Phrases.RolePlural(d.Role)} {Phrases.Has(d.Trait)}";
 
-        var examples = following.Take(maxExamples).Select(p => Example(index, p, p.Traits[d.Trait.Key].Line)).ToList();
+        var examples = following.Take(maxExamples).Select(p => Example(precedentIndex, p, p.Traits[d.Trait.Key].Line)).ToList();
         var primary = affected[0];
         var currentLine = (primary.Instead.Count > 0 ? primary.Instead[0].Line : (int?)null) ?? primary.Anchor.StartLine;
 
@@ -435,7 +436,7 @@ public sealed class PeerPatternDetector : IChangeDetector
                 Convention = convention,
                 Supporting = notFollowing.Count,
                 PeerCount = d.Peers.Count,
-                Examples = [.. notFollowing.Take(3).Select(p => Example(index, p, p.DeclarationLine))],
+                Examples = [.. notFollowing.Take(3).Select(p => Example(precedentIndex, p, p.DeclarationLine))],
             });
         }
 
@@ -480,18 +481,20 @@ public sealed class PeerPatternDetector : IChangeDetector
         file.Path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) &&
         !RepositoryTypeIndex.IsTestPath(file.Path);
 
-    /// <summary>Type facts at merge-base for every modified source file.</summary>
+    /// <summary>Type facts at merge-base for every modified, renamed or deleted source file.</summary>
     private static async Task<Dictionary<string, IReadOnlyList<TypeFacts>>> ReadBaseFactsAsync(
         PullRequestSnapshot snapshot,
         Func<string, CancellationToken, Task<string?>> readBaseFile,
+        Dictionary<string, string> sources,
         CancellationToken cancellationToken)
     {
         var result = new Dictionary<string, IReadOnlyList<TypeFacts>>(StringComparer.Ordinal);
-        foreach (var file in snapshot.Files.Where(f => IsAnalysable(f) && f.Kind is FileChangeKind.Modified or FileChangeKind.Renamed))
+        foreach (var file in snapshot.Files.Where(f => IsAnalysable(f) && f.Kind is FileChangeKind.Modified or FileChangeKind.Renamed or FileChangeKind.Deleted))
         {
             var baseText = await readBaseFile(file.OldPath ?? file.Path, cancellationToken).ConfigureAwait(false);
             if (baseText is not null)
             {
+                sources[file.Path] = baseText;
                 result[file.Path] = TypeFactsExtractor.Extract(file.Path, baseText, isTest: false);
             }
         }

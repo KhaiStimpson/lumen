@@ -82,6 +82,7 @@ public sealed class RepositoryPatternInvestigator(TimeProvider time) : IInvestig
                 OutputSchema = OutputSchema,
                 Timeout = limits.Timeout,
                 MaxOutputBytes = limits.MaxOutputBytes,
+                AllowMeteredUsage = brief.AllowMeteredUsage,
             },
             cancellationToken).ConfigureAwait(false);
 

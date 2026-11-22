@@ -18,6 +18,17 @@ internal sealed class GrpcLikeReviewSource(FixtureReviewSource inner) : IReviewS
         bool refresh,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        if (refresh && RefreshEvents is { } refreshed)
+        {
+            foreach (var evt in refreshed)
+            {
+                yield return evt;
+            }
+
+            await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+            yield break;
+        }
+
         var events = inner.WatchAsync(pullRequest, refresh, cancellationToken).GetAsyncEnumerator(cancellationToken);
         await using (events.ConfigureAwait(false))
         {
@@ -40,11 +51,22 @@ internal sealed class GrpcLikeReviewSource(FixtureReviewSource inner) : IReviewS
         }
     }
 
-    public Task<FileDiff> GetFileDiffAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken) =>
-        inner.GetFileDiffAsync(pullRequest, path, cancellationToken);
+    public IReadOnlyList<PullRequestEvent>? RefreshEvents { get; set; }
 
-    public Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken) =>
-        inner.GetSourceFileAsync(pullRequest, path, cancellationToken);
+    public string? FailDiffPath { get; set; }
+
+    public Task<FileDiff> GetFileDiffAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken) =>
+        path == FailDiffPath
+            ? Task.FromException<FileDiff>(new RpcException(new Status(StatusCode.Unavailable, "Diff unavailable")))
+            : inner.GetFileDiffAsync(pullRequest, path, cancellationToken);
+
+    public List<(string Path, bool FromBase)> SourceRequests { get; } = [];
+
+    public Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken, bool fromBase = false)
+    {
+        SourceRequests.Add((path, fromBase));
+        return inner.GetSourceFileAsync(pullRequest, path, cancellationToken, fromBase);
+    }
 
     public Task SetReviewPointStateAsync(PullRequestRef pullRequest, string reviewPointId, ReviewPointState state, CancellationToken cancellationToken) =>
         inner.SetReviewPointStateAsync(pullRequest, reviewPointId, state, cancellationToken);

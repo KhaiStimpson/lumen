@@ -129,6 +129,34 @@ public class MoveClassifierTests
         Assert.All(hunks, h => Assert.NotEqual(TriageTier.Skip, h.Tier));
     }
 
+    [Theory]
+    [InlineData("    public int First { get; } = Next();", "    public int Second { get; } = Next();")]
+    [InlineData("    public event Action First = Register();", "    public event Action Second = Register();")]
+    public void ReorderedPropertyAndEventInitialisersRemainReviewable(string first, string second)
+    {
+        var before = Class("Order", first, second, "    private static int Next() => 1;\n    private static Action Register() => () => { };");
+        var after = Class("Order", second, first, "    private static int Next() => 1;\n    private static Action Register() => () => { };");
+
+        var moved = TriageHarness.Run(new TestFile("src/Order.cs", before, after)).Hunks.Where(h => h.Class == ChangeClass.Move).ToList();
+
+        Assert.NotEmpty(moved);
+        Assert.All(moved, h => Assert.Equal(TriageTier.Skim, h.Tier));
+    }
+
+    [Theory]
+    [InlineData("struct", "public int First { get; set; }", "public int Second { get; set; }")]
+    [InlineData("record struct", "public int First;", "public int Second;")]
+    public void MovingStructStorageMembersKeepsLayoutChangesReviewable(string kind, string first, string second)
+    {
+        var before = $"public {kind} C\n{{\n    {first}\n\n    {second}\n}}\n";
+        var after = $"public {kind} C\n{{\n    {second}\n\n    {first}\n}}\n";
+
+        var moved = TriageHarness.Run(new TestFile("src/C.cs", before, after)).Hunks.Where(h => h.Class == ChangeClass.Move).ToList();
+
+        Assert.NotEmpty(moved);
+        Assert.All(moved, h => Assert.Equal(TriageTier.Skim, h.Tier));
+    }
+
     [Fact]
     public void HunkWithAMoveAndAnUnrelatedEditIsSplit()
     {

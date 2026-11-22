@@ -5,7 +5,7 @@ using Lumen.Domain;
 namespace Lumen.GitHub;
 
 /// <summary>
-/// Resolves a token from <c>LUMEN_GITHUB_TOKEN</c>, falling back to <c>gh auth token</c>. The token is cached for the process lifetime.
+/// Resolves a token from <c>LUMEN_GITHUB_TOKEN</c>, falling back to <c>gh auth token</c>. Cached until GitHub rejects it.
 /// </summary>
 public sealed class GhCliTokenSource : IGitHubTokenSource, IDisposable
 {
@@ -57,6 +57,19 @@ public sealed class GhCliTokenSource : IGitHubTokenSource, IDisposable
     }
 
     public void Dispose() => _gate.Dispose();
+
+    public async Task InvalidateAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _token = null;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
 
     private async Task<string> ReadFromGhAsync(CancellationToken cancellationToken)
     {

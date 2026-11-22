@@ -120,6 +120,50 @@ public sealed class EngineInvestigationTests : IAsyncDisposable
         Assert.DoesNotContain(events, e => e.InvestigationStatus is not null);
     }
 
+    [Theory]
+    [InlineData(Contracts.ReviewPointState.Dismissed)]
+    [InlineData(Contracts.ReviewPointState.Commented)]
+    [InlineData(Contracts.ReviewPointState.Examined)]
+    public async Task InvestigationUpdatesPreserveDecisionsMadeWhileTheAgentRuns(Contracts.ReviewPointState state)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var provider = new FakeAgentProvider("""
+            { "outcome": "supported", "summary": "Workers claim queue items.", "findings": [], "recommendReviewPoint": true }
+            """) { CompletionGate = completion.Task };
+        await StartAsync(AgentsOn, provider, new RoutingEvaluator());
+
+        using var channel = EngineEndpoint.CreateChannel(_pipe);
+        var client = new ReviewEngine.ReviewEngineClient(channel);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var call = client.WatchPullRequest(new WatchPullRequestRequest { PullRequest = Pr }, cancellationToken: cts.Token);
+        string? pointId = null;
+        await foreach (var evt in call.ResponseStream.ReadAllAsync(cts.Token))
+        {
+            if (evt.ReviewPointAdded is { } point)
+            {
+                pointId = point.Id;
+            }
+
+            if (evt.InvestigationStatus is { Active: > 0 })
+            {
+                Assert.NotNull(pointId);
+                await client.SetReviewPointStateAsync(new SetReviewPointStateRequest
+                {
+                    PullRequest = Pr, ReviewPointId = pointId, State = state,
+                }, cancellationToken: cts.Token);
+                completion.SetResult();
+            }
+
+            if (evt.ReviewPointUpdated is { } updated)
+            {
+                Assert.Equal(state, updated.State);
+                return;
+            }
+        }
+
+        Assert.Fail("No investigation update arrived.");
+    }
+
     [Fact]
     public async Task ReviewCompletesWhenTheAgentIsSignedOut()
     {
@@ -175,6 +219,8 @@ public sealed class EngineInvestigationTests : IAsyncDisposable
 
     private sealed class FakeAgentProvider(string structuredOutput) : IAgentProvider
     {
+        public Task CompletionGate { get; init; } = Task.CompletedTask;
+
         public AgentAuthenticationState State { get; init; } = new(AgentConnectionStatus.SignedIn, AgentBilling.Subscription, "Claude Pro via Claude Code");
 
         public List<AgentSessionRequest> Requests { get; } = [];
@@ -201,7 +247,13 @@ public sealed class EngineInvestigationTests : IAsyncDisposable
                 Model = "fake-model",
                 Billing = AgentBilling.Subscription,
             };
-            return Task.FromResult(new AgentSession("s1", events.Reader, Task.FromResult(result), () => { }));
+            async Task<AgentSessionResult> CompleteAsync()
+            {
+                await CompletionGate.WaitAsync(cancellationToken);
+                return result;
+            }
+
+            return Task.FromResult(new AgentSession("s1", events.Reader, CompleteAsync(), () => { }));
         }
     }
 }

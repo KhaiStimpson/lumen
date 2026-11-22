@@ -61,6 +61,23 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
     }
 
     [Fact]
+    public async Task SourceFileRequestsSelectTheRequestedRevision()
+    {
+        using var channel = EngineEndpoint.CreateChannel(_pipe);
+        var client = new ReviewEngine.ReviewEngineClient(channel);
+        var events = await CollectUntilCompleteAsync(client);
+        Assert.DoesNotContain(events, e => e.Failed is not null);
+
+        var head = await client.GetSourceFileAsync(new GetSourceFileRequest { PullRequest = Pr, Path = WorkerScenario.NewWorkerPath });
+        var before = await client.GetSourceFileAsync(new GetSourceFileRequest { PullRequest = Pr, Path = WorkerScenario.NewWorkerPath, FromBase = true });
+
+        Assert.True(head.Exists);
+        Assert.Contains("InvoiceRetryWorker", head.Text, StringComparison.Ordinal);
+        Assert.False(before.Exists);
+        Assert.Empty(before.Text);
+    }
+
+    [Fact]
     public async Task StreamsSnapshotReviewPointAndCompletion()
     {
         using var channel = EngineEndpoint.CreateChannel(_pipe);
@@ -109,6 +126,21 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
     }
 
     [Fact]
+    public async Task ResolvedStateSurvivesReanalysis()
+    {
+        using var channel = EngineEndpoint.CreateChannel(_pipe);
+        var client = new ReviewEngine.ReviewEngineClient(channel);
+        var point = (await CollectUntilCompleteAsync(client)).First(e => e.ReviewPointAdded is not null).ReviewPointAdded;
+        await client.SetReviewPointStateAsync(new SetReviewPointStateRequest
+        {
+            PullRequest = Pr, ReviewPointId = point.Id, State = Contracts.ReviewPointState.Resolved,
+        });
+
+        var refreshed = await CollectUntilCompleteAsync(client, refresh: true);
+        Assert.Equal(Contracts.ReviewPointState.Resolved, refreshed.First(e => e.ReviewPointAdded is not null).ReviewPointAdded.State);
+    }
+
+    [Fact]
     public async Task PostsCommentOnHeadSideAndMarksPointCommented()
     {
         using var channel = EngineEndpoint.CreateChannel(_pipe);
@@ -146,6 +178,26 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
             Body = "hi",
         }));
         Assert.Equal(StatusCode.InvalidArgument, ex.StatusCode);
+        Assert.Empty(_gitHub.Posted);
+    }
+
+    [Fact]
+    public async Task RejectsAnUnknownReviewPointBeforePostingAnything()
+    {
+        using var channel = EngineEndpoint.CreateChannel(_pipe);
+        var client = new ReviewEngine.ReviewEngineClient(channel);
+        var point = (await CollectUntilCompleteAsync(client)).First(e => e.ReviewPointAdded is not null).ReviewPointAdded;
+
+        var ex = await Assert.ThrowsAsync<RpcException>(async () => await client.PostReviewCommentAsync(new PostReviewCommentRequest
+        {
+            PullRequest = Pr,
+            ReviewPointId = "outdated-point",
+            Path = point.Anchor.Path,
+            Line = point.Anchor.StartLine,
+            Body = "Should this use QueueClaimService?",
+        }));
+
+        Assert.Equal(StatusCode.NotFound, ex.StatusCode);
         Assert.Empty(_gitHub.Posted);
     }
 
@@ -196,6 +248,43 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
         Assert.Equal(Environment.ProcessId, ping.ProcessId);
     }
 
+    [Theory]
+    [InlineData("network")]
+    [InlineData("server")]
+    [InlineData("timeout")]
+    public async Task TransientGitHubFailuresUseTheCachedPullRequest(string failure)
+    {
+        using var channel = EngineEndpoint.CreateChannel(_pipe);
+        var client = new ReviewEngine.ReviewEngineClient(channel);
+        await CollectUntilCompleteAsync(client);
+        _gitHub.FailWith = failure switch
+        {
+            "server" => new Lumen.GitHub.GitHubApiException(System.Net.HttpStatusCode.ServiceUnavailable, "GitHub unavailable"),
+            "timeout" => new TaskCanceledException("HTTP request timed out"),
+            _ => new HttpRequestException("Network offline"),
+        };
+
+        var events = await CollectUntilCompleteAsync(client, refresh: true);
+
+        Assert.Contains(events, e => e.Snapshot is not null);
+        Assert.Contains(events, e => e.Complete is not null);
+        Assert.DoesNotContain(events, e => e.Failed is not null);
+    }
+
+    [Fact]
+    public async Task CachedPullRequestDoesNotMaskRevokedAuthentication()
+    {
+        using var channel = EngineEndpoint.CreateChannel(_pipe);
+        var client = new ReviewEngine.ReviewEngineClient(channel);
+        await CollectUntilCompleteAsync(client);
+        _gitHub.FailWith = new Lumen.GitHub.GitHubApiException(System.Net.HttpStatusCode.Unauthorized, "Bad credentials");
+
+        var events = await CollectUntilCompleteAsync(client, refresh: true);
+
+        Assert.True(Assert.Single(events, e => e.Failed is not null).Failed.IsAuthentication);
+        Assert.DoesNotContain(events, e => e.Snapshot is not null);
+    }
+
     [Fact]
     public async Task TriagesTheSnapshotAndCachesItPerHead()
     {
@@ -218,7 +307,7 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
         Assert.True(ready.Files.Single(f => f.Path == WorkerScenario.NewWorkerPath).TierLines.Skim > 0);
 
         var cached = await _engine.Services.GetRequiredService<ITriageStore>()
-            .FindTriageAsync(key, WorkerScenario.HeadSha, Sessions.TriageRunner.VersionFor(Analysis.ReviewSettings.Default), CancellationToken.None);
+            .FindTriageAsync(key, WorkerScenario.HeadSha, Sessions.TriageRunner.VersionFor(Analysis.ReviewSettings.Default, session.Snapshot!.MergeBaseSha), CancellationToken.None);
         Assert.Equal(triage.Hunks.Count, cached!.Hunks.Count);
     }
 

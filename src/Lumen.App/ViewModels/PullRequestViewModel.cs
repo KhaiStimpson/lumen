@@ -57,6 +57,8 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
     public event EventHandler<NavigationRequest>? NavigationRequested;
 
+    public event EventHandler<PlanTarget>? PlanNavigationRequested;
+
     // Header ---------------------------------------------------------------------------------------
 
     [ObservableProperty]
@@ -149,9 +151,11 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         CoverageShort = Triage is null || total == 0 ? "" : string.Create(CultureInfo.InvariantCulture, $"{percent}% covered");
     }
 
-    private void MarkVisited(string path, int startLine, int endLine)
+    private void MarkVisited(string path, int startLine, int endLine, bool oldSide = false)
     {
-        foreach (var hunk in Triage?.Hunks.Where(h => h.Path == path && h.NewStart > 0 && h.NewStart <= endLine && startLine <= h.NewEnd) ?? [])
+        foreach (var hunk in Triage?.Hunks.Where(h => h.Path == path && (oldSide
+                     ? h.OldStart > 0 && h.OldStart <= endLine && startLine <= h.OldEnd
+                     : h.NewStart > 0 && h.NewStart <= endLine && startLine <= h.NewEnd)) ?? [])
         {
             _visitedHunks.Add(DiffFolds.IdFor(hunk));
         }
@@ -264,6 +268,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
     private async Task FocusPlanTargetAsync(PlanTarget target)
     {
+        Mode = ReviewMode.Diff;
         if (CurrentPoint is { } point)
         {
             point.IsCurrent = false;
@@ -271,7 +276,6 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         }
 
         _planFocus = target;
-        MarkVisited(target.Path, target.StartLine, target.EndLine);
         if (Files.FirstOrDefault(f => f.Path == target.Path) is { } file && SelectedFile?.Path != target.Path)
         {
             await SelectFileAsync(file).ConfigureAwait(true);
@@ -279,6 +283,11 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
         UpdateMarkers();
         OnPropertyChanged(nameof(PositionLabel));
+        if (CurrentDiff?.Path == target.Path)
+        {
+            MarkVisited(target.Path, target.StartLine, target.EndLine, target.IsOldSide);
+            PlanNavigationRequested?.Invoke(this, target);
+        }
     }
 
     // Files ----------------------------------------------------------------------------------------
@@ -445,21 +454,46 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
     private void ResetForReload()
     {
+        _watchCts.Dispose();
         _watchCts = new CancellationTokenSource();
+        ++_diffVersion;
         ReviewPoints.Clear();
         Conventions.Clear();
         _arrived.Clear();
         _diffCache.Clear();
         _headCache.Clear();
+        _visitedHunks.Clear();
+        _expandedFolds.Clear();
+        _planFocus = null;
+        ReviewPlan.Reset();
+        Triage = null;
+        Files.Clear();
+        GeneratedFiles.Clear();
+        Tree.Clear();
+        _nodes.Clear();
+        SelectedFile = null;
+        SelectedNode = null;
+        CurrentDiff = null;
+        Markers = [];
+        FocusRange = null;
+        SourcePreview = null;
+        IsDiffLoading = false;
         CurrentPoint = null;
         Mode = ReviewMode.Diff;
         IsAnalysing = true;
+        IsLoading = true;
+        IsAuthenticationError = false;
+        _completeStatus = "";
+        RebuildPlan();
+        OnPropertyChanged(nameof(ViewedSummary));
+        OnPropertyChanged(nameof(GeneratedSummary));
         Error = null;
     }
 
     private async Task WatchAsync(bool refresh)
     {
-        var token = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, _watchCts.Token).Token;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, _watchCts.Token);
+        var token = linked.Token;
         try
         {
             await foreach (var evt in _source.WatchAsync(Ref, refresh, token).ConfigureAwait(true))
@@ -728,18 +762,40 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         SelectedFile = file;
         SelectedNode = _nodes.GetValueOrDefault(file.Path);
         var version = ++_diffVersion;
+        IsDiffLoading = false;
+        if (CurrentDiff?.Path != file.Path)
+        {
+            CurrentDiff = null;
+            Markers = [];
+            FocusRange = null;
+        }
+
+        var reload = _watchCts;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, reload.Token);
 
         if (!_diffCache.TryGetValue(file.Path, out var diff))
         {
             IsDiffLoading = true;
             try
             {
-                diff = await _source.GetFileDiffAsync(Ref, file.Path, _lifetime.Token).ConfigureAwait(true);
+                diff = await _source.GetFileDiffAsync(Ref, file.Path, linked.Token).ConfigureAwait(true);
+                if (linked.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 _diffCache[file.Path] = diff;
+            }
+            catch (OperationCanceledException) when (linked.IsCancellationRequested)
+            {
+                return;
             }
             catch (RpcException ex)
             {
-                Toast = $"Couldn't load {file.Name}: {ex.Status.Detail}";
+                if (!linked.IsCancellationRequested && version == _diffVersion)
+                {
+                    Toast = $"Couldn't load {file.Name}: {ex.Status.Detail}";
+                }
                 return;
             }
             finally
@@ -791,15 +847,27 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         }
 
         IsDiffLoading = true;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, _watchCts.Token);
         try
         {
-            var source = await _source.GetSourceFileAsync(Ref, file.Path, _lifetime.Token).ConfigureAwait(true);
+            var source = await _source.GetSourceFileAsync(Ref, file.Path, linked.Token).ConfigureAwait(true);
+            if (linked.IsCancellationRequested)
+            {
+                return;
+            }
+
             _headCache[file.Path] = source.Exists ? source.Text : null;
+        }
+        catch (OperationCanceledException) when (linked.IsCancellationRequested)
+        {
         }
         catch (RpcException ex)
         {
             // Not cached, so the next toggle or visit retries; meanwhile the plain diff stays up.
-            Toast = $"Couldn't load the full {file.Name}: {ex.Status.Detail}";
+            if (!linked.IsCancellationRequested && version == _diffVersion)
+            {
+                Toast = $"Couldn't load the full {file.Name}: {ex.Status.Detail}";
+            }
         }
         finally
         {
@@ -831,6 +899,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         {
             file.IsViewed = !viewed;
             OnPropertyChanged(nameof(ViewedSummary));
+            UpdateCoverage();
             Toast = $"Couldn't mark {file.Name} as {(viewed ? "viewed" : "not viewed")}: {ex.Status.Detail}";
         }
     }
@@ -1171,7 +1240,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
         try
         {
-            var file = await _source.GetSourceFileAsync(Ref, example.Path, _lifetime.Token).ConfigureAwait(true);
+            var file = await _source.GetSourceFileAsync(Ref, example.Path, _lifetime.Token, fromBase: true).ConfigureAwait(true);
             SourcePreview = file.Exists
                 ? new SourcePreviewViewModel(example.Path, example.TypeName, file.Text, example.Line)
                 : new SourcePreviewViewModel(example.Path, example.TypeName, example.Snippet, example.Line, example.StartLine);

@@ -376,6 +376,31 @@ public sealed class UnifiedDiffParserTests
     }
 
     [Fact]
+    public void DecodesEscapesInBinaryPathsWithoutFileHeaders()
+    {
+        var file = Assert.Single(UnifiedDiffParser.Parse(Diff(
+            "diff --git \"a/docs/caf\\303\\251.bin\" \"b/docs/caf\\303\\251.bin\"",
+            "Binary files \"a/docs/caf\\303\\251.bin\" and \"b/docs/caf\\303\\251.bin\" differ")));
+
+        Assert.Equal("docs/café.bin", file.Path);
+        Assert.True(file.IsBinary);
+    }
+
+    [Fact]
+    public void DecodesQuotedRenamePathsWithoutHunks()
+    {
+        var file = Assert.Single(UnifiedDiffParser.Parse(Diff(
+            "diff --git \"a/docs/caf\\303\\251.md\" \"b/docs/th\\303\\251.md\"",
+            "similarity index 100%",
+            "rename from \"docs/caf\\303\\251.md\"",
+            "rename to \"docs/th\\303\\251.md\"")));
+
+        Assert.Equal("docs/café.md", file.OldPath);
+        Assert.Equal("docs/thé.md", file.Path);
+        Assert.Equal(FileChangeKind.Renamed, file.Kind);
+    }
+
+    [Fact]
     public void ChangedFileExposesDiffLinesForAnchoring()
     {
         var files = ChangedFiles.FromUnifiedDiff(Diff(

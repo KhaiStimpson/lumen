@@ -17,7 +17,7 @@
         <StackPanel Spacing="8">
           <TextBlock Classes="section" Text="PULL REQUEST" />
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-            <TextBox Name="Reference" Text="{Binding Reference}" Watermark="https://github.com/owner/repo/pull/123  or  owner/repo#123"
+            <TextBox Name="Reference" Text="{Binding Reference}" PlaceholderText="https://github.com/owner/repo/pull/123  or  owner/repo#123"
                      MinHeight="38" VerticalContentAlignment="Center">
               <TextBox.KeyBindings>
                 <KeyBinding Gesture="Enter" Command="{Binding OpenCommand}" />
