@@ -4,7 +4,7 @@
 
 **What needs my judgement?** The few places in a pull request that deserve a closer look, next to the precedent they break.
 
-![Kelpie Review showing the review plan, the diff and the inspector](docs/design/kelpie-gauge/app/02-open.png)
+![Kelpie Review showing the review plan, a finding inline in the diff, and the inspector](docs/screenshots/review.png)
 
 Kelpie Review (formerly Lumen) is a desktop pull-request review tool that keeps the code central and points the reviewer to the few places that
 deserve judgement — starting with **pattern deviations**: code that differs from how this repository normally
@@ -23,6 +23,28 @@ model.
 The **Map** tab (`M`) shows the pull request as the system it builds: its components placed by how they use each other
 (**Blueprint**, linked by Roslyn from the code), or sized by lines added (**Terrain**), with lenses for risky areas, what
 changed since your last review, and which code the pull request's tests exercise. See [docs/map.md](docs/map.md).
+
+## Screenshots
+
+**Inbox.** Pull requests waiting on you, your own, and the repositories you watch.
+
+![The inbox: review requested, my open pull requests and watched repositories](docs/screenshots/inbox.png)
+
+**Examine a review point.** The code this pull request adds, beside the precedent it breaks and why it matters.
+
+![Examine mode: the current approach next to the established approach, with the reason](docs/screenshots/examine.png)
+
+**The Map.** The pull request as the system it builds, with risky areas and open threads marked.
+
+![The Map tab in Blueprint layout with the Attention lens](docs/screenshots/map.png)
+
+**Conversation.** The description, comments and reviews, with the walkthrough alongside.
+
+![The Conversation tab with the pull request description and the walkthrough](docs/screenshots/conversation.png)
+
+**Light theme.**
+
+![The Files list and diff in the light theme](docs/screenshots/light.png)
 
 ## Run it
 
