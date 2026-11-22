@@ -86,7 +86,7 @@
     <Border Classes="divider" />
 
     <StackPanel Spacing="12" IsEnabled="{Binding IsLoaded}">
-      <TextBlock Classes="section" Text="INVESTIGATIONS" />
+      <TextBlock Classes="section" Text="Investigations" />
       <Grid ColumnDefinitions="*,Auto,28" ColumnSpacing="12">
         <StackPanel Spacing="2">
           <TextBlock Classes="body" Text="Per pull request" />

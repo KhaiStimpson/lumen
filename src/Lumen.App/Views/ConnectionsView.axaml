@@ -109,7 +109,7 @@
                 IsVisible="{Binding !ShowLegacy}" />
           <Path Data="{StaticResource Icon.ChevronDown}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="10" Height="10"
                 IsVisible="{Binding ShowLegacy}" />
-          <TextBlock Classes="section" Text="LEGACY" />
+          <TextBlock Classes="section" Text="Legacy" />
         </StackPanel>
       </Button>
       <StackPanel Spacing="12" IsVisible="{Binding ShowLegacy}">

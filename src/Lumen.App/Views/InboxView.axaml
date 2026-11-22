@@ -48,6 +48,16 @@
 
         <TextBlock Classes="caption tertiary" Text="Loading your pull requests…" IsVisible="{Binding IsLoading}" Margin="4,0" />
 
+        <!-- Empty inbox: the one place inside the app the Kelpie brand appears (Gauge brand boundary) -->
+        <StackPanel Name="InboxEmpty" Spacing="6" HorizontalAlignment="Center" Margin="0,36,0,12" IsVisible="{Binding IsEmpty}">
+          <Border Width="300" Height="87" Background="{DynamicResource Brand.Lockup}" HorizontalAlignment="Center" />
+          <TextBlock Classes="mono tertiary" Text="Kelpie Review · what needs my judgement?" HorizontalAlignment="Center" Margin="0,4,0,12" />
+          <TextBlock FontSize="14" HorizontalAlignment="Center">
+            <Run Text="Nothing is waiting on you." FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" />
+            <Run Text="Paste a pull request above to open it." />
+          </TextBlock>
+        </StackPanel>
+
         <ItemsControl Name="Sections" ItemsSource="{Binding Sections}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:InboxSectionViewModel">
@@ -99,7 +109,7 @@
         </ItemsControl>
 
         <StackPanel Spacing="4" IsVisible="{Binding Recent.Count, Converter={x:Static views:Converters.IsPositive}}" Margin="4,0">
-          <TextBlock Classes="section" Text="RECENT" Margin="0,0,0,2" />
+          <TextBlock Classes="section" Text="Recent" Margin="0,0,0,2" />
           <WrapPanel>
             <ItemsControl ItemsSource="{Binding Recent}">
               <ItemsControl.ItemsPanel>

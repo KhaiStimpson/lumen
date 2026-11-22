@@ -23,7 +23,7 @@
 
     <StackPanel Spacing="8">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-        <TextBlock Classes="section" Text="SENSITIVITY" VerticalAlignment="Center" />
+        <TextBlock Classes="section" Text="Sensitivity" VerticalAlignment="Center" />
         <StackPanel Name="OverrideNote" Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsOverriding}">
           <Ellipse Width="6" Height="6" Fill="{DynamicResource Accent}" VerticalAlignment="Center" />
           <TextBlock Classes="caption" Text="{Binding OverrideNote}" VerticalAlignment="Center" />

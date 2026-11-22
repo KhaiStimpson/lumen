@@ -173,7 +173,7 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <StackPanel Spacing="6" IsVisible="{Binding CurrentPoint.HasExceptions, FallbackValue=False}">
-                  <TextBlock Classes="section" Text="EXCEPTIONS IN THIS CODEBASE" />
+                  <TextBlock Classes="section" Text="Exceptions in this codebase" />
                   <ItemsControl ItemsSource="{Binding CurrentPoint.Exceptions, FallbackValue={x:Null}}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:PrecedentExampleViewModel">
@@ -210,7 +210,7 @@
                 </ItemsControl>
 
                 <StackPanel Spacing="6">
-                  <TextBlock Classes="section" Text="AFFECTED LOCATIONS" />
+                  <TextBlock Classes="section" Text="Affected locations" />
                   <ItemsControl ItemsSource="{Binding CurrentPoint.Locations, FallbackValue={x:Null}}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:LocationViewModel">

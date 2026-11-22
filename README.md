@@ -1,13 +1,20 @@
-# Lumen
+<p align="center"><img src="docs/brand/kelpie-lockup.svg" alt="Kelpie" width="280"></p>
 
-A desktop pull-request review tool that keeps the code central and points the reviewer to the few places that
+# Kelpie Review
+
+**What needs my judgement?** The few places in a pull request that deserve a closer look, next to the precedent they break.
+
+![Kelpie Review showing the review plan, the diff and the inspector](docs/design/kelpie-gauge/app/02-open.png)
+
+Kelpie Review (formerly Lumen) is a desktop pull-request review tool that keeps the code central and points the reviewer to the few places that
 deserve judgement — starting with **pattern deviations**: code that differs from how this repository normally
-solves the same problem, shown next to the precedent it deviates from.
+solves the same problem, shown next to the precedent it deviates from. The code, solution and executable keep the
+`Lumen` name for now.
 
 Design: [docs/tdd.md](docs/tdd.md) · v1 plan: [docs/plan.md](docs/plan.md) · Current plan and status:
 [docs/plan-v2.md](docs/plan-v2.md) · The Map: [docs/map.md](docs/map.md)
 
-Version 2 makes Lumen a place to do the whole review: an **inbox** of the pull requests waiting on you, the PR's
+Version 2 makes Kelpie Review a place to do the whole review: an **inbox** of the pull requests waiting on you, the PR's
 conversation, commits and checks, comments on any line (single or multi-line, with suggestions) gathered into a
 **pending review** you submit as Comment / Approve / Request changes, existing threads inline in the diff, split view,
 whitespace toggle, find in diff — and an optional AI **walkthrough** (intent, reading order, risky areas) from a fast
@@ -99,7 +106,7 @@ Connections is one section of the **Settings** overlay (plug button for Connecti
   repository's lists add to the ones for all repositories.
 - **Inbox**: repositories to watch, whose open pull requests join the inbox.
 - **Cloud AI limits**: the fast model id, AI Gateway, timeout, diff size limit and daily request cap; the JEV model, timeout and zero-data-retention routing; investigations per pull request and at
-  once; and metered usage (Lumen never switches to metered API billing without it).
+  once; and metered usage (Kelpie Review never switches to metered API billing without it).
 - **Appearance**: theme and motion.
 
 Global settings live in `settings.json`, a repository's overrides in `%LOCALAPPDATA%\Lumen\review\{owner}\{repo}.json`.
@@ -201,3 +208,7 @@ Opt-in suites that touch the network or a local clone:
 | `LUMEN_LIVE_CLAUDE=1` | One real pattern investigation through your Claude Code sign-in (uses subscription quota; refuses metered billing) |
 
 `LUMEN_LIVE_PR` runs the real engine, so it will also call JEV if a key is stored and agents if they're enabled.
+
+## Part of Kelpie
+
+Kelpie is a family of developer tools that read the hard stuff and tell you plainly: Dumps · Plans · SQL · Review · Recon.

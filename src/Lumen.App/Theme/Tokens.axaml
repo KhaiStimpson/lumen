@@ -1,67 +1,106 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <!--
-    Design tokens. Every colour in the app comes from here so light and dark stay in lockstep.
-    Calm, low-chroma surfaces; colour is reserved for meaning (diff state, severity, review markers).
+    Design tokens: the Gauge design system (KhaiStimpson/gauge-design-kit, tokens.json), used by every Kelpie app.
+    Neutral greys do the structural work; one accent covers links, focus and the primary action; colour is reserved
+    for meaning and that meaning is always also written as text. Gauge.* keys carry the Gauge role names; the older
+    app keys below them map onto those roles. Change a colour in tokens.json first, then here, and re-run
+    check-contrast.py. Kelpie brand colours (rust, cream) never appear in the app UI.
   -->
   <ResourceDictionary.ThemeDictionaries>
     <ResourceDictionary x:Key="Light">
-      <Color x:Key="WindowColor">#F4F5F7</Color>
-      <SolidColorBrush x:Key="Surface.Window" Color="#F4F5F7" />
-      <SolidColorBrush x:Key="Surface.Pane" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="Surface.Raised" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="Surface.Sunken" Color="#F7F8FA" />
-      <SolidColorBrush x:Key="Surface.Hover" Color="#F0F2F5" />
-      <SolidColorBrush x:Key="Surface.Selected" Color="#EAF1FE" />
-      <SolidColorBrush x:Key="Border.Subtle" Color="#E7E9ED" />
-      <SolidColorBrush x:Key="Border.Strong" Color="#D5D9E0" />
-      <SolidColorBrush x:Key="Text.Primary" Color="#171A1F" />
-      <SolidColorBrush x:Key="Text.Secondary" Color="#59616E" />
-      <SolidColorBrush x:Key="Text.Tertiary" Color="#8B929E" />
-      <SolidColorBrush x:Key="Accent" Color="#2F6BE8" />
-      <SolidColorBrush x:Key="Accent.Hover" Color="#255CD1" />
-      <SolidColorBrush x:Key="Accent.Soft" Color="#EAF1FE" />
+      <!-- Kelpie brand lockup: only on empty states and About (dark lockup on dark surfaces) -->
+      <ImageBrush x:Key="Brand.Lockup" Source="avares://Lumen/Assets/kelpie-lockup.png" Stretch="Uniform" />
+      <Color x:Key="WindowColor">#FFFFFF</Color>
+      <SolidColorBrush x:Key="Gauge.Bg0" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="Gauge.Bg1" Color="#FAFAFA" />
+      <SolidColorBrush x:Key="Gauge.Bg2" Color="#F3F3F3" />
+      <SolidColorBrush x:Key="Gauge.Bg3" Color="#E8E8E8" />
+      <SolidColorBrush x:Key="Gauge.Bg4" Color="#DCDCDC" />
+      <SolidColorBrush x:Key="Gauge.Line" Color="#E1E1E1" />
+      <SolidColorBrush x:Key="Gauge.Line2" Color="#C6C6C6" />
+      <SolidColorBrush x:Key="Gauge.LineCtl" Color="#858585" />
+      <SolidColorBrush x:Key="Gauge.Fg0" Color="#1B1B1B" />
+      <SolidColorBrush x:Key="Gauge.Fg1" Color="#2F2F2F" />
+      <SolidColorBrush x:Key="Gauge.Fg2" Color="#4D4D4D" />
+      <SolidColorBrush x:Key="Gauge.Fg3" Color="#6B6B6B" />
+      <SolidColorBrush x:Key="Gauge.Accent" Color="#0A64C8" />
+      <SolidColorBrush x:Key="Gauge.AccentInk" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="Gauge.Sel" Color="#D6E6F8" />
+      <SolidColorBrush x:Key="Gauge.SelFg" Color="#1B1B1B" />
+      <SolidColorBrush x:Key="Gauge.SelEdge" Color="#0A64C8" />
+      <SolidColorBrush x:Key="Gauge.Crit" Color="#B42318" />
+      <SolidColorBrush x:Key="Gauge.Warn" Color="#8A5700" />
+      <SolidColorBrush x:Key="Gauge.Ok" Color="#1D7A3A" />
+      <SolidColorBrush x:Key="Gauge.Code" Color="#7A3FC4" />
+      <SolidColorBrush x:Key="Gauge.Scrim" Color="#40000000" />
+
+      <SolidColorBrush x:Key="Surface.Window" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="Surface.Pane" Color="#FAFAFA" />
+      <SolidColorBrush x:Key="Surface.Raised" Color="#FAFAFA" />
+      <SolidColorBrush x:Key="Surface.Chrome" Color="#F3F3F3" />
+      <SolidColorBrush x:Key="Surface.Sunken" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="Surface.Control" Color="#E8E8E8" />
+      <SolidColorBrush x:Key="Surface.Hover" Color="#E8E8E8" />
+      <SolidColorBrush x:Key="Surface.Active" Color="#DCDCDC" />
+      <SolidColorBrush x:Key="Surface.Selected" Color="#D6E6F8" />
+      <SolidColorBrush x:Key="Border.Subtle" Color="#E1E1E1" />
+      <SolidColorBrush x:Key="Border.Strong" Color="#C6C6C6" />
+      <SolidColorBrush x:Key="Border.Control" Color="#858585" />
+      <SolidColorBrush x:Key="Text.Primary" Color="#1B1B1B" />
+      <SolidColorBrush x:Key="Text.Body" Color="#2F2F2F" />
+      <SolidColorBrush x:Key="Text.Secondary" Color="#4D4D4D" />
+      <SolidColorBrush x:Key="Text.Tertiary" Color="#6B6B6B" />
+      <SolidColorBrush x:Key="Selection.Text" Color="#1B1B1B" />
+      <SolidColorBrush x:Key="Selection.Edge" Color="#0A64C8" />
+      <SolidColorBrush x:Key="Selection.Crit" Color="#B42318" />
+      <SolidColorBrush x:Key="Selection.Warn" Color="#8A5700" />
+      <!-- Fluent focus visual: Gauge focus is a 2px accent ring -->
+      <Color x:Key="FocusStrokeColorOuter">#0A64C8</Color>
+      <Color x:Key="FocusStrokeColorInner">#FFFFFF</Color>
+      <SolidColorBrush x:Key="Accent" Color="#0A64C8" />
+      <SolidColorBrush x:Key="Accent.Hover" Color="#0857B0" />
+      <SolidColorBrush x:Key="Accent.Soft" Color="#1A0A64C8" />
       <SolidColorBrush x:Key="Accent.OnAccent" Color="#FFFFFF" />
 
-      <SolidColorBrush x:Key="Diff.Added.Bg" Color="#EAF7EE" />
-      <SolidColorBrush x:Key="Diff.Added.Gutter" Color="#D5F0DD" />
-      <SolidColorBrush x:Key="Diff.Added.Sign" Color="#1F883D" />
-      <SolidColorBrush x:Key="Diff.Removed.Bg" Color="#FDEEEE" />
-      <SolidColorBrush x:Key="Diff.Removed.Gutter" Color="#F9DADA" />
-      <SolidColorBrush x:Key="Diff.Removed.Sign" Color="#CF222E" />
-      <SolidColorBrush x:Key="Diff.Hunk.Bg" Color="#EEF3FC" />
-      <SolidColorBrush x:Key="Diff.Hunk.Text" Color="#5C6F96" />
-      <SolidColorBrush x:Key="Diff.Focus.Bg" Color="#FFF6DD" />
-      <SolidColorBrush x:Key="Diff.Focus.Edge" Color="#F0B429" />
-      <SolidColorBrush x:Key="Find.Match" Color="#55F5D76E" />
-      <SolidColorBrush x:Key="Find.Current" Color="#AAF0A020" />
-      <SolidColorBrush x:Key="Code.LineNumber" Color="#A3A9B4" />
-      <SolidColorBrush x:Key="Ruler.Thumb" Color="#1C171A1F" />
-      <SolidColorBrush x:Key="Ruler.ThumbEdge" Color="#52171A1F" />
+      <SolidColorBrush x:Key="Diff.Added.Bg" Color="#EBF3ED" />
+      <SolidColorBrush x:Key="Diff.Added.Gutter" Color="#E4EFE7" />
+      <SolidColorBrush x:Key="Diff.Added.Sign" Color="#1D7A3A" />
+      <SolidColorBrush x:Key="Diff.Removed.Bg" Color="#FAF0EF" />
+      <SolidColorBrush x:Key="Diff.Removed.Gutter" Color="#F8E9E8" />
+      <SolidColorBrush x:Key="Diff.Removed.Sign" Color="#B42318" />
+      <SolidColorBrush x:Key="Diff.Hunk.Bg" Color="#F3F3F3" />
+      <SolidColorBrush x:Key="Diff.Hunk.Text" Color="#6B6B6B" />
+      <SolidColorBrush x:Key="Diff.Focus.Bg" Color="#E3EDF9" />
+      <SolidColorBrush x:Key="Diff.Focus.Edge" Color="#0A64C8" />
+      <SolidColorBrush x:Key="Find.Match" Color="#55E9B44C" />
+      <SolidColorBrush x:Key="Find.Current" Color="#AAE0A020" />
+      <SolidColorBrush x:Key="Code.LineNumber" Color="#6B6B6B" />
+      <SolidColorBrush x:Key="Ruler.Thumb" Color="#1C1B1B1B" />
+      <SolidColorBrush x:Key="Ruler.ThumbEdge" Color="#521B1B1B" />
 
-      <SolidColorBrush x:Key="Severity.High" Color="#D93F3F" />
-      <SolidColorBrush x:Key="Severity.High.Soft" Color="#FCEBEB" />
-      <SolidColorBrush x:Key="Severity.Medium" Color="#B76E00" />
-      <SolidColorBrush x:Key="Severity.Medium.Soft" Color="#FFF3DC" />
-      <SolidColorBrush x:Key="Severity.Low" Color="#5C6F96" />
-      <SolidColorBrush x:Key="Severity.Low.Soft" Color="#EEF1F7" />
+      <SolidColorBrush x:Key="Severity.High" Color="#B42318" />
+      <SolidColorBrush x:Key="Severity.High.Soft" Color="#F7E8E7" />
+      <SolidColorBrush x:Key="Severity.Medium" Color="#8A5700" />
+      <SolidColorBrush x:Key="Severity.Medium.Soft" Color="#F5EFE5" />
+      <SolidColorBrush x:Key="Severity.Low" Color="#4D4D4D" />
+      <SolidColorBrush x:Key="Severity.Low.Soft" Color="#E8E8E8" />
 
-      <SolidColorBrush x:Key="Marker.Correctness" Color="#E5484D" />
-      <SolidColorBrush x:Key="Marker.Deviation" Color="#F0A020" />
-      <SolidColorBrush x:Key="Marker.Behaviour" Color="#3E7BFA" />
-      <SolidColorBrush x:Key="Marker.Architecture" Color="#8E4EC6" />
-      <SolidColorBrush x:Key="Marker.Verified" Color="#30A46C" />
+      <SolidColorBrush x:Key="Marker.Correctness" Color="#B42318" />
+      <SolidColorBrush x:Key="Marker.Deviation" Color="#8A5700" />
+      <SolidColorBrush x:Key="Marker.Behaviour" Color="#0A64C8" />
+      <SolidColorBrush x:Key="Marker.Architecture" Color="#7A3FC4" />
+      <SolidColorBrush x:Key="Marker.Verified" Color="#1D7A3A" />
 
-      <SolidColorBrush x:Key="Compare.Current.Bg" Color="#FFF7F7" />
-      <SolidColorBrush x:Key="Compare.Current.Border" Color="#F4D3D3" />
-      <SolidColorBrush x:Key="Compare.Current.Title" Color="#C8323A" />
-      <SolidColorBrush x:Key="Compare.Precedent.Bg" Color="#F5FBF7" />
-      <SolidColorBrush x:Key="Compare.Precedent.Border" Color="#CBE9D5" />
-      <SolidColorBrush x:Key="Compare.Precedent.Title" Color="#1E7F45" />
-
-      <SolidColorBrush x:Key="Card.Deviation.Border" Color="#F2C46B" />
-      <SolidColorBrush x:Key="Card.Deviation.Bg" Color="#FFFCF5" />
-      <SolidColorBrush x:Key="Shadow" Color="#1A1D2433" />
+      <SolidColorBrush x:Key="Compare.Current.Bg" Color="#FAFAFA" />
+      <SolidColorBrush x:Key="Compare.Current.Border" Color="#C6C6C6" />
+      <SolidColorBrush x:Key="Compare.Current.Title" Color="#B42318" />
+      <SolidColorBrush x:Key="Compare.Precedent.Bg" Color="#FAFAFA" />
+      <SolidColorBrush x:Key="Compare.Precedent.Border" Color="#C6C6C6" />
+      <SolidColorBrush x:Key="Compare.Precedent.Title" Color="#1D7A3A" />
+      <SolidColorBrush x:Key="Card.Deviation.Border" Color="#C6C6C6" />
+      <SolidColorBrush x:Key="Card.Deviation.Bg" Color="#F3F3F3" />
+      <SolidColorBrush x:Key="Shadow" Color="#26000000" />
       <StreamGeometry x:Key="Icon.Refresh">M13.5,8 A5.5,5.5 0 1 1 11.9,4.1 M12.5,1.5 L12.5,4.5 L9.5,4.5</StreamGeometry>
   <StreamGeometry x:Key="Icon.Plus">M8,3 L8,13 M3,8 L13,8</StreamGeometry>
   <StreamGeometry x:Key="Icon.Commit">M8,5.5 A2.5,2.5 0 1 1 7.99,5.5 Z M1,8 L5.5,8 M10.5,8 L15,8</StreamGeometry>
@@ -69,65 +108,101 @@
   <StreamGeometry x:Key="Icon.Risk">M8,1.5 L14.5,8 L8,14.5 L1.5,8 Z M8,5 L8,8.8 M8,10.6 L8,11</StreamGeometry>
   <StreamGeometry x:Key="Icon.Tray">M1.5,9 L4.5,2.5 L11.5,2.5 L14.5,9 L14.5,13.5 L1.5,13.5 Z M1.5,9 L5.5,9 L6.5,11 L9.5,11 L10.5,9 L14.5,9</StreamGeometry>
   <StreamGeometry x:Key="Icon.Map">M1.5,3.5 L5.5,2 L10.5,3.5 L14.5,2 L14.5,12.5 L10.5,14 L5.5,12.5 L1.5,14 Z M5.5,2 L5.5,12.5 M10.5,3.5 L10.5,14</StreamGeometry>
-</ResourceDictionary>
+    </ResourceDictionary>
 
     <ResourceDictionary x:Key="Dark">
-      <Color x:Key="WindowColor">#0E1014</Color>
-      <SolidColorBrush x:Key="Surface.Window" Color="#0E1014" />
-      <SolidColorBrush x:Key="Surface.Pane" Color="#15181D" />
-      <SolidColorBrush x:Key="Surface.Raised" Color="#1B1F25" />
-      <SolidColorBrush x:Key="Surface.Sunken" Color="#111317" />
-      <SolidColorBrush x:Key="Surface.Hover" Color="#1F242B" />
-      <SolidColorBrush x:Key="Surface.Selected" Color="#1A2740" />
-      <SolidColorBrush x:Key="Border.Subtle" Color="#23272F" />
-      <SolidColorBrush x:Key="Border.Strong" Color="#323844" />
-      <SolidColorBrush x:Key="Text.Primary" Color="#E8EAED" />
-      <SolidColorBrush x:Key="Text.Secondary" Color="#A0A7B2" />
-      <SolidColorBrush x:Key="Text.Tertiary" Color="#6D7481" />
-      <SolidColorBrush x:Key="Accent" Color="#5B8DF5" />
-      <SolidColorBrush x:Key="Accent.Hover" Color="#7AA2F8" />
-      <SolidColorBrush x:Key="Accent.Soft" Color="#1A2740" />
-      <SolidColorBrush x:Key="Accent.OnAccent" Color="#FFFFFF" />
+      <!-- Kelpie brand lockup: only on empty states and About (dark lockup on dark surfaces) -->
+      <ImageBrush x:Key="Brand.Lockup" Source="avares://Lumen/Assets/kelpie-lockup-dark.png" Stretch="Uniform" />
+      <Color x:Key="WindowColor">#1E1E1E</Color>
+      <SolidColorBrush x:Key="Gauge.Bg0" Color="#1E1E1E" />
+      <SolidColorBrush x:Key="Gauge.Bg1" Color="#252525" />
+      <SolidColorBrush x:Key="Gauge.Bg2" Color="#2B2B2B" />
+      <SolidColorBrush x:Key="Gauge.Bg3" Color="#333333" />
+      <SolidColorBrush x:Key="Gauge.Bg4" Color="#444444" />
+      <SolidColorBrush x:Key="Gauge.Line" Color="#3C3C3C" />
+      <SolidColorBrush x:Key="Gauge.Line2" Color="#555555" />
+      <SolidColorBrush x:Key="Gauge.LineCtl" Color="#767676" />
+      <SolidColorBrush x:Key="Gauge.Fg0" Color="#F2F2F2" />
+      <SolidColorBrush x:Key="Gauge.Fg1" Color="#DCDCDC" />
+      <SolidColorBrush x:Key="Gauge.Fg2" Color="#C4C4C4" />
+      <SolidColorBrush x:Key="Gauge.Fg3" Color="#9E9E9E" />
+      <SolidColorBrush x:Key="Gauge.Accent" Color="#7CC0FF" />
+      <SolidColorBrush x:Key="Gauge.AccentInk" Color="#06263F" />
+      <SolidColorBrush x:Key="Gauge.Sel" Color="#0A4A78" />
+      <SolidColorBrush x:Key="Gauge.SelFg" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="Gauge.SelEdge" Color="#7CC0FF" />
+      <SolidColorBrush x:Key="Gauge.Crit" Color="#FF7B72" />
+      <SolidColorBrush x:Key="Gauge.Warn" Color="#E9B44C" />
+      <SolidColorBrush x:Key="Gauge.Ok" Color="#6FCF97" />
+      <SolidColorBrush x:Key="Gauge.Code" Color="#D6B4FF" />
+      <SolidColorBrush x:Key="Gauge.Scrim" Color="#99050709" />
 
-      <SolidColorBrush x:Key="Diff.Added.Bg" Color="#0E1F16" />
-      <SolidColorBrush x:Key="Diff.Added.Gutter" Color="#12281C" />
-      <SolidColorBrush x:Key="Diff.Added.Sign" Color="#4CC47A" />
-      <SolidColorBrush x:Key="Diff.Removed.Bg" Color="#2A1416" />
-      <SolidColorBrush x:Key="Diff.Removed.Gutter" Color="#3A1A1D" />
-      <SolidColorBrush x:Key="Diff.Removed.Sign" Color="#F0676E" />
-      <SolidColorBrush x:Key="Diff.Hunk.Bg" Color="#161F30" />
-      <SolidColorBrush x:Key="Diff.Hunk.Text" Color="#8497BD" />
-      <SolidColorBrush x:Key="Diff.Focus.Bg" Color="#2A2412" />
-      <SolidColorBrush x:Key="Diff.Focus.Edge" Color="#D99A1C" />
-      <SolidColorBrush x:Key="Find.Match" Color="#44E3B341" />
-      <SolidColorBrush x:Key="Find.Current" Color="#99F0A020" />
-      <SolidColorBrush x:Key="Code.LineNumber" Color="#555C68" />
-      <SolidColorBrush x:Key="Ruler.Thumb" Color="#1FE8EAED" />
-      <SolidColorBrush x:Key="Ruler.ThumbEdge" Color="#55E8EAED" />
+      <SolidColorBrush x:Key="Surface.Window" Color="#1E1E1E" />
+      <SolidColorBrush x:Key="Surface.Pane" Color="#252525" />
+      <SolidColorBrush x:Key="Surface.Raised" Color="#252525" />
+      <SolidColorBrush x:Key="Surface.Chrome" Color="#2B2B2B" />
+      <SolidColorBrush x:Key="Surface.Sunken" Color="#1E1E1E" />
+      <SolidColorBrush x:Key="Surface.Control" Color="#333333" />
+      <SolidColorBrush x:Key="Surface.Hover" Color="#333333" />
+      <SolidColorBrush x:Key="Surface.Active" Color="#444444" />
+      <SolidColorBrush x:Key="Surface.Selected" Color="#0A4A78" />
+      <SolidColorBrush x:Key="Border.Subtle" Color="#3C3C3C" />
+      <SolidColorBrush x:Key="Border.Strong" Color="#555555" />
+      <SolidColorBrush x:Key="Border.Control" Color="#767676" />
+      <SolidColorBrush x:Key="Text.Primary" Color="#F2F2F2" />
+      <SolidColorBrush x:Key="Text.Body" Color="#DCDCDC" />
+      <SolidColorBrush x:Key="Text.Secondary" Color="#C4C4C4" />
+      <SolidColorBrush x:Key="Text.Tertiary" Color="#9E9E9E" />
+      <SolidColorBrush x:Key="Selection.Text" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="Selection.Edge" Color="#7CC0FF" />
+      <SolidColorBrush x:Key="Selection.Crit" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="Selection.Warn" Color="#FFFFFF" />
+      <!-- Fluent focus visual: Gauge focus is a 2px accent ring -->
+      <Color x:Key="FocusStrokeColorOuter">#7CC0FF</Color>
+      <Color x:Key="FocusStrokeColorInner">#1E1E1E</Color>
+      <SolidColorBrush x:Key="Accent" Color="#7CC0FF" />
+      <SolidColorBrush x:Key="Accent.Hover" Color="#9ACFFF" />
+      <SolidColorBrush x:Key="Accent.Soft" Color="#227CC0FF" />
+      <SolidColorBrush x:Key="Accent.OnAccent" Color="#06263F" />
 
-      <SolidColorBrush x:Key="Severity.High" Color="#F07178" />
-      <SolidColorBrush x:Key="Severity.High.Soft" Color="#341A1D" />
-      <SolidColorBrush x:Key="Severity.Medium" Color="#E7A93C" />
-      <SolidColorBrush x:Key="Severity.Medium.Soft" Color="#33280F" />
-      <SolidColorBrush x:Key="Severity.Low" Color="#97A6C6" />
-      <SolidColorBrush x:Key="Severity.Low.Soft" Color="#1C2230" />
+      <SolidColorBrush x:Key="Diff.Added.Bg" Color="#28342D" />
+      <SolidColorBrush x:Key="Diff.Added.Gutter" Color="#2B3931" />
+      <SolidColorBrush x:Key="Diff.Added.Sign" Color="#6FCF97" />
+      <SolidColorBrush x:Key="Diff.Removed.Bg" Color="#402C2B" />
+      <SolidColorBrush x:Key="Diff.Removed.Gutter" Color="#482F2E" />
+      <SolidColorBrush x:Key="Diff.Removed.Sign" Color="#FF7B72" />
+      <SolidColorBrush x:Key="Diff.Hunk.Bg" Color="#2B2B2B" />
+      <SolidColorBrush x:Key="Diff.Hunk.Text" Color="#9E9E9E" />
+      <SolidColorBrush x:Key="Diff.Focus.Bg" Color="#2D3741" />
+      <SolidColorBrush x:Key="Diff.Focus.Edge" Color="#7CC0FF" />
+      <SolidColorBrush x:Key="Find.Match" Color="#44E9B44C" />
+      <SolidColorBrush x:Key="Find.Current" Color="#99E9B44C" />
+      <SolidColorBrush x:Key="Code.LineNumber" Color="#9E9E9E" />
+      <SolidColorBrush x:Key="Ruler.Thumb" Color="#1FF2F2F2" />
+      <SolidColorBrush x:Key="Ruler.ThumbEdge" Color="#55F2F2F2" />
 
-      <SolidColorBrush x:Key="Marker.Correctness" Color="#F0676E" />
-      <SolidColorBrush x:Key="Marker.Deviation" Color="#E7A93C" />
-      <SolidColorBrush x:Key="Marker.Behaviour" Color="#5B8DF5" />
-      <SolidColorBrush x:Key="Marker.Architecture" Color="#B084E0" />
-      <SolidColorBrush x:Key="Marker.Verified" Color="#4CC47A" />
+      <SolidColorBrush x:Key="Severity.High" Color="#FF7B72" />
+      <SolidColorBrush x:Key="Severity.High.Soft" Color="#3F2F2E" />
+      <SolidColorBrush x:Key="Severity.Medium" Color="#E9B44C" />
+      <SolidColorBrush x:Key="Severity.Medium.Soft" Color="#3A3426" />
+      <SolidColorBrush x:Key="Severity.Low" Color="#C4C4C4" />
+      <SolidColorBrush x:Key="Severity.Low.Soft" Color="#333333" />
 
-      <SolidColorBrush x:Key="Compare.Current.Bg" Color="#1E1416" />
-      <SolidColorBrush x:Key="Compare.Current.Border" Color="#3D2226" />
-      <SolidColorBrush x:Key="Compare.Current.Title" Color="#F0767C" />
-      <SolidColorBrush x:Key="Compare.Precedent.Bg" Color="#111D16" />
-      <SolidColorBrush x:Key="Compare.Precedent.Border" Color="#1F3A2A" />
-      <SolidColorBrush x:Key="Compare.Precedent.Title" Color="#5CCB8A" />
+      <SolidColorBrush x:Key="Marker.Correctness" Color="#FF7B72" />
+      <SolidColorBrush x:Key="Marker.Deviation" Color="#E9B44C" />
+      <SolidColorBrush x:Key="Marker.Behaviour" Color="#7CC0FF" />
+      <SolidColorBrush x:Key="Marker.Architecture" Color="#D6B4FF" />
+      <SolidColorBrush x:Key="Marker.Verified" Color="#6FCF97" />
 
-      <SolidColorBrush x:Key="Card.Deviation.Border" Color="#6B4E17" />
-      <SolidColorBrush x:Key="Card.Deviation.Bg" Color="#1C1912" />
-      <SolidColorBrush x:Key="Shadow" Color="#66000000" />
+      <SolidColorBrush x:Key="Compare.Current.Bg" Color="#252525" />
+      <SolidColorBrush x:Key="Compare.Current.Border" Color="#555555" />
+      <SolidColorBrush x:Key="Compare.Current.Title" Color="#FF7B72" />
+      <SolidColorBrush x:Key="Compare.Precedent.Bg" Color="#252525" />
+      <SolidColorBrush x:Key="Compare.Precedent.Border" Color="#555555" />
+      <SolidColorBrush x:Key="Compare.Precedent.Title" Color="#6FCF97" />
+      <SolidColorBrush x:Key="Card.Deviation.Border" Color="#555555" />
+      <SolidColorBrush x:Key="Card.Deviation.Bg" Color="#2B2B2B" />
+      <SolidColorBrush x:Key="Shadow" Color="#88000000" />
       <StreamGeometry x:Key="Icon.Refresh">M13.5,8 A5.5,5.5 0 1 1 11.9,4.1 M12.5,1.5 L12.5,4.5 L9.5,4.5</StreamGeometry>
   <StreamGeometry x:Key="Icon.Plus">M8,3 L8,13 M3,8 L13,8</StreamGeometry>
   <StreamGeometry x:Key="Icon.Commit">M8,5.5 A2.5,2.5 0 1 1 7.99,5.5 Z M1,8 L5.5,8 M10.5,8 L15,8</StreamGeometry>
@@ -135,15 +210,15 @@
   <StreamGeometry x:Key="Icon.Risk">M8,1.5 L14.5,8 L8,14.5 L1.5,8 Z M8,5 L8,8.8 M8,10.6 L8,11</StreamGeometry>
   <StreamGeometry x:Key="Icon.Tray">M1.5,9 L4.5,2.5 L11.5,2.5 L14.5,9 L14.5,13.5 L1.5,13.5 Z M1.5,9 L5.5,9 L6.5,11 L9.5,11 L10.5,9 L14.5,9</StreamGeometry>
   <StreamGeometry x:Key="Icon.Map">M1.5,3.5 L5.5,2 L10.5,3.5 L14.5,2 L14.5,12.5 L10.5,14 L5.5,12.5 L1.5,14 Z M5.5,2 L5.5,12.5 M10.5,3.5 L10.5,14</StreamGeometry>
-</ResourceDictionary>
+    </ResourceDictionary>
   </ResourceDictionary.ThemeDictionaries>
 
-  <FontFamily x:Key="UiFont">fonts:Inter#Inter, Segoe UI, Helvetica Neue, sans-serif</FontFamily>
-  <FontFamily x:Key="CodeFont">Cascadia Mono, Cascadia Code, JetBrains Mono, Consolas, Menlo, monospace</FontFamily>
-  <x:Double x:Key="CodeFontSize">12.5</x:Double>
-  <CornerRadius x:Key="Radius.Card">10</CornerRadius>
-  <CornerRadius x:Key="Radius.Control">7</CornerRadius>
-  <CornerRadius x:Key="Radius.Pill">999</CornerRadius>
+  <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI Variable, fonts:Inter#Inter, Segoe UI, sans-serif</FontFamily>
+  <FontFamily x:Key="CodeFont">Cascadia Code, Cascadia Mono, JetBrains Mono, Consolas, Menlo, monospace</FontFamily>
+  <x:Double x:Key="CodeFontSize">12</x:Double>
+  <CornerRadius x:Key="Radius.Card">4</CornerRadius>
+  <CornerRadius x:Key="Radius.Control">3</CornerRadius>
+  <CornerRadius x:Key="Radius.Pill">3</CornerRadius>
 
   <!-- Icon geometries (16×16 grid). Shapes differ by meaning so markers never rely on colour alone (TDD §28). -->
   <StreamGeometry x:Key="Icon.Deviation">M8,1.5 L14.5,13.5 L1.5,13.5 Z M7.25,5.5 L8.75,5.5 L8.6,9.6 L7.4,9.6 Z M8,10.6 A0.9,0.9 0 1 1 7.99,10.6 Z</StreamGeometry>

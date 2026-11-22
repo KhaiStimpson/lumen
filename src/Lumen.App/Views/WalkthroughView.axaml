@@ -38,14 +38,14 @@
     <Border Background="{DynamicResource Accent.Soft}" CornerRadius="6" Padding="10,7"
             IsVisible="{Binding DeltaWalkthrough.HasIntent, FallbackValue=False}">
       <StackPanel Spacing="2">
-        <TextBlock Classes="section" Text="SINCE YOU LAST LOOKED" />
+        <TextBlock Classes="section" Text="Since you last looked" />
         <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding DeltaWalkthrough.Intent, FallbackValue=''}" />
       </StackPanel>
     </Border>
 
     <!-- Change groups in reading order -->
     <StackPanel Spacing="2" IsVisible="{Binding Walkthrough.Groups.Count, Converter={x:Static views:Converters.IsPositive}, FallbackValue=False}">
-      <TextBlock Classes="section" Text="READING ORDER" Margin="0,4,0,2" />
+      <TextBlock Classes="section" Text="Reading order" Margin="0,4,0,2" />
       <ItemsControl Name="WalkthroughGroups" ItemsSource="{Binding Walkthrough.Groups, FallbackValue={x:Null}}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:WalkthroughGroupViewModel">
@@ -70,7 +70,7 @@
 
     <!-- Risky areas: a checklist on your own PR -->
     <StackPanel Spacing="2" IsVisible="{Binding Walkthrough.HasRisks, FallbackValue=False}">
-      <TextBlock Classes="section" Text="WORTH A CAREFUL LOOK" Margin="0,4,0,2" />
+      <TextBlock Classes="section" Text="Worth a careful look" Margin="0,4,0,2" />
       <ItemsControl Name="WalkthroughRisks" ItemsSource="{Binding Walkthrough.Risks, FallbackValue={x:Null}}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:RiskViewModel">
