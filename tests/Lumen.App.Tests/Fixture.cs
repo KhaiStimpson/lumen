@@ -23,6 +23,12 @@ internal static class Fixture
 
     public static FixtureReviewSource CreateSource() => new(DirectoryPath);
 
+    /// <summary>andrew-crm commit 85e0db9e run through the engine offline: a refactor with rename and move groups.</summary>
+    public static FixtureReviewSource CreateRefactorSource() => new(Path.Combine(AppContext.BaseDirectory, "fixtures", "andrew-crm-refactor"));
+
+    /// <summary>andrew-crm commit cc4e8ef9 run through the engine offline: renamed-only files and a migration.</summary>
+    public static FixtureReviewSource CreateAuditSource() => new(Path.Combine(AppContext.BaseDirectory, "fixtures", "andrew-crm-audit"));
+
     /// <summary>Starts a view model over the fixture and waits for the analysis to complete.</summary>
     public static async Task<PullRequestViewModel> LoadAsync(IReviewSource source)
     {

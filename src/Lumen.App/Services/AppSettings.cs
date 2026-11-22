@@ -30,7 +30,13 @@ public sealed class AppSettings
     {
         try
         {
-            return File.Exists(path) ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new() : new();
+            var settings = File.Exists(path) ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new() : new();
+            settings.RecentPullRequests = [.. (settings.RecentPullRequests ?? [])
+                .Where(reference => !string.IsNullOrWhiteSpace(reference))
+                .Select(reference => reference.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(8)];
+            return settings;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {

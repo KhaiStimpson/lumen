@@ -1,0 +1,9 @@
+{
+  "labels": [
+    { "path": "src/Order.cs",  "side": "old",  "startLine": 13, "endLine": 13, "tier": "Critical", "note": "removed null guard" },
+    { "path": "src/Sneaky.cs", "side": "head", "startLine": 8,  "endLine": 8,  "tier": "Critical", "note": "boundary changed from > to >=" },
+    { "path": "src/Fmt.cs",    "side": "head", "startLine": 5,  "endLine": 5,  "tier": "Skip",     "note": "whitespace only" },
+    { "path": "src/Fresh.cs",  "side": "head", "startLine": 1,  "endLine": 3,  "tier": "Skim",     "note": "empty new type", "draft": true },
+    { "path": "src/Gone.cs",   "side": "head", "startLine": 1,  "endLine": 2,  "tier": "Critical", "note": "points at nothing" }
+  ]
+}

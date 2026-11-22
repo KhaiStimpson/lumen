@@ -64,11 +64,15 @@ public sealed partial class ReviewEngineService(
 
     public override async Task<SourceFile> GetSourceFile(GetSourceFileRequest request, ServerCallContext context)
     {
-        var checkout = RequireSession(request.PullRequest).Checkout
+        var session = RequireSession(request.PullRequest);
+        var checkout = session.Checkout
             ?? throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pull request is still loading."));
         try
         {
-            var text = await checkout.ReadHeadFileAsync(request.Path, context.CancellationToken).ConfigureAwait(false);
+            var basePath = session.Snapshot?.FindFile(request.Path)?.OldPath ?? request.Path;
+            var text = request.FromBase
+                ? await checkout.ReadBaseFileAsync(basePath, context.CancellationToken).ConfigureAwait(false)
+                : await checkout.ReadHeadFileAsync(request.Path, context.CancellationToken).ConfigureAwait(false);
             return new SourceFile { Path = request.Path, Text = text ?? "", Exists = text is not null };
         }
         catch (ArgumentException ex)
@@ -111,6 +115,31 @@ public sealed partial class ReviewEngineService(
         return posted is not null
             ? new PostReviewCommentReply { CommentId = posted.Id, Url = posted.Url }
             : new PostReviewCommentReply { AddedToPendingReview = true, PendingReview = ProtoMapper.ToProto(pending, session.PendingPoints) };
+    }
+
+    public override async Task<SetTriageGroupAcknowledgedReply> SetTriageGroupAcknowledged(SetTriageGroupAcknowledgedRequest request, ServerCallContext context)
+    {
+        var session = RequireSession(request.PullRequest);
+        if (session.Triage?.Groups.Any(g => g.Id == request.GroupId) != true)
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, $"Unknown triage group '{request.GroupId}'."));
+        }
+
+        await store.RecordInteractionAsync(
+            new ReviewInteraction(
+                session.Key,
+                session.Snapshot?.HeadSha ?? "",
+                TriageAcknowledgement.InteractionId(request.GroupId),
+                request.Acknowledged ? ReviewAction.Acknowledged : ReviewAction.Unacknowledged,
+                time.GetUtcNow(),
+                null),
+            context.CancellationToken).ConfigureAwait(false);
+
+        session.Publish(new PullRequestEvent
+        {
+            TriageGroupAcknowledged = new TriageGroupAcknowledged { GroupId = request.GroupId, Acknowledged = request.Acknowledged },
+        });
+        return new SetTriageGroupAcknowledgedReply();
     }
 
     public override async Task<SetFileViewedReply> SetFileViewed(SetFileViewedRequest request, ServerCallContext context)
@@ -542,10 +571,20 @@ public sealed partial class ReviewEngineService(
             new ReviewInteraction(session.Key, session.Snapshot?.HeadSha ?? "", reviewPointId, ProtoMapper.ToAction(state), time.GetUtcNow(), detail),
             cancellationToken).ConfigureAwait(false);
 
-        session.Publish(new PullRequestEvent
-        {
-            ReviewPointStateChanged = new ReviewPointStateChanged { ReviewPointId = reviewPointId, State = state },
-        });
+        session.UpdateReviewPoint(
+            reviewPointId,
+            point => point with { State = state switch
+            {
+                Contracts.ReviewPointState.Dismissed => Domain.ReviewPointState.Dismissed,
+                Contracts.ReviewPointState.Commented => Domain.ReviewPointState.Commented,
+                Contracts.ReviewPointState.Examined => Domain.ReviewPointState.Examined,
+                Contracts.ReviewPointState.Resolved => Domain.ReviewPointState.Resolved,
+                _ => Domain.ReviewPointState.Visible,
+            } },
+            _ => new PullRequestEvent
+            {
+                ReviewPointStateChanged = new ReviewPointStateChanged { ReviewPointId = reviewPointId, State = state },
+            });
     }
 
     private PullRequestSession RequireSession(PullRequestRef pullRequest) =>

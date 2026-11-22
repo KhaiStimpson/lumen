@@ -222,6 +222,55 @@ public sealed class InvestigationTests : IDisposable
     }
 
     [Fact]
+    public async Task SchedulerPassesTheMeteredOptInToTheActualAgentSession()
+    {
+        var provider = new FakeProvider(request =>
+        {
+            if (!request.AllowMeteredUsage)
+            {
+                throw new AgentUnavailableException("metered usage requires opt-in");
+            }
+
+            return Answer("{}");
+        }) { State = new AgentAuthenticationState(AgentConnectionStatus.SignedIn, AgentBilling.Metered, "API key") };
+        using var scheduler = Scheduler(provider, new MemoryInvestigationStore(), new InvestigationSchedulerOptions { AllowMeteredUsage = true });
+
+        var summary = await scheduler.RunAsync(new FakeCheckout(_repo), Pr,
+            [new InvestigationJob(Point(), InvestigationType.RepositoryPattern, InvestigationBudget.Standard, 1)],
+            (_, _) => Task.CompletedTask, _ => { }, CancellationToken.None);
+
+        Assert.True(Assert.Single(provider.Requests).AllowMeteredUsage);
+        Assert.Equal(1, summary.Completed);
+        Assert.Null(summary.Unavailable);
+    }
+
+    [Fact]
+    public async Task TurningInvestigationsOffPreventsQueuedSessionsFromStarting()
+    {
+        var release = new TaskCompletionSource<AgentSessionResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var provider = new FakeProvider(_ => throw new InvalidOperationException()) { Completion = release.Task };
+        var options = new InvestigationSchedulerOptions { MaxConcurrent = 1, MaxPerPullRequest = 2 };
+        using var scheduler = new InvestigationScheduler(
+            [new RepositoryPatternInvestigator(TimeProvider.System)], provider, new MemoryInvestigationStore(),
+            new FakeWorktrees(_repo), () => options, NullLogger<InvestigationScheduler>.Instance);
+
+        var run = scheduler.RunAsync(new FakeCheckout(_repo), Pr,
+            [new InvestigationJob(Point("first"), InvestigationType.RepositoryPattern, InvestigationBudget.Standard, 2),
+             new InvestigationJob(Point("queued"), InvestigationType.RepositoryPattern, InvestigationBudget.Standard, 1)],
+            (_, _) => Task.CompletedTask, _ => { }, CancellationToken.None);
+
+        Assert.Single(provider.Requests);
+        options = options with { Enabled = false };
+        release.SetResult(Answer("{}"));
+        var summary = await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Single(provider.Requests);
+        Assert.Equal(1, summary.Completed);
+        Assert.Equal(1, summary.Skipped);
+        Assert.Contains("disabled", summary.Unavailable, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task SchedulerGivesMutatingRolesAnIsolatedWorktree()
     {
         var worktrees = new FakeWorktrees(_repo);
@@ -261,6 +310,8 @@ public sealed class InvestigationTests : IDisposable
 
     private sealed class FakeProvider(Func<AgentSessionRequest, AgentSessionResult> answer) : IAgentProvider
     {
+        public Task<AgentSessionResult>? Completion { get; init; }
+
         public AgentAuthenticationState State { get; init; } = new(AgentConnectionStatus.SignedIn, AgentBilling.Subscription, "Claude Pro via Claude Code");
 
         public List<AgentSessionRequest> Requests { get; } = [];
@@ -276,7 +327,7 @@ public sealed class InvestigationTests : IDisposable
             Requests.Add(request);
             var events = Channel.CreateUnbounded<AgentEvent>();
             events.Writer.Complete();
-            return Task.FromResult(new AgentSession("s", events.Reader, Task.FromResult(answer(request)), () => { }));
+            return Task.FromResult(new AgentSession("s", events.Reader, Completion ?? Task.FromResult(answer(request)), () => { }));
         }
     }
 

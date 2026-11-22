@@ -82,8 +82,14 @@ public sealed partial class FixtureReviewSource : IReviewSource
         return Task.FromResult(_diffs.TryGetValue(request.Path, out var diff) ? diff : new FileDiff { Path = request.Path });
     }
 
-    public Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken)
+    public Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken, bool fromBase = false)
     {
+        if (fromBase)
+        {
+            // The recording has no whole base files. Keep the recorded precedent snippet as the proof.
+            return Task.FromResult(new SourceFile { Path = path, Exists = false });
+        }
+
         // Reconstruct head-side text from the diff when available; precedent files usually aren't in the diff.
         if (_diffs.TryGetValue(path, out var diff))
         {
@@ -132,6 +138,12 @@ public sealed partial class FixtureReviewSource : IReviewSource
     public Task SetFileViewedAsync(PullRequestRef pullRequest, string path, bool viewed, CancellationToken cancellationToken)
     {
         Broadcast(new PullRequestEvent { FileViewed = new FileViewed { Path = path, Viewed = viewed } });
+        return Task.CompletedTask;
+    }
+
+    public Task SetTriageGroupAcknowledgedAsync(PullRequestRef pullRequest, string groupId, bool acknowledged, CancellationToken cancellationToken)
+    {
+        Broadcast(new PullRequestEvent { TriageGroupAcknowledged = new TriageGroupAcknowledged { GroupId = groupId, Acknowledged = acknowledged } });
         return Task.CompletedTask;
     }
 

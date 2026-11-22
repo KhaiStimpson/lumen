@@ -1,0 +1,32 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             x:Class="Lumen.App.Views.FoldBadgeView"
+             x:DataType="vm:FoldBadgeViewModel"
+             FontFamily="{StaticResource UiFont}">
+  <!-- A proven-mechanical hunk, collapsed behind its reason (docs/design/review-plan.md). Quiet: no accent, no severity. -->
+  <Border Background="{DynamicResource Surface.Sunken}" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="1"
+          CornerRadius="7" Padding="10,5,6,5" HorizontalAlignment="Stretch">
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+      <Path Data="{StaticResource Icon.Generated}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke"
+            Width="12" Height="12" VerticalAlignment="Center" />
+      <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="12" TextTrimming="CharacterEllipsis">
+        <Run Text="{Binding Reason}" FontWeight="Medium" Foreground="{DynamicResource Text.Secondary}" />
+        <Run Text="  ·  " Foreground="{DynamicResource Text.Tertiary}" />
+        <Run Text="{Binding LinesLabel}" Foreground="{DynamicResource Text.Tertiary}" />
+      </TextBlock>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" IsVisible="{Binding HasGroup}">
+        <Button Classes="ghost" Padding="5" Command="{Binding PreviousCommand}" IsHitTestVisible="{Binding HasPrevious}" Opacity="{Binding !HasPrevious, Converter={x:Static views:Converters.DimIf}}" ToolTip.Tip="Previous in this group">
+          <Path Data="{StaticResource Icon.ChevronLeft}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="10" Height="10" />
+        </Button>
+        <TextBlock Classes="caption tertiary" Text="{Binding GroupLabel}" VerticalAlignment="Center" ToolTip.Tip="{Binding GroupTitle}" />
+        <Button Classes="ghost" Padding="5" Command="{Binding NextCommand}" IsHitTestVisible="{Binding HasNext}" Opacity="{Binding !HasNext, Converter={x:Static views:Converters.DimIf}}" ToolTip.Tip="Next in this group">
+          <Path Data="{StaticResource Icon.ChevronRight}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="10" Height="10" />
+        </Button>
+      </StackPanel>
+      <Button Grid.Column="3" Classes="link" Content="{Binding ToggleLabel}" Command="{Binding ToggleCommand}" VerticalAlignment="Center"
+              ToolTip.Tip="Show or hide the mechanical lines" />
+    </Grid>
+  </Border>
+</UserControl>

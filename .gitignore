@@ -483,3 +483,7 @@ $RECYCLE.BIN/
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# flow working state
+.flow/logs/
+.flow/wrap-pending

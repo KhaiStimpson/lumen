@@ -70,13 +70,10 @@ public sealed partial class InvestigationCoordinator(
                 jobs,
                 (investigation, point) =>
                 {
-                    var current = session.FindReviewPoint(point.Id) ?? point;
-                    var updated = EvidenceAggregator.Apply(current, investigation);
-                    if (!ReferenceEquals(updated, current))
-                    {
-                        session.AddReviewPoint(updated);
-                        session.Publish(new PullRequestEvent { ReviewPointUpdated = ProtoMapper.ToProto(updated) });
-                    }
+                    session.UpdateReviewPoint(
+                        point.Id,
+                        current => EvidenceAggregator.Apply(current, investigation),
+                        updated => new PullRequestEvent { ReviewPointUpdated = ProtoMapper.ToProto(updated) });
 
                     return Task.CompletedTask;
                 },

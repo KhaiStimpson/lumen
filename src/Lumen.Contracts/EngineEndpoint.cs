@@ -11,7 +11,7 @@ namespace Lumen.Contracts;
 /// </summary>
 public static class EngineEndpoint
 {
-    public const string ContractVersion = "v1";
+    public const string ContractVersion = "v2";
 
     public static string DefaultName =>
         $"lumen-engine-{ContractVersion}-{Sanitize(Environment.UserName)}";

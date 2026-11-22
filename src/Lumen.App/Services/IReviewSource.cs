@@ -16,7 +16,7 @@ public interface IReviewSource : IAsyncDisposable
     /// <summary>A file's diff, optionally limited to a commit range or ignoring whitespace.</summary>
     Task<FileDiff> GetFileDiffAsync(GetFileDiffRequest request, CancellationToken cancellationToken);
 
-    Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken);
+    Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken, bool fromBase = false);
 
     Task SetReviewPointStateAsync(PullRequestRef pullRequest, string reviewPointId, ReviewPointState state, CancellationToken cancellationToken);
 
@@ -24,6 +24,9 @@ public interface IReviewSource : IAsyncDisposable
 
     /// <summary>Ticks or clears the file's "Viewed" checkbox on GitHub.</summary>
     Task SetFileViewedAsync(PullRequestRef pullRequest, string path, bool viewed, CancellationToken cancellationToken);
+
+    /// <summary>Clears (or restores) a triage group for this pull request; the engine stores it like a dismissal.</summary>
+    Task SetTriageGroupAcknowledgedAsync(PullRequestRef pullRequest, string groupId, bool acknowledged, CancellationToken cancellationToken);
 
     Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken);
 

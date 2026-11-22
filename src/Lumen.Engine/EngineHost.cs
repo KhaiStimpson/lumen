@@ -88,6 +88,7 @@ public static class EngineHost
         services.AddSingleton<IReviewStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
         services.AddSingleton<IAttentionEvaluationStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
         services.AddSingleton<IInvestigationStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
+        services.AddSingleton<ITriageStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
         services.AddSingleton<IPullRequestVisitStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
         services.AddSingleton<IWalkthroughStore>(sp => sp.GetRequiredService<SqliteReviewStore>());
 
@@ -102,6 +103,7 @@ public static class EngineHost
         services.AddSingleton<IReviewPointExplainer, PeerDeviationExplainer>();
         services.AddSingleton<ReviewPointPipeline>();
         AddAgents(services, options);
+        services.AddSingleton<TriageRunner>();
         AddFastModel(services, options);
         services.AddSingleton<PullRequestSessionManager>();
         services.AddSingleton<ReviewActions>();
@@ -218,6 +220,7 @@ public static class EngineHost
                 sp.GetRequiredService<IAgentWorktreeFactory>(),
                 () => new InvestigationSchedulerOptions
                 {
+                    Enabled = settings.Current.AgentsAllowed,
                     MaxConcurrent = settings.Current.Agents.MaxConcurrent,
                     MaxPerPullRequest = settings.Current.Agents.MaxInvestigationsPerPullRequest,
                     AllowMeteredUsage = settings.Current.Agents.AllowMeteredUsage,

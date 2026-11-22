@@ -1,0 +1,293 @@
+{
+  "pr": "KhaiStimpson/andrew-crm#58",
+  "labels": [
+    {
+      "path": "src/AndrewCrm.Web/Services/Ai/AiSourceAuthorization.cs",
+      "side": "head",
+      "startLine": 74,
+      "endLine": 83,
+      "tier": "Critical",
+      "note": "new ExternalKnowledge branch in the AI source authorization gate: missing item is allowed when allowDeleted, and the cross-contact check only runs when the item exists",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Services/CatchMeUpService.cs",
+      "side": "head",
+      "startLine": 515,
+      "endLine": 531,
+      "tier": "Critical",
+      "note": "external enrichment text (untrusted web/news content) enters the AI prompt context",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Services/CatchMeUpService.cs",
+      "side": "head",
+      "startLine": 538,
+      "endLine": 546,
+      "tier": "WorthALook",
+      "note": "snapshot hash now includes external sources; changes brief invalidation",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Services/CatchMeUpService.cs",
+      "side": "head",
+      "startLine": 218,
+      "endLine": 239,
+      "tier": "WorthALook",
+      "note": "source-link resolution rewritten from a conditional to a switch; deleted-source fallback behaviour",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Services/CatchMeUpService.cs",
+      "side": "head",
+      "startLine": 205,
+      "endLine": 209,
+      "tier": "WorthALook",
+      "note": "loads eligible external knowledge for source links",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Services/CatchMeUpService.cs",
+      "side": "head",
+      "startLine": 340,
+      "endLine": 346,
+      "tier": "WorthALook",
+      "note": "staleness count now includes newer external knowledge",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Services/Enrichment/EnrichmentScheduler.cs",
+      "side": "head",
+      "startLine": 46,
+      "endLine": 50,
+      "tier": "Critical",
+      "note": "IgnoreQueryFilters over all tenants in the scheduled refresh; tenant isolation depends on the per-tenant loop below",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Services/Enrichment/EnrichmentIngestionService.cs",
+      "side": "head",
+      "startLine": 255,
+      "endLine": 281,
+      "tier": "WorthALook",
+      "note": "accepting a suggestion writes an external value into the contact record",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Services/Enrichment/EnrichmentIngestionService.cs",
+      "side": "head",
+      "startLine": 290,
+      "endLine": 301,
+      "tier": "WorthALook",
+      "note": "field-by-field application of external values to Contact",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Services/Enrichment/PeopleDataLabsProvider.cs",
+      "side": "head",
+      "startLine": 30,
+      "endLine": 45,
+      "tier": "WorthALook",
+      "note": "sends the contact email to a paid third party using the tenant API key",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Services/Enrichment/EnrichmentSettingsService.cs",
+      "side": "head",
+      "startLine": 80,
+      "endLine": 110,
+      "tier": "WorthALook",
+      "note": "provider API key stored/decrypted with DataProtection",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Services/ImportService.cs",
+      "side": "head",
+      "startLine": 105,
+      "endLine": 116,
+      "tier": "WorthALook",
+      "note": "auto-enqueues enrichment for every imported contact when the tenant opted in (fan-out, external calls)",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Pages/Settings/Index.cshtml.cs",
+      "side": "head",
+      "startLine": 108,
+      "endLine": 117,
+      "tier": "WorthALook",
+      "note": "opt-in consent switch for enrichment; records who enabled it",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Program.cs",
+      "side": "head",
+      "startLine": 461,
+      "endLine": 467,
+      "tier": "WorthALook",
+      "note": "daily recurring job that re-enriches contacts",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Data/Entities.cs",
+      "side": "head",
+      "startLine": 112,
+      "endLine": 113,
+      "tier": "WorthALook",
+      "note": "persisted enum gains a value; existing values must not be renumbered",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Services/RecommendationService.cs",
+      "side": "head",
+      "startLine": 177,
+      "endLine": 179,
+      "tier": "WorthALook",
+      "note": "deterministic engine now excludes enrichment signals",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Program.cs",
+      "side": "head",
+      "startLine": 228,
+      "endLine": 274,
+      "tier": "Skim",
+      "note": "DI registration of enrichment services and typed HttpClients",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Program.cs",
+      "side": "head",
+      "startLine": 191,
+      "endLine": 191,
+      "tier": "Skim",
+      "note": "DI registration",
+      "draft": true
+    },
+    {
+      "path": "src/AndrewCrm.Web/Services/Conversations/ConversationStreamService.cs",
+      "side": "head",
+      "startLine": 34,
+      "endLine": 34,
+      "tier": "Skim",
+      "note": "one activity type added to the stream filter",
+      "draft": true
+    },
+    {
+      "path": "docs/specs/contact-data-enrichment.md",
+      "side": "head",
+      "startLine": 1,
+      "endLine": 200,
+      "tier": "Skim",
+      "note": "design brief",
+      "draft": true
+    },
+    {
+      "path": "CONTEXT.md",
+      "side": "head",
+      "startLine": 66,
+      "endLine": 103,
+      "tier": "Skim",
+      "note": "docs",
+      "draft": true
+    },
+    {
+      "path": "README.md",
+      "side": "head",
+      "startLine": 91,
+      "endLine": 92,
+      "tier": "Skim",
+      "note": "docs",
+      "draft": true
+    },
+    {
+      "path": "tests/AndrewCrm.Web.Tests/Services/BusinessRegistryProviderTests.cs",
+      "side": "head",
+      "startLine": 1,
+      "endLine": 157,
+      "tier": "Skim",
+      "note": "new tests",
+      "draft": true
+    },
+    {
+      "path": "tests/AndrewCrm.Web.Tests/Services/CompanyWebsiteEnrichmentProviderTests.cs",
+      "side": "head",
+      "startLine": 1,
+      "endLine": 133,
+      "tier": "Skim",
+      "note": "new tests",
+      "draft": true
+    },
+    {
+      "path": "tests/AndrewCrm.Web.Tests/Services/EnrichmentIngestionServiceTests.cs",
+      "side": "head",
+      "startLine": 1,
+      "endLine": 269,
+      "tier": "Skim",
+      "note": "new tests",
+      "draft": true
+    },
+    {
+      "path": "tests/AndrewCrm.Web.Tests/Services/EnrichmentSchedulerTests.cs",
+      "side": "head",
+      "startLine": 1,
+      "endLine": 135,
+      "tier": "Skim",
+      "note": "new tests",
+      "draft": true
+    },
+    {
+      "path": "tests/AndrewCrm.Web.Tests/Services/EnrichmentServiceTests.cs",
+      "side": "head",
+      "startLine": 1,
+      "endLine": 149,
+      "tier": "Skim",
+      "note": "new tests",
+      "draft": true
+    },
+    {
+      "path": "tests/AndrewCrm.Web.Tests/Services/ExternalKnowledgeRetrievalTests.cs",
+      "side": "head",
+      "startLine": 1,
+      "endLine": 150,
+      "tier": "Skim",
+      "note": "new tests",
+      "draft": true
+    },
+    {
+      "path": "tests/AndrewCrm.Web.Tests/Services/ImportEnrichmentEnqueueTests.cs",
+      "side": "head",
+      "startLine": 1,
+      "endLine": 103,
+      "tier": "Skim",
+      "note": "new tests",
+      "draft": true
+    },
+    {
+      "path": "tests/AndrewCrm.Web.Tests/Services/NewsSignalProviderTests.cs",
+      "side": "head",
+      "startLine": 1,
+      "endLine": 98,
+      "tier": "Skim",
+      "note": "new tests",
+      "draft": true
+    },
+    {
+      "path": "tests/AndrewCrm.Web.Tests/Services/PeopleDataLabsProviderTests.cs",
+      "side": "head",
+      "startLine": 1,
+      "endLine": 95,
+      "tier": "Skim",
+      "note": "new tests",
+      "draft": true
+    },
+    {
+      "path": "tests/AndrewCrm.Web.Tests/Services/SignalRecommendationTests.cs",
+      "side": "head",
+      "startLine": 1,
+      "endLine": 106,
+      "tier": "Skim",
+      "note": "new tests",
+      "draft": true
+    }
+  ]
+}

@@ -95,16 +95,11 @@ public sealed class SandboxedProcessRunner(CommandPolicy policy) : IProcessRunne
 
             process.StandardInput.Close();
 
-            while (await process.StandardOutput.ReadLineAsync(linked.Token).ConfigureAwait(false) is { } line)
+            bytes = await PumpStandardOutputAsync(process.StandardOutput.BaseStream, command.MaxOutputBytes, onOutputLine, linked.Token)
+                .ConfigureAwait(false);
+            if (bytes > command.MaxOutputBytes)
             {
-                bytes += Utf8.GetByteCount(line) + 1;
-                if (bytes > command.MaxOutputBytes)
-                {
-                    end = ProcessEnd.OutputLimitExceeded;
-                    break;
-                }
-
-                await onOutputLine(line).ConfigureAwait(false);
+                end = ProcessEnd.OutputLimitExceeded;
             }
 
             if (end == ProcessEnd.Exited)
@@ -119,6 +114,12 @@ public sealed class SandboxedProcessRunner(CommandPolicy policy) : IProcessRunne
         catch (IOException) when (process.HasExited)
         {
         }
+        catch
+        {
+            Kill(process);
+            await stderrTask.ConfigureAwait(false);
+            throw;
+        }
 
         if (end != ProcessEnd.Exited)
         {
@@ -128,6 +129,63 @@ public sealed class SandboxedProcessRunner(CommandPolicy policy) : IProcessRunne
         await stderrTask.ConfigureAwait(false);
         var tail = stderr.Length > StandardErrorTailChars ? stderr.ToString(stderr.Length - StandardErrorTailChars, StandardErrorTailChars) : stderr.ToString();
         return new ProcessResult(end, end == ProcessEnd.Exited ? process.ExitCode : null, tail, bytes);
+    }
+
+    /// <summary>Counts raw bytes before buffering lines, so output without newlines cannot bypass the cap.</summary>
+    private static async Task<long> PumpStandardOutputAsync(
+        Stream stream,
+        long limit,
+        Func<string, ValueTask> onOutputLine,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[4096];
+        var characters = new char[Utf8.GetMaxCharCount(buffer.Length)];
+        var decoder = Utf8.GetDecoder();
+        var line = new StringBuilder();
+        var afterCarriageReturn = false;
+        long bytes = 0;
+        while (true)
+        {
+            var read = await stream.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, limit - bytes + 1)), cancellationToken)
+                .ConfigureAwait(false);
+            bytes += read;
+            if (bytes > limit)
+            {
+                return bytes;
+            }
+
+            var count = decoder.GetChars(buffer, 0, read, characters, 0, flush: read == 0);
+            for (var i = 0; i < count; i++)
+            {
+                var character = characters[i];
+                if (afterCarriageReturn && character == '\n')
+                {
+                    afterCarriageReturn = false;
+                    continue;
+                }
+
+                afterCarriageReturn = character == '\r';
+                if (character is '\r' or '\n')
+                {
+                    await onOutputLine(line.ToString()).ConfigureAwait(false);
+                    line.Clear();
+                }
+                else
+                {
+                    line.Append(character);
+                }
+            }
+
+            if (read == 0)
+            {
+                if (line.Length > 0)
+                {
+                    await onOutputLine(line.ToString()).ConfigureAwait(false);
+                }
+
+                return bytes;
+            }
+        }
     }
 
     private static async Task PumpStandardErrorAsync(StreamReader reader, StringBuilder buffer)

@@ -69,9 +69,9 @@ public sealed class EngineReviewSource : IReviewSource
             .GetFileDiffAsync(request, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-    public async Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken) =>
+    public async Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken, bool fromBase = false) =>
         await (await ClientAsync(cancellationToken).ConfigureAwait(false))
-            .GetSourceFileAsync(new GetSourceFileRequest { PullRequest = pullRequest, Path = path }, cancellationToken: cancellationToken)
+            .GetSourceFileAsync(new GetSourceFileRequest { PullRequest = pullRequest, Path = path, FromBase = fromBase }, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
     public async Task SetReviewPointStateAsync(PullRequestRef pullRequest, string reviewPointId, ReviewPointState state, CancellationToken cancellationToken) =>
@@ -90,6 +90,13 @@ public sealed class EngineReviewSource : IReviewSource
         await (await ClientAsync(cancellationToken).ConfigureAwait(false))
             .SetFileViewedAsync(
                 new SetFileViewedRequest { PullRequest = pullRequest, Path = path, Viewed = viewed },
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task SetTriageGroupAcknowledgedAsync(PullRequestRef pullRequest, string groupId, bool acknowledged, CancellationToken cancellationToken) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .SetTriageGroupAcknowledgedAsync(
+                new SetTriageGroupAcknowledgedRequest { PullRequest = pullRequest, GroupId = groupId, Acknowledged = acknowledged },
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 

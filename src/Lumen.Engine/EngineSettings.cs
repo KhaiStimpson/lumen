@@ -99,13 +99,47 @@ public sealed record EngineSettings
         var path = PathIn(dataDirectory);
         try
         {
-            return File.Exists(path) ? JsonSerializer.Deserialize<EngineSettings>(File.ReadAllText(path), Json) ?? new() : new();
+            return File.Exists(path)
+                ? (JsonSerializer.Deserialize<EngineSettings>(File.ReadAllText(path), Json) ?? new()).Normalised()
+                : new();
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
             return new();
         }
     }
+
+    /// <summary>Hand-edited JSON can contain null sections or values outside the ranges the settings UI permits.</summary>
+    private EngineSettings Normalised()
+    {
+        var jev = Jev ?? new JevSettings();
+        var agents = Agents ?? new AgentSettings();
+        var review = Review ?? new ReviewSettings();
+        return this with
+        {
+            Privacy = Privacy ?? new PrivacySettings(),
+            Jev = jev with
+            {
+                Model = string.IsNullOrWhiteSpace(jev.Model) ? new JevSettings().Model : jev.Model.Trim(),
+                TimeoutSeconds = double.IsFinite(jev.TimeoutSeconds) ? Math.Clamp(jev.TimeoutSeconds, 2, 60) : new JevSettings().TimeoutSeconds,
+            },
+            Agents = agents with
+            {
+                MaxConcurrent = Math.Clamp(agents.MaxConcurrent, 1, 4),
+                MaxInvestigationsPerPullRequest = Math.Clamp(agents.MaxInvestigationsPerPullRequest, 0, 20),
+            },
+            Review = review with
+            {
+                Sensitivity = (review.Sensitivity ?? ReviewSensitivity.Balanced).Clamped(),
+                IgnoredNames = Clean(review.IgnoredNames),
+                MechanicalPaths = Clean(review.MechanicalPaths),
+                SkippedPaths = Clean(review.SkippedPaths),
+            },
+        };
+    }
+
+    private static List<string> Clean(IEnumerable<string>? entries) =>
+        [.. (entries ?? []).Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => e.Trim()).Distinct(StringComparer.Ordinal)];
 
     public void Save(string dataDirectory)
     {

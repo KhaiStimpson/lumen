@@ -28,6 +28,9 @@ public sealed class PullRequestSession : IDisposable
 
     public IPullRequestCheckout? Checkout { get; private set; }
 
+    /// <summary>The head commit's triage; null until computed, or when it could not be.</summary>
+    public TriageResult? Triage { get; private set; }
+
     public bool IsFinished { get; private set; }
 
     public bool HasFailed { get; private set; }
@@ -150,11 +153,37 @@ public sealed class PullRequestSession : IDisposable
         Checkout = checkout;
     }
 
+    internal void SetTriage(TriageResult? triage) => Triage = triage;
+
     internal void AddReviewPoint(Domain.ReviewPoint point)
     {
         lock (_gate)
         {
             _points[point.Id] = point;
+        }
+    }
+
+    /// <summary>Changes the latest point and publishes it under the same lock, preserving concurrent reviewer decisions.</summary>
+    internal void UpdateReviewPoint(
+        string id,
+        Func<Domain.ReviewPoint, Domain.ReviewPoint> update,
+        Func<Domain.ReviewPoint, PullRequestEvent> notification)
+    {
+        lock (_gate)
+        {
+            if (!_points.TryGetValue(id, out var current))
+            {
+                return;
+            }
+
+            var updated = update(current);
+            if (ReferenceEquals(current, updated))
+            {
+                return;
+            }
+
+            _points[id] = updated;
+            Publish(notification(updated));
         }
     }
 

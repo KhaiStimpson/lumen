@@ -13,6 +13,91 @@ namespace Lumen.App.Tests;
 public sealed class PullRequestViewModelTests
 {
     [AvaloniaFact]
+    public async Task PrecedentSourceUsesBaseWhileFullFileUsesHead()
+    {
+        var source = new GrpcLikeReviewSource(Fixture.CreateSource());
+        var pr = await Fixture.LoadAsync(source);
+        try
+        {
+            pr.ShowFullFile = true;
+            await Fixture.WaitUntilAsync(() => source.SourceRequests.Count > 0);
+            Assert.False(source.SourceRequests[^1].FromBase);
+            var example = pr.CurrentPoint!.PrecedentExamples[0];
+
+            await pr.OpenSourceAsync(example);
+
+            Assert.Equal((example.Path, true), source.SourceRequests[^1]);
+            Assert.Equal(example.Snippet, pr.SourcePreview!.Text);
+            Assert.Equal(example.StartLine, pr.SourcePreview.StartLine);
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task FailedFileSelectionClearsThePreviousFilesCode()
+    {
+        var source = new GrpcLikeReviewSource(Fixture.CreateSource());
+        var pr = await Fixture.LoadAsync(source);
+        try
+        {
+            Assert.NotNull(pr.CurrentDiff);
+            var next = pr.Files.First(f => f.Path != pr.SelectedFile!.Path);
+            source.FailDiffPath = next.Path;
+
+            await pr.SelectFileAsync(next);
+
+            Assert.Same(next, pr.SelectedFile);
+            Assert.Null(pr.CurrentDiff);
+            Assert.Empty(pr.Markers);
+            Assert.Null(pr.FocusRange);
+            Assert.False(pr.IsDiffLoading);
+            Assert.Contains("Diff unavailable", pr.Toast, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task RefreshWithNoReviewPointsReplacesSelectionAndClearsOldTriage()
+    {
+        var source = new GrpcLikeReviewSource(Fixture.CreateSource());
+        var pr = await Fixture.LoadAsync(source);
+        try
+        {
+            var oldFile = pr.SelectedFile!;
+            var remaining = pr.Files.First(f => f.Path != oldFile.Path && !f.IsMechanical);
+            source.RefreshEvents =
+            [
+                new PullRequestEvent { Snapshot = new PullRequestSnapshot { Files = { remaining.Model.Clone() } } },
+                new PullRequestEvent { Complete = new AnalysisComplete() },
+            ];
+
+            await pr.ReanalyseCommand.ExecuteAsync(null);
+            await Fixture.WaitUntilAsync(() => !pr.IsAnalysing);
+
+            Assert.Empty(pr.ReviewPoints);
+            Assert.Null(pr.Triage);
+            Assert.Empty(pr.ReviewPlan.Groups);
+            Assert.Empty(pr.ReviewPlan.Sections);
+            Assert.Equal(0, pr.CoverageFraction);
+            Assert.Equal("", pr.CoverageLabel);
+            Assert.Equal(remaining.Path, pr.SelectedFile?.Path);
+            Assert.Same(Assert.Single(pr.Files), pr.SelectedFile);
+            Assert.Equal(remaining.Path, pr.CurrentDiff?.Path);
+            Assert.DoesNotContain(oldFile, pr.Files);
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task LoadsFilesAndBuildsCompactTreeWithoutMechanicalFiles()
     {
         var pr = await Fixture.LoadAsync(Fixture.CreateSource());
@@ -27,6 +112,26 @@ public sealed class PullRequestViewModelTests
             Assert.Equal(46, fileNodes.Count);
             Assert.DoesNotContain(fileNodes, n => n.File!.IsMechanical);
             Assert.Contains(nodes, n => n.IsFolder && n.Name.Contains('/', StringComparison.Ordinal));
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task ReplayCarriesTheTriage()
+    {
+        var pr = await Fixture.LoadAsync(new GrpcLikeReviewSource(Fixture.CreateSource()));
+        try
+        {
+            var triage = pr.Triage;
+            Assert.NotNull(triage);
+            Assert.StartsWith("19,743 lines changed: 15,864 proven mechanical", triage.Summary.Text, StringComparison.Ordinal);
+            Assert.Equal(60, triage.Files.Count);
+            Assert.Contains(triage.Hunks, h => h.ChangeClass == ChangeClass.Generated && h.Tier == TriageTier.Skip);
+            Assert.Contains(triage.Hunks, h => h.ChangeClass == ChangeClass.ImportsOnly && h.Tier == TriageTier.Skip);
+            Assert.Equal(triage.Summary.TotalLines, triage.Files.Sum(f => f.TierLines.Critical + f.TierLines.WorthALook + f.TierLines.Skim + f.TierLines.Skip));
         }
         finally
         {
@@ -70,12 +175,15 @@ public sealed class PullRequestViewModelTests
         var pr = await Fixture.LoadAsync(source);
         try
         {
-            var file = pr.Files[0];
+            var path = pr.Triage!.Hunks.First(h => h.Tier == TriageTier.WorthALook && h.Path != pr.SelectedFile!.Path).Path;
+            var file = pr.Files.Single(f => f.Path == path);
+            var coverage = pr.CoverageFraction;
 
             await pr.ToggleViewedCommand.ExecuteAsync(file);
 
             Assert.False(file.IsViewed);
             Assert.Equal("0 / 60 viewed", pr.ViewedSummary);
+            Assert.Equal(coverage, pr.CoverageFraction);
             Assert.Contains("Resource not accessible", pr.Toast, StringComparison.Ordinal);
         }
         finally

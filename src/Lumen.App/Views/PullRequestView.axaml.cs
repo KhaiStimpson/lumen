@@ -20,6 +20,20 @@ public sealed partial class PullRequestView : UserControl, IDisposable
     {
         InitializeComponent();
         Editor.CardFactory = CreateCard;
+        if (!App.Motion.ReducedMotion)
+        {
+            // Progress eases forward; with reduced motion it simply takes its new value.
+            ((Avalonia.Media.ScaleTransform)CoverageFill.RenderTransform!).Transitions =
+            [
+                new Avalonia.Animation.DoubleTransition
+                {
+                    Property = Avalonia.Media.ScaleTransform.ScaleXProperty,
+                    Duration = TimeSpan.FromMilliseconds(320),
+                    Easing = new Avalonia.Animation.Easings.CubicEaseOut(),
+                },
+            ];
+        }
+
         SplitEditor.CardFactory = CreateCard;
         Editor.MarkerClicked += async (_, id) => await OnMarkerClickedAsync(id).ConfigureAwait(true);
         SplitEditor.MarkerClicked += async (_, id) => await OnMarkerClickedAsync(id).ConfigureAwait(true);
@@ -107,6 +121,7 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         if (_viewModel is not null)
         {
             _viewModel.NavigationRequested -= OnNavigationRequested;
+            _viewModel.PlanNavigationRequested -= OnPlanNavigationRequested;
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             _viewModel.DraftOpened -= OnDraftOpened;
             _viewModel.LineRevealRequested -= OnLineRevealRequested;
@@ -118,6 +133,7 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         if (_viewModel is not null)
         {
             _viewModel.NavigationRequested += OnNavigationRequested;
+            _viewModel.PlanNavigationRequested += OnPlanNavigationRequested;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
             _viewModel.DraftOpened += OnDraftOpened;
             _viewModel.LineRevealRequested += OnLineRevealRequested;
@@ -135,6 +151,11 @@ public sealed partial class PullRequestView : UserControl, IDisposable
     /// <summary>Review points, threads and comment drafts each have their own card (plan v2 M3, M4).</summary>
     private Control? CreateCard(string cardId)
     {
+        if (cardId.StartsWith(Diff.DiffFold.CardPrefix, StringComparison.Ordinal))
+        {
+            return _viewModel?.ResolveFold(cardId) is { } fold ? new FoldBadgeView { DataContext = fold } : null;
+        }
+
         if (_viewModel is null)
         {
             return null;
@@ -272,6 +293,34 @@ public sealed partial class PullRequestView : UserControl, IDisposable
             if (ExistingCard(request.Point.Id) is ReviewCardView arriving && request.Reason != NavigationReason.Refocus)
             {
                 await motion.RevealAsync(arriving.CardSurface, Motion.MotionPreset.NavigateReviewPoint, token).ConfigureAwait(true);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async void OnPlanNavigationRequested(object? sender, PlanTarget target)
+    {
+        _navigation?.Cancel();
+        _navigation?.Dispose();
+        _navigation = new CancellationTokenSource();
+        var token = _navigation.Token;
+        try
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render, token);
+            if (_viewModel?.CurrentDiff is not { } diff || diff.Path != target.Path)
+            {
+                return;
+            }
+
+            var badgeLine = target.FoldId is { } id ? diff.CardLine(DiffFold.CardPrefix + id) : null;
+            var documentLine = badgeLine ?? (target.IsOldSide
+                ? diff.Rows.Select((row, index) => (row, index)).Where(x => x.row.OldNumber >= target.StartLine).Select(x => (int?)(x.index + 1)).FirstOrDefault()
+                : diff.DocumentLineForNewLine(target.StartLine));
+            if (documentLine is { } line)
+            {
+                await Editor.RevealDocumentLineAsync(line, App.Motion, token).ConfigureAwait(true);
             }
         }
         catch (OperationCanceledException)

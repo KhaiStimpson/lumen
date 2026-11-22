@@ -230,6 +230,11 @@ public sealed partial class GitHubRestClient : IGitHubClient
 
         using (response)
         {
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                await _tokenSource.InvalidateAsync(cancellationToken).ConfigureAwait(false);
+            }
+
             throw await CreateExceptionAsync(request, response, cancellationToken).ConfigureAwait(false);
         }
     }

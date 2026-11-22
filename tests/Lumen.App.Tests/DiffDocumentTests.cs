@@ -195,6 +195,42 @@ public sealed class DiffDocumentTests
     }
 
     [Fact]
+    public void CollapsedFoldReplacesItsChangedLinesWithOneBadgeRow()
+    {
+        var fold = new DiffFold("f1", 2, 2, 2, 3, Expanded: false);
+
+        var doc = DiffDocument.Build(Sample(), NoCards, folds: [fold]);
+
+        Assert.Equal(
+            [DiffRowKind.HunkHeader, DiffRowKind.Context, DiffRowKind.Card, DiffRowKind.Context, DiffRowKind.HunkHeader, DiffRowKind.Context, DiffRowKind.Context],
+            doc.Rows.Select(r => r.Kind));
+        Assert.Equal("fold:f1", doc.Rows[2].CardId);
+        Assert.Equal(0, doc.Additions);
+        Assert.Equal(3, doc.CardLine("fold:f1"));
+    }
+
+    [Fact]
+    public void ExpandedFoldKeepsItsBadgeAboveTheLines()
+    {
+        var doc = DiffDocument.Build(Sample(), NoCards, folds: [new DiffFold("f1", 2, 2, 2, 3, Expanded: true)]);
+
+        Assert.Equal(
+            [DiffRowKind.HunkHeader, DiffRowKind.Context, DiffRowKind.Card, DiffRowKind.Removed, DiffRowKind.Added, DiffRowKind.Added, DiffRowKind.Context],
+            doc.Rows.Take(7).Select(r => r.Kind));
+        Assert.Equal(2, doc.Additions);
+    }
+
+    [Fact]
+    public void AFoldCoversOnlyItsOwnSpan()
+    {
+        var doc = DiffDocument.Build(Sample(), NoCards, folds: [new DiffFold("f1", 0, 0, 3, 3, Expanded: false)]);
+
+        Assert.Equal(
+            [DiffRowKind.HunkHeader, DiffRowKind.Context, DiffRowKind.Removed, DiffRowKind.Added, DiffRowKind.Card, DiffRowKind.Context],
+            doc.Rows.Take(6).Select(r => r.Kind));
+    }
+
+    [Fact]
     public void GroupsEachRunOfChangedRowsAndKeepsCardsInsideTheRun()
     {
         var doc = DiffDocument.Build(Sample(), [("p1", 2)]);

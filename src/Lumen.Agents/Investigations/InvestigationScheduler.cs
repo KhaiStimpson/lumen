@@ -8,6 +8,9 @@ public sealed record InvestigationJob(ReviewPoint Point, InvestigationType Type,
 
 public sealed record InvestigationSchedulerOptions
 {
+    /// <summary>Rechecked before each session so a live privacy opt-out also stops queued work.</summary>
+    public bool Enabled { get; init; } = true;
+
     /// <summary>Agent sessions running at once across all pull requests.</summary>
     public int MaxConcurrent { get; init; } = 1;
 
@@ -113,6 +116,11 @@ public sealed partial class InvestigationScheduler : IDisposable
             return new InvestigationRunSummary(cached, 0, skipped, null);
         }
 
+        if (!_currentOptions().Enabled)
+        {
+            return new InvestigationRunSummary(cached, 0, skipped + fresh.Count, "Investigations disabled in settings");
+        }
+
         var auth = await _provider.GetAuthenticationStateAsync(cancellationToken).ConfigureAwait(false);
         if (!auth.IsUsable || (auth.Billing != AgentBilling.Subscription && !_currentOptions().AllowMeteredUsage))
         {
@@ -136,7 +144,20 @@ public sealed partial class InvestigationScheduler : IDisposable
                     return;
                 }
 
-                var result = await RunOneAsync(checkout, item.Job, item.Investigator, cancellationToken).ConfigureAwait(false);
+                var options = _currentOptions();
+                if (!options.Enabled)
+                {
+                    unavailable = "Investigations disabled in settings";
+                    return;
+                }
+
+                if (auth.Billing != AgentBilling.Subscription && !options.AllowMeteredUsage)
+                {
+                    unavailable = "Metered usage is no longer enabled";
+                    return;
+                }
+
+                var result = await RunOneAsync(checkout, item.Job, item.Investigator, options.AllowMeteredUsage, cancellationToken).ConfigureAwait(false);
                 await _store.SaveInvestigationAsync(key, checkout.HeadSha, item.Job.Point.Id, result, CancellationToken.None).ConfigureAwait(false);
                 Interlocked.Increment(ref completed);
                 await onResult(result, item.Job.Point).ConfigureAwait(false);
@@ -164,9 +185,10 @@ public sealed partial class InvestigationScheduler : IDisposable
         IPullRequestCheckout checkout,
         InvestigationJob job,
         IInvestigator investigator,
+        bool allowMeteredUsage,
         CancellationToken cancellationToken)
     {
-        var brief = new InvestigationBrief(job.Point, checkout.RootPath, job.Budget);
+        var brief = new InvestigationBrief(job.Point, checkout.RootPath, job.Budget) { AllowMeteredUsage = allowMeteredUsage };
         if (!investigator.MutatesWorkingTree && !InvestigationLimits.For(job.Budget).IsolatedWorktree)
         {
             return await investigator.InvestigateAsync(brief, _provider, checkout.RootPath, cancellationToken).ConfigureAwait(false);

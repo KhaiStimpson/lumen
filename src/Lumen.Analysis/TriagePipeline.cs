@@ -1,0 +1,215 @@
+using Lumen.Domain;
+
+namespace Lumen.Analysis;
+
+/// <summary>What a classifier sees: the whole pull request, plus the one hunk it is asked about.</summary>
+public sealed record HunkContext(PullRequestSnapshot Snapshot, ChangedFile File, DiffHunk Hunk)
+{
+    /// <summary>The file at the merge-base, when it was loaded; proofs that need it decline without it.</summary>
+    public string? BaseText { get; init; }
+
+    /// <summary>The file at head, when it was loaded.</summary>
+    public string? HeadText { get; init; }
+
+    public TriageSources Sources { get; init; } = TriageSources.None;
+
+    /// <summary>Per-run cache shared by every classifier call (parsed trees, PR-wide analyses).</summary>
+    public TriageWorkspace Workspace { get; init; } = new();
+}
+
+/// <summary>A per-run cache so PR-wide analyses (rename maps, moved bodies) are computed once.</summary>
+public sealed class TriageWorkspace
+{
+    private readonly Dictionary<string, object?> cache = new(StringComparer.Ordinal);
+
+    public T GetOrAdd<T>(string key, Func<T> create)
+    {
+        if (cache.TryGetValue(key, out var existing))
+        {
+            return (T)existing!;
+        }
+
+        var value = create();
+        cache[key] = value;
+        return value;
+    }
+}
+
+/// <summary>Ties a hunk to others that are one idea across the pull request (a rename, a move, a ripple).</summary>
+public sealed record GroupClaim(string Key, string Title);
+
+/// <summary>A classifier's proof that a hunk is of a given class. <see cref="Reasons"/> are words, never a score.</summary>
+public sealed record HunkVerdict(ChangeClass Class, TriageTier Tier, IReadOnlyList<string> Reasons, GroupClaim? Group = null)
+{
+    /// <summary>
+    /// When set, the hunk is reported as these parts instead (for example the moved lines and the lines edited
+    /// during the move); each part's span and line count come from its own changed lines.
+    /// </summary>
+    public IReadOnlyList<HunkPart> Parts { get; init; } = [];
+}
+
+/// <summary>Some of a hunk's changed lines, with their own verdict.</summary>
+public sealed record HunkPart(ChangeClass Class, TriageTier Tier, IReadOnlyList<string> Reasons, GroupClaim? Group, IReadOnlyList<DiffLine> Lines);
+
+/// <summary>
+/// One proof about a hunk. Return null when the hunk is not provably of this class: any doubt, parse error or
+/// partial match is a null, because a false "mechanical" is the worst bug triage can ship.
+/// </summary>
+public interface IHunkClassifier
+{
+    HunkVerdict? Classify(HunkContext context);
+}
+
+/// <summary>Claims hunks in files the built-in mechanical rules recognise (generated code, lock files, migrations).</summary>
+public sealed class MechanicalFileClassifier : IHunkClassifier
+{
+    public HunkVerdict? Classify(HunkContext context) =>
+        context.File.Mechanical.IsMechanical
+            ? new(ChangeClass.Generated, TriageTier.Skip, [context.File.Mechanical.Reason ?? "Mechanical file"])
+            : null;
+}
+
+/// <summary>
+/// Runs classifiers in order over every hunk. The first proof wins; a hunk nobody claims is new code (added file)
+/// or a behaviour change, and is tiered provisionally until risk signals re-rank it.
+/// </summary>
+public sealed class TriagePipeline(IReadOnlyList<IHunkClassifier> classifiers)
+{
+    public static TriagePipeline Default { get; } = new([new MechanicalFileClassifier()]);
+
+    public TriageResult Run(PullRequestSnapshot snapshot, TriageSources? sources = null)
+    {
+        sources ??= TriageSources.None;
+        var workspace = new TriageWorkspace();
+        var hunks = new List<HunkTriage>();
+        var groupKeys = new List<string>();
+        var groupInfo = new Dictionary<string, (ChangeClass Class, string Title, List<HunkTriage> Members)>(StringComparer.Ordinal);
+
+        foreach (var file in snapshot.Files)
+        {
+            foreach (var hunk in file.Hunks)
+            {
+                if (SpanOf(hunk.Lines) is null)
+                {
+                    continue;
+                }
+
+                var verdict = ClassifyHunk(new HunkContext(snapshot, file, hunk)
+                {
+                    BaseText = sources.Base(file.Path),
+                    HeadText = sources.Head(file.Path),
+                    Sources = sources,
+                    Workspace = workspace,
+                }) ?? Fallback(file);
+
+                var parts = verdict.Parts.Count > 0
+                    ? verdict.Parts
+                    : [new HunkPart(verdict.Class, verdict.Tier, verdict.Reasons, verdict.Group, hunk.Lines)];
+                foreach (var part in parts)
+                {
+                    if (SpanOf(part.Lines) is not { } partSpan)
+                    {
+                        continue;
+                    }
+
+                    var groupId = part.Group is { } claim ? GroupId(claim.Key, groupKeys) : null;
+                    var triage = new HunkTriage
+                    {
+                        Path = file.Path,
+                        OldStart = partSpan.OldStart,
+                        OldEnd = partSpan.OldEnd,
+                        NewStart = partSpan.NewStart,
+                        NewEnd = partSpan.NewEnd,
+                        Class = part.Class,
+                        Tier = part.Tier,
+                        Reasons = part.Reasons,
+                        ChangedLines = part.Lines.Count(l => l.Kind != DiffLineKind.Context),
+                        GroupId = groupId,
+                    };
+                    hunks.Add(triage);
+
+                    if (groupId is not null)
+                    {
+                        if (!groupInfo.TryGetValue(groupId, out var info))
+                        {
+                            info = (part.Class, part.Group!.Title, []);
+                            groupInfo[groupId] = info;
+                        }
+
+                        info.Members.Add(triage);
+                    }
+                }
+            }
+        }
+
+        var groups = groupKeys
+            .Select(key => IdFor(key))
+            .Select(id => new TriageGroup { Id = id, Class = groupInfo[id].Class, Title = groupInfo[id].Title, Members = groupInfo[id].Members })
+            .ToList();
+
+        return new TriageResult(hunks, groups);
+    }
+
+    private HunkVerdict? ClassifyHunk(HunkContext context)
+    {
+        foreach (var classifier in classifiers)
+        {
+            try
+            {
+                if (classifier.Classify(context) is { } verdict)
+                {
+                    return verdict;
+                }
+            }
+            catch (Exception)
+            {
+                // A classifier that cannot decide has not proven anything. Fall through to the next one.
+            }
+        }
+
+        return null;
+    }
+
+    private static HunkVerdict Fallback(ChangedFile file) =>
+        file.Kind == FileChangeKind.Added
+            ? new(ChangeClass.NewCode, TriageTier.Skim, ["new file"])
+            : new(ChangeClass.BehaviourChange, TriageTier.WorthALook, ["changes existing code"]);
+
+    /// <summary>
+    /// A group's id is derived from what the group is (its claim key), not its position, so an acknowledgement stored
+    /// for a pull request still points at the same group after a new push or a re-analysis.
+    /// </summary>
+    public static string IdFor(string groupKey) =>
+        "g" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(groupKey)))[..12].ToLowerInvariant();
+
+    private static string GroupId(string key, List<string> keys)
+    {
+        if (!keys.Contains(key))
+        {
+            keys.Add(key);
+        }
+
+        return IdFor(key);
+    }
+
+    /// <summary>The tightest old/new line spans covering the hunk's changed lines; context is not part of the span.</summary>
+    private static (int? OldStart, int? OldEnd, int? NewStart, int? NewEnd)? SpanOf(IEnumerable<DiffLine> lines)
+    {
+        int? oldStart = null, oldEnd = null, newStart = null, newEnd = null;
+        foreach (var line in lines)
+        {
+            if (line.Kind == DiffLineKind.Removed && line.OldNumber is { } o)
+            {
+                oldStart = oldStart is null ? o : Math.Min(oldStart.Value, o);
+                oldEnd = oldEnd is null ? o : Math.Max(oldEnd.Value, o);
+            }
+            else if (line.Kind == DiffLineKind.Added && line.NewNumber is { } n)
+            {
+                newStart = newStart is null ? n : Math.Min(newStart.Value, n);
+                newEnd = newEnd is null ? n : Math.Max(newEnd.Value, n);
+            }
+        }
+
+        return oldStart is null && newStart is null ? null : (oldStart, oldEnd, newStart, newEnd);
+    }
+}

@@ -41,6 +41,25 @@ public sealed class GitHubRestClientTests : IDisposable
     }
 
     [Fact]
+    public async Task UnauthorizedInvalidatesTheCachedTokenWithoutRetryingTheWrite()
+    {
+        var token = "expired-token";
+        using var source = new GhCliTokenSource(_ => token, "unused-gh");
+        var client = new GitHubRestClient(_http, source);
+        _handler.Respond(HttpStatusCode.Unauthorized, """{"message":"Bad credentials"}""");
+
+        await Assert.ThrowsAsync<GitHubApiException>(() => client.PostReviewCommentAsync(
+            new NewReviewComment(Key, "head222", "src/Foo.cs", 17, "Looks off."), CancellationToken.None));
+        Assert.Single(_handler.Requests);
+
+        token = "fresh-login-token";
+        _handler.Respond(HttpStatusCode.OK, """{"login":"mona","id":1}""");
+        Assert.Equal("mona", await client.GetViewerLoginAsync(CancellationToken.None));
+        Assert.Equal("Bearer expired-token", _handler.Requests[0].Headers["Authorization"]);
+        Assert.Equal("Bearer fresh-login-token", _handler.Requests[1].Headers["Authorization"]);
+    }
+
+    [Fact]
     public async Task GetPullRequestMapsFields()
     {
         _handler.Respond(HttpStatusCode.OK, PullRequestJson(state: "open", merged: false, draft: true));

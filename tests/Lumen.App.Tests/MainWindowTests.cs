@@ -19,6 +19,45 @@ public sealed class MainWindowTests
     private static string ScreensDirectory => Path.Combine(AppContext.BaseDirectory, "screens");
 
     [AvaloniaFact]
+    public async Task SelectingPlanChangesScrollsTheDiffToTheirLocation()
+    {
+        Directory.CreateDirectory(ScreensDirectory);
+        await using var session = await Session.OpenAsync();
+        var pr = session.PullRequest;
+        var editor = session.Window.GetVisualDescendants().OfType<Diff.DiffEditor>().Single(e => e.Name == "Editor");
+        var scroll = editor.GetVisualDescendants().OfType<ScrollViewer>().First();
+        var before = scroll.Offset.Y;
+        await pr.ExamineAsync(null);
+        await Fixture.PumpAsync();
+
+        await pr.SelectMoreChangesAsync(new MoreChangesViewModel(TriageTier.Skim,
+            [new HunkTriage { Path = Fixture.TopPointPath, NewStart = 180, NewEnd = 185 }]));
+        await Fixture.WaitUntilAsync(() => !pr.IsExamining && scroll.Offset.Y > before + 200);
+        await Fixture.PumpAsync(30);
+
+        Assert.Equal((180, 185), pr.FocusRange);
+        Assert.Equal(Fixture.TopPointPath, editor.Diff!.Path);
+        Capture(session.Window, "14-plan-navigation.png");
+
+        var requestedTheme = Application.Current!.RequestedThemeVariant;
+        try
+        {
+            session.Window.Width = 1280;
+            session.Window.Height = 800;
+            foreach (var theme in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+            {
+                Application.Current.RequestedThemeVariant = theme;
+                await Fixture.PumpAsync(15);
+                Capture(session.Window, $"14-plan-navigation-1280x800-{theme.ToString().ToLowerInvariant()}.png");
+            }
+        }
+        finally
+        {
+            Application.Current.RequestedThemeVariant = requestedTheme;
+        }
+    }
+
+    [AvaloniaFact]
     public async Task DraggingSplittersResizesPanesToAnyWidthAndSavesThem()
     {
         await using var session = await Session.OpenAsync();
@@ -637,6 +676,7 @@ public sealed class MainWindowTests
 
     private static void Capture(Window window, string name)
     {
+        Directory.CreateDirectory(ScreensDirectory);
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         using var frame = window.CaptureRenderedFrame();
         Assert.NotNull(frame);

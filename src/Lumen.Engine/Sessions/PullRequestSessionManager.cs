@@ -17,6 +17,7 @@ public sealed partial class PullRequestSessionManager(
     ReviewPointPipeline pipeline,
     InvestigationCoordinator investigations,
     ReviewSettingsStore reviewSettings,
+    TriageRunner triage,
     IPullRequestVisitStore visits,
     EngineOptions options,
     TimeProvider time,
@@ -80,8 +81,18 @@ public sealed partial class PullRequestSessionManager(
             _ = Task.Run(() => FollowAsync(session), CancellationToken.None);
             SessionReady?.Invoke(session);
 
-            Progress(session, "analysis", "Comparing with repository precedent…");
+            // Triage runs before detectors (it needs only the snapshot) and never blocks the review: null means unavailable.
+            Progress(session, "triage", "Separating mechanical changes from real ones…");
+            var triageResult = await triage.RunAsync(snapshot, checkout, settings, ct).ConfigureAwait(false);
+            session.SetTriage(triageResult);
             var states = await store.GetLatestActionsAsync(key, ct).ConfigureAwait(false);
+            if (triageResult is not null)
+            {
+                var acknowledged = TriageAcknowledgement.AcknowledgedGroups(states);
+                session.Publish(new PullRequestEvent { TriageReady = ProtoMapper.ToProto(triageResult, snapshot, viewed, acknowledged) });
+            }
+
+            Progress(session, "analysis", "Comparing with repository precedent…");
 
             var result = await pipeline.RunAsync(
                 new AnalysisContext(snapshot, checkout) { Settings = settings },
@@ -229,7 +240,9 @@ public sealed partial class PullRequestSessionManager(
             await store.SetCacheAsync(cacheKey, JsonSerializer.Serialize(cached), ct).ConfigureAwait(false);
             return (info, viewer, state, await viewedTask.ConfigureAwait(false));
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is HttpRequestException
+            || ex is GitHubApiException { StatusCode: { } status } && (int)status >= 500
+            || ex is OperationCanceledException && !ct.IsCancellationRequested)
         {
             var json = await store.GetCacheAsync(cacheKey, ct).ConfigureAwait(false);
             if (json is null || JsonSerializer.Deserialize<CachedPullRequest>(json) is not { } cached)
@@ -277,6 +290,7 @@ public sealed partial class PullRequestSessionManager(
         ReviewAction.Dismissed => Domain.ReviewPointState.Dismissed,
         ReviewAction.Commented => Domain.ReviewPointState.Commented,
         ReviewAction.Examined => Domain.ReviewPointState.Examined,
+        ReviewAction.Resolved => Domain.ReviewPointState.Resolved,
         ReviewAction.Restored => Domain.ReviewPointState.Visible,
         _ => fallback,
     };

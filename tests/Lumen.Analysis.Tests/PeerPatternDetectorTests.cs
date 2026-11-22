@@ -218,7 +218,9 @@ public sealed class PeerPatternDetectorTests
         Assert.Equal(4, precedent.PeerCount);
         Assert.DoesNotContain(facts.Following, p => p.Name == "ReportWorker");
         Assert.Equal("ReportWorker", Assert.Single(facts.NotFollowing).Name);
-        Assert.Contains(candidate.Evidence, e => e.IsCounterEvidence);
+        var exception = Assert.Single(candidate.Evidence.OfType<RepositoryPrecedentEvidence>(), e => e.IsCounterEvidence);
+        Assert.Contains("AppDbContext", Assert.Single(exception.Examples).Snippet, StringComparison.Ordinal);
+        Assert.DoesNotContain("QueueClaimService", Assert.Single(exception.Examples).Snippet, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -242,6 +244,34 @@ public sealed class PeerPatternDetectorTests
         var result = await Detect(head, diff, baseSources);
 
         Assert.DoesNotContain(result.Candidates, c => FactsOf(c).Missing.Key == "Dependency:QueueClaimService");
+    }
+
+    [Fact]
+    public async Task DeletedPeersStillCountAsPrePullRequestPrecedent()
+    {
+        var head = WorkerRepo();
+        var baseSources = new Dictionary<string, string>();
+        var diff = "";
+        foreach (var name in ExistingWorkers.Take(2))
+        {
+            var path = WorkerPath(name);
+            baseSources[path] = head[path];
+            diff += Support.TriageHarness.Diff(path, head[path], null);
+            head.Remove(path);
+        }
+
+        var newPath = WorkerPath(NewWorker);
+        head[newPath] = DbWorker(NewWorker);
+        diff += AddedFile(newPath, head[newPath]);
+
+        var result = await Detect(head, diff, baseSources);
+
+        var candidate = Assert.Single(result.Candidates);
+        Assert.Equal("Dependency:QueueClaimService", FactsOf(candidate).Missing.Key);
+        Assert.Equal((4, 4), (candidate.Signals.Supporting, candidate.Signals.PeerCount));
+        Assert.Equal(NewWorker, Assert.Single(FactsOf(candidate).Affected).Type.Name);
+        Assert.All(baseSources.Keys, path => Assert.Contains(Precedent(candidate).Examples, e => e.Location.Path == path));
+        Assert.All(Precedent(candidate).Examples, e => Assert.Contains("QueueClaimService", e.Snippet, StringComparison.Ordinal));
     }
 
     [Fact]

@@ -127,7 +127,7 @@ public sealed partial class ReviewSettingsStore(EngineSettingsStore engine, stri
 
     /// <summary>Trimmed, non-empty, first occurrence kept, in the order they were entered.</summary>
     private static List<string> Clean(IEnumerable<string>? entries) =>
-        [.. (entries ?? []).Select(e => e.Trim()).Where(e => e.Length > 0).Distinct(StringComparer.Ordinal)];
+        [.. (entries ?? []).Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => e.Trim()).Distinct(StringComparer.Ordinal)];
 
     private static string Segment(string value) =>
         SafeSegment().IsMatch(value) && value is not ("." or "..")

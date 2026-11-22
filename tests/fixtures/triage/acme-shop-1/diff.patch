@@ -1,0 +1,41 @@
+diff --git a/src/Order.cs b/src/Order.cs
+index 1111111..2222222 100644
+--- a/src/Order.cs
++++ b/src/Order.cs
+@@ -10,7 +10,6 @@ public class Order
+     public void Ship(Customer customer)
+     {
+         var total = Total();
+-        ArgumentNullException.ThrowIfNull(customer);
+         customer.Notify();
+         Status = Shipped;
+     }
+diff --git a/src/Sneaky.cs b/src/Sneaky.cs
+index 1111111..2222222 100644
+--- a/src/Sneaky.cs
++++ b/src/Sneaky.cs
+@@ -5,5 +5,5 @@
+ class Sneaky
+ {
+     bool Ok(int x)
+-        => x > 0;
++        => x >= 0;
+ }
+diff --git a/src/Fmt.cs b/src/Fmt.cs
+index 1111111..2222222 100644
+--- a/src/Fmt.cs
++++ b/src/Fmt.cs
+@@ -3,3 +3,3 @@
+ class Fmt
+ {
+-    int  A =1;
++    int A = 1;
+diff --git a/src/Fresh.cs b/src/Fresh.cs
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/Fresh.cs
+@@ -0,0 +1,3 @@
++class Fresh
++{
++}
