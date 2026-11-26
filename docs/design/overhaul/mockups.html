@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kelpie Review overhaul: mock-ups</title>
+<style>
+/* Generated from tokens.json by build-theme.py. */
+
+:root {
+  color-scheme: dark;
+  --gauge-sans: 'Segoe UI Variable Text', 'Segoe UI Variable', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --gauge-mono: 'Cascadia Code', 'JetBrains Mono', 'Consolas', ui-monospace, monospace;
+  --gauge-r-1: 3px;
+  --gauge-r-2: 3px;
+  --gauge-r-3: 4px;
+  --gauge-motion-fast: 120ms;
+  --gauge-motion-base: 180ms;
+  --gauge-motion-slow: 240ms;
+  --gauge-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --gauge-ease-enter: cubic-bezier(0, 0, 0, 1);
+  --gauge-ease-exit: cubic-bezier(0.3, 0, 1, 1);
+  --gauge-motion-shift: 24px;
+  --gauge-loading-delay: 300ms;
+  --gauge-loading-min: 400ms;
+  --gauge-indeterminate-cycle: 1100ms;
+  --gauge-bg-0: #1e1e1e;
+  --gauge-bg-1: #252525;
+  --gauge-bg-2: #2b2b2b;
+  --gauge-bg-3: #333333;
+  --gauge-bg-4: #444444;
+  --gauge-line: #3c3c3c;
+  --gauge-line-2: #555555;
+  --gauge-line-ctl: #767676;
+  --gauge-fg-0: #f2f2f2;
+  --gauge-fg-1: #dcdcdc;
+  --gauge-fg-2: #c4c4c4;
+  --gauge-fg-3: #9e9e9e;
+  --gauge-accent: #7cc0ff;
+  --gauge-accent-dim: #7cc0ff22;
+  --gauge-accent-ink: #06263f;
+  --gauge-sel: #0a4a78;
+  --gauge-crit: #ff7b72;
+  --gauge-crit-dim: #ff7b721f;
+  --gauge-warn: #e9b44c;
+  --gauge-warn-dim: #e9b44c1f;
+  --gauge-info: #7cc0ff;
+  --gauge-info-dim: #7cc0ff1f;
+  --gauge-ok: #6fcf97;
+  --gauge-ok-dim: #6fcf971f;
+  --gauge-code: #d6b4ff;
+  --gauge-sel-fg: #ffffff;
+  --gauge-sel-crit: #ffffff;
+  --gauge-sel-warn: #ffffff;
+  --gauge-sel-edge: #7cc0ff;
+  --gauge-val-str: #a7f3d0;
+  --gauge-val-num: #fcd34d;
+  --gauge-tm-fg: #ffffff;
+  --gauge-tm-1: #2f5d8a;
+  --gauge-tm-2: #34526f;
+  --gauge-tm-3: #37495c;
+  --gauge-tm-4: #383f4a;
+  --gauge-tm-5: #363b42;
+  --gauge-tm-6: #34383d;
+  --gauge-tm-7: #33363a;
+  --gauge-tm-8: #323437;
+  --gauge-tm-9: #313335;
+  --gauge-shadow: #00000088;
+  --gauge-scrim: #05070999;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --gauge-bg-0: #ffffff;
+  --gauge-bg-1: #fafafa;
+  --gauge-bg-2: #f3f3f3;
+  --gauge-bg-3: #e8e8e8;
+  --gauge-bg-4: #dcdcdc;
+  --gauge-line: #e1e1e1;
+  --gauge-line-2: #c6c6c6;
+  --gauge-line-ctl: #858585;
+  --gauge-fg-0: #1b1b1b;
+  --gauge-fg-1: #2f2f2f;
+  --gauge-fg-2: #4d4d4d;
+  --gauge-fg-3: #6b6b6b;
+  --gauge-accent: #0a64c8;
+  --gauge-accent-dim: #0a64c81a;
+  --gauge-accent-ink: #ffffff;
+  --gauge-sel: #d6e6f8;
+  --gauge-crit: #b42318;
+  --gauge-crit-dim: #b4231814;
+  --gauge-warn: #8a5700;
+  --gauge-warn-dim: #8a570014;
+  --gauge-info: #0a64c8;
+  --gauge-info-dim: #0a64c814;
+  --gauge-ok: #1d7a3a;
+  --gauge-ok-dim: #1d7a3a14;
+  --gauge-code: #7a3fc4;
+  --gauge-sel-fg: #1b1b1b;
+  --gauge-sel-crit: #b42318;
+  --gauge-sel-warn: #8a5700;
+  --gauge-sel-edge: #0a64c8;
+  --gauge-val-str: #11703a;
+  --gauge-val-num: #9a4a00;
+  --gauge-tm-fg: #1b1b1b;
+  --gauge-tm-1: #a9c8ea;
+  --gauge-tm-2: #bcd0e4;
+  --gauge-tm-3: #c8d5e2;
+  --gauge-tm-4: #d2d9e0;
+  --gauge-tm-5: #d8dce1;
+  --gauge-tm-6: #dcdfe3;
+  --gauge-tm-7: #dfe1e4;
+  --gauge-tm-8: #e2e3e6;
+  --gauge-tm-9: #e4e5e7;
+  --gauge-shadow: #00000026;
+  --gauge-scrim: #00000040;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --gauge-bg-0: #ffffff;
+    --gauge-bg-1: #fafafa;
+    --gauge-bg-2: #f3f3f3;
+    --gauge-bg-3: #e8e8e8;
+    --gauge-bg-4: #dcdcdc;
+    --gauge-line: #e1e1e1;
+    --gauge-line-2: #c6c6c6;
+    --gauge-line-ctl: #858585;
+    --gauge-fg-0: #1b1b1b;
+    --gauge-fg-1: #2f2f2f;
+    --gauge-fg-2: #4d4d4d;
+    --gauge-fg-3: #6b6b6b;
+    --gauge-accent: #0a64c8;
+    --gauge-accent-dim: #0a64c81a;
+    --gauge-accent-ink: #ffffff;
+    --gauge-sel: #d6e6f8;
+    --gauge-crit: #b42318;
+    --gauge-crit-dim: #b4231814;
+    --gauge-warn: #8a5700;
+    --gauge-warn-dim: #8a570014;
+    --gauge-info: #0a64c8;
+    --gauge-info-dim: #0a64c814;
+    --gauge-ok: #1d7a3a;
+    --gauge-ok-dim: #1d7a3a14;
+    --gauge-code: #7a3fc4;
+    --gauge-sel-fg: #1b1b1b;
+    --gauge-sel-crit: #b42318;
+    --gauge-sel-warn: #8a5700;
+    --gauge-sel-edge: #0a64c8;
+    --gauge-val-str: #11703a;
+    --gauge-val-num: #9a4a00;
+    --gauge-tm-fg: #1b1b1b;
+    --gauge-tm-1: #a9c8ea;
+    --gauge-tm-2: #bcd0e4;
+    --gauge-tm-3: #c8d5e2;
+    --gauge-tm-4: #d2d9e0;
+    --gauge-tm-5: #d8dce1;
+    --gauge-tm-6: #dcdfe3;
+    --gauge-tm-7: #dfe1e4;
+    --gauge-tm-8: #e2e3e6;
+    --gauge-tm-9: #e4e5e7;
+    --gauge-shadow: #00000026;
+    --gauge-scrim: #00000040;
+  }
+}
+
+@media print {
+  :root:root {
+    color-scheme: light;
+    --gauge-bg-0: #ffffff;
+    --gauge-bg-1: #fafafa;
+    --gauge-bg-2: #f3f3f3;
+    --gauge-bg-3: #e8e8e8;
+    --gauge-bg-4: #dcdcdc;
+    --gauge-line: #e1e1e1;
+    --gauge-line-2: #c6c6c6;
+    --gauge-line-ctl: #858585;
+    --gauge-fg-0: #1b1b1b;
+    --gauge-fg-1: #2f2f2f;
+    --gauge-fg-2: #4d4d4d;
+    --gauge-fg-3: #6b6b6b;
+    --gauge-accent: #0a64c8;
+    --gauge-accent-dim: #0a64c81a;
+    --gauge-accent-ink: #ffffff;
+    --gauge-sel: #d6e6f8;
+    --gauge-crit: #b42318;
+    --gauge-crit-dim: #b4231814;
+    --gauge-warn: #8a5700;
+    --gauge-warn-dim: #8a570014;
+    --gauge-info: #0a64c8;
+    --gauge-info-dim: #0a64c814;
+    --gauge-ok: #1d7a3a;
+    --gauge-ok-dim: #1d7a3a14;
+    --gauge-code: #7a3fc4;
+    --gauge-sel-fg: #1b1b1b;
+    --gauge-sel-crit: #b42318;
+    --gauge-sel-warn: #8a5700;
+    --gauge-sel-edge: #0a64c8;
+    --gauge-val-str: #11703a;
+    --gauge-val-num: #9a4a00;
+    --gauge-tm-fg: #1b1b1b;
+    --gauge-tm-1: #a9c8ea;
+    --gauge-tm-2: #bcd0e4;
+    --gauge-tm-3: #c8d5e2;
+    --gauge-tm-4: #d2d9e0;
+    --gauge-tm-5: #d8dce1;
+    --gauge-tm-6: #dcdfe3;
+    --gauge-tm-7: #dfe1e4;
+    --gauge-tm-8: #e2e3e6;
+    --gauge-tm-9: #e4e5e7;
+    --gauge-shadow: #00000026;
+    --gauge-scrim: #00000040;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --gauge-motion-fast: 0ms;
+    --gauge-motion-base: 0ms;
+    --gauge-motion-slow: 0ms;
+  }
+}
+/* Gauge components. Optional: load after theme.css. Every class is prefixed `g-` so it can
+   sit beside a project's own styles. Dimensions, states and keyboard behaviour are in
+   COMPONENTS.md. */
+
+.g-root {
+  background: var(--gauge-bg-0);
+  color: var(--gauge-fg-1);
+  font: 13px/1.45 var(--gauge-sans);
+}
+.g-mono {
+  font-family: var(--gauge-mono);
+  font-size: 12px;
+}
+
+/* Focus: 2px accent ring, 2px offset, never removed. */
+.g-root :focus {
+  outline: none;
+}
+.g-root :focus-visible {
+  outline: 2px solid var(--gauge-accent);
+  outline-offset: 2px;
+  border-radius: var(--gauge-r-3);
+}
+
+/* Button: secondary by default, --primary for the one main action, --ghost inside toolbars. */
+.g-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  padding: 3px 11px;
+  border: 1px solid var(--gauge-line-2);
+  border-radius: var(--gauge-r-2);
+  background: var(--gauge-bg-3);
+  color: var(--gauge-fg-0);
+  font: inherit;
+  cursor: pointer;
+}
+.g-btn:hover {
+  background: var(--gauge-bg-4);
+}
+.g-btn--primary {
+  background: var(--gauge-accent);
+  border-color: var(--gauge-accent);
+  color: var(--gauge-accent-ink);
+  font-weight: 600;
+}
+.g-btn--primary:hover {
+  background: var(--gauge-accent);
+  filter: brightness(1.08);
+}
+/* A ghost button has no fill, so its border is the control boundary. */
+.g-btn--ghost {
+  background: none;
+  border-color: var(--gauge-line-ctl);
+}
+.g-btn--ghost:hover {
+  background: var(--gauge-bg-3);
+}
+.g-btn[aria-pressed='true'] {
+  border-color: var(--gauge-accent);
+  color: var(--gauge-accent);
+}
+.g-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  filter: none;
+}
+
+/* Fields: the border is the only boundary, so it uses line-ctl. */
+.g-field {
+  min-height: 26px;
+  padding: 3px 8px;
+  border: 1px solid var(--gauge-line-ctl);
+  border-radius: var(--gauge-r-2);
+  background: var(--gauge-bg-0);
+  color: var(--gauge-fg-0);
+  font: inherit;
+}
+select.g-field {
+  padding-right: 4px;
+  cursor: pointer;
+}
+textarea.g-field {
+  min-height: 64px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+.g-field::placeholder {
+  color: var(--gauge-fg-3);
+}
+
+/* Segmented control: mutually exclusive views or filters, 2-5 short options. */
+.g-seg {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--gauge-line-ctl);
+  border-radius: var(--gauge-r-2);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.g-seg button {
+  min-height: 22px;
+  padding: 2px 10px;
+  border: 0;
+  border-left: 1px solid var(--gauge-line-2);
+  background: none;
+  color: var(--gauge-fg-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.g-seg button:first-child {
+  border-left: 0;
+}
+.g-seg button:hover {
+  background: var(--gauge-bg-3);
+  color: var(--gauge-fg-0);
+}
+.g-seg button[aria-pressed='true'] {
+  background: var(--gauge-bg-4);
+  color: var(--gauge-fg-0);
+  font-weight: 600;
+}
+.g-root .g-seg button:focus-visible {
+  outline-offset: -2px;
+  border-radius: 0;
+}
+
+/* Entity link: any named thing that opens details. Underlined text, never a badge. */
+.g-entity {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gauge-fg-0);
+  font-family: var(--gauge-mono);
+  font-size: 12px;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--gauge-fg-3);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.g-entity:hover {
+  color: var(--gauge-accent);
+  text-decoration-color: var(--gauge-accent);
+}
+/* Entities with human names (files, types, people) read in sans. */
+.g-entity--sans {
+  font-family: var(--gauge-sans);
+  font-size: 13px;
+}
+
+/* Severity: always a word. Only critical and warning carry colour. */
+.g-sev {
+  color: var(--gauge-fg-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.g-sev--crit {
+  color: var(--gauge-crit);
+}
+.g-sev--warn {
+  color: var(--gauge-warn);
+}
+.g-sev--ok {
+  color: var(--gauge-ok);
+}
+
+.g-kbd {
+  padding: 0 5px;
+  border: 1px solid var(--gauge-line-2);
+  border-bottom-width: 2px;
+  border-radius: var(--gauge-r-3);
+  background: var(--gauge-bg-2);
+  color: var(--gauge-fg-2);
+  font-family: var(--gauge-mono);
+  font-size: 11px;
+}
+/* A glossary term: dotted underline, definition on hover or in a help view. */
+.g-term {
+  border-bottom: 1px dotted var(--gauge-fg-3);
+  cursor: help;
+}
+.g-term:hover {
+  border-bottom-color: var(--gauge-fg-2);
+  color: var(--gauge-fg-0);
+}
+
+.g-callout {
+  margin: 18px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--gauge-line-2);
+  border-radius: var(--gauge-r-2);
+  background: var(--gauge-bg-2);
+  color: var(--gauge-fg-1);
+}
+.g-callout--crit {
+  border-color: var(--gauge-crit);
+}
+
+/* Pane header: title, inline facts, actions pushed right. */
+.g-pane-h {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--gauge-line);
+}
+.g-pane-h > h2,
+.g-pane-h > h3 {
+  margin: 0;
+  color: var(--gauge-fg-0);
+  font-size: 14px;
+  font-weight: 600;
+}
+.g-pane-h .g-facts {
+  color: var(--gauge-fg-2);
+  font-size: 12.5px;
+}
+.g-pane-h .g-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Navigation rail. Mark the current item with aria-current="page". */
+.g-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+  border-right: 1px solid var(--gauge-line);
+  background: var(--gauge-bg-2);
+}
+.g-nav button,
+.g-nav a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 30px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--gauge-r-3);
+  background: none;
+  color: var(--gauge-fg-2);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.g-nav :is(button, a):hover {
+  background: var(--gauge-bg-3);
+  color: var(--gauge-fg-0);
+}
+.g-nav [aria-current='page'] {
+  background: var(--gauge-bg-4);
+  color: var(--gauge-fg-0);
+  font-weight: 600;
+}
+.g-nav .g-count {
+  margin-left: auto;
+  color: var(--gauge-fg-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+/* fg-3 drops below 4.5:1 on bg-3 and bg-4. */
+.g-nav :is(:hover, [aria-current='page']) .g-count {
+  color: var(--gauge-fg-2);
+}
+.g-nav .g-count.g-count--crit {
+  color: var(--gauge-crit);
+}
+/* crit falls below 4.5:1 on dark bg-4; the current section no longer needs the alert. */
+.g-nav [aria-current='page'] .g-count.g-count--crit {
+  color: var(--gauge-fg-0);
+}
+.g-nav hr {
+  margin: 5px 2px;
+  border: 0;
+  border-top: 1px solid var(--gauge-line);
+}
+
+/* Data table with a selectable row. Mark the selected row with .is-selected; the control that
+   selected it carries aria-current="true". */
+.g-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.g-table th {
+  padding: 6px 14px;
+  background: var(--gauge-bg-2);
+  color: var(--gauge-fg-2);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+.g-table td {
+  padding: 6px 14px;
+  border-top: 1px solid var(--gauge-line);
+}
+.g-table .g-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.g-table tbody tr:hover {
+  background: var(--gauge-bg-2);
+}
+.g-table tbody tr.is-selected {
+  background: var(--gauge-sel);
+  color: var(--gauge-sel-fg);
+  box-shadow: inset 2px 0 var(--gauge-sel-edge);
+}
+.g-table tbody tr.is-selected :is(.g-entity, .g-sev) {
+  color: var(--gauge-sel-fg);
+  text-decoration-color: currentColor;
+}
+.g-table tbody tr.is-selected .g-sev--warn {
+  color: var(--gauge-sel-warn);
+}
+.g-table tbody tr.is-selected .g-sev--crit {
+  color: var(--gauge-sel-crit);
+}
+
+/* Menus: dropdown and context menu share one look. */
+.g-menu {
+  min-width: 190px;
+  padding: 4px;
+  border: 1px solid var(--gauge-line-2);
+  border-radius: var(--gauge-r-3);
+  background: var(--gauge-bg-2);
+  box-shadow: 0 8px 24px var(--gauge-shadow);
+}
+.g-menu [role^='menuitem'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--gauge-r-3);
+  background: none;
+  color: var(--gauge-fg-1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.g-menu [role^='menuitem']:is(:hover, :focus-visible) {
+  background: var(--gauge-bg-4);
+  color: var(--gauge-fg-0);
+}
+.g-root .g-menu [role^='menuitem']:focus-visible {
+  outline-offset: -2px;
+}
+.g-menu [aria-checked='true'] {
+  color: var(--gauge-fg-0);
+  font-weight: 600;
+}
+.g-menu .g-note {
+  color: var(--gauge-fg-2);
+  font-size: 12px;
+  font-weight: 400;
+}
+.g-menu hr {
+  margin: 4px 2px;
+  border: 0;
+  border-top: 1px solid var(--gauge-line);
+}
+
+/* Command palette: a modal dialog over a scrim. */
+.g-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: var(--gauge-scrim);
+}
+.g-palette {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  z-index: 31;
+  width: min(600px, calc(100vw - 24px));
+  margin: 0;
+  padding: 0;
+  translate: -50% 0;
+  border: 1px solid var(--gauge-line-2);
+  border-radius: 6px;
+  background: var(--gauge-bg-2);
+  color: var(--gauge-fg-1);
+  box-shadow: 0 12px 32px var(--gauge-shadow);
+}
+.g-palette input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--gauge-line);
+  background: none;
+  color: var(--gauge-fg-0);
+  font: inherit;
+  font-size: 15px;
+}
+.g-root .g-palette input:focus-visible {
+  outline: none;
+}
+.g-palette [role='listbox'] {
+  max-height: 50vh;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+  list-style: none;
+}
+.g-palette .g-group {
+  padding: 8px 10px 4px;
+  color: var(--gauge-fg-2);
+  font-size: 12px;
+}
+.g-palette [role='option'] {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--gauge-r-2);
+  cursor: pointer;
+}
+.g-palette [role='option'][aria-selected='true'] {
+  background: var(--gauge-sel);
+  color: var(--gauge-sel-fg);
+  box-shadow: inset 2px 0 var(--gauge-sel-edge);
+}
+.g-palette [role='option'] .g-note {
+  color: var(--gauge-fg-2);
+  font-size: 12px;
+}
+.g-palette [aria-selected='true'] .g-note {
+  color: var(--gauge-sel-fg);
+}
+
+/* Status bar: counts, background work, theme control. */
+.g-statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  min-height: 24px;
+  padding: 0 12px;
+  border-top: 1px solid var(--gauge-line);
+  background: var(--gauge-bg-2);
+  color: var(--gauge-fg-2);
+  font-size: 11.5px;
+}
+
+.g-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Motion. Each rule uses one role from COMPONENTS.md. Durations come from theme.css and drop to
+   0ms when the system asks for reduced motion. Showing and hiding uses the hidden attribute:
+   browsers without @starting-style or discrete transitions simply show and hide instantly. */
+
+/* state: hover, pressed and selected change colour only. */
+.g-btn,
+.g-entity,
+.g-seg button,
+.g-nav :is(button, a),
+.g-table tr,
+.g-menu [role^='menuitem'] {
+  transition:
+    background-color var(--gauge-motion-fast) var(--gauge-ease-standard),
+    border-color var(--gauge-motion-fast) var(--gauge-ease-standard),
+    color var(--gauge-motion-fast) var(--gauge-ease-standard);
+}
+
+/* reveal: a menu fades in and grows from 0.96 at its anchor. Set transform-origin to the corner
+   nearest the anchor. */
+.g-menu {
+  transform-origin: top left;
+  transition-property: opacity, scale, display;
+  transition-duration: var(--gauge-motion-fast);
+  transition-timing-function: var(--gauge-ease-enter);
+  transition-behavior: allow-discrete;
+}
+.g-menu[hidden] {
+  display: none;
+  pointer-events: none;
+  opacity: 0;
+  scale: 0.96;
+  transition-timing-function: var(--gauge-ease-exit);
+}
+@starting-style {
+  .g-menu:not([hidden]) {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+/* panel: the command palette is a centred dialog, so it fades and grows from 0.98. The scrim
+   fades with it. In over base, out over fast. */
+.g-palette,
+.g-scrim {
+  transition-property: opacity, scale, display;
+  transition-duration: var(--gauge-motion-base);
+  transition-timing-function: var(--gauge-ease-enter);
+  transition-behavior: allow-discrete;
+}
+.g-palette {
+  transform-origin: top center;
+}
+.g-palette[hidden],
+.g-scrim[hidden] {
+  display: none;
+  pointer-events: none;
+  opacity: 0;
+  transition-duration: var(--gauge-motion-fast);
+  transition-timing-function: var(--gauge-ease-exit);
+}
+.g-palette[hidden] {
+  scale: 0.98;
+}
+@starting-style {
+  .g-palette:not([hidden]) {
+    opacity: 0;
+    scale: 0.98;
+  }
+  .g-scrim:not([hidden]) {
+    opacity: 0;
+  }
+}
+
+/* panel: a sheet or docked inspector that opens and closes slides in by shift from its edge.
+   It comes from the right by default. Set --g-panel-from: -1 for a panel on the left. */
+.g-panel {
+  transition-property: opacity, translate, display;
+  transition-duration: var(--gauge-motion-base);
+  transition-timing-function: var(--gauge-ease-enter);
+  transition-behavior: allow-discrete;
+}
+.g-panel[hidden] {
+  display: none;
+  pointer-events: none;
+  opacity: 0;
+  translate: calc(var(--g-panel-from, 1) * var(--gauge-motion-shift)) 0;
+  transition-duration: var(--gauge-motion-fast);
+  transition-timing-function: var(--gauge-ease-exit);
+}
+@starting-style {
+  .g-panel:not([hidden]) {
+    opacity: 0;
+    translate: calc(var(--g-panel-from, 1) * var(--gauge-motion-shift)) 0;
+  }
+}
+
+/* layout: fade a list in as a whole when it loads, or a row as it is added. Never stagger rows.
+   To remove a row, add .g-leaving and remove the element when its transition ends. */
+.g-appear {
+  animation: g-appear var(--gauge-motion-base) var(--gauge-ease-standard);
+}
+@keyframes g-appear {
+  from {
+    opacity: 0;
+  }
+}
+.g-leaving {
+  opacity: 0;
+  transition: opacity var(--gauge-motion-base) var(--gauge-ease-standard);
+}
+
+/* progress: always paired with a written label. A determinate bar eases to each new value. */
+.g-progress {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--gauge-bg-4);
+}
+.g-progress > span {
+  display: block;
+  width: var(--g-value, 0%);
+  height: 100%;
+  background: var(--gauge-accent);
+  transition: width var(--gauge-motion-base) var(--gauge-ease-standard);
+}
+/* The only endless animation Gauge allows. */
+.g-progress--indeterminate > span {
+  width: 30%;
+  animation: g-indeterminate var(--gauge-indeterminate-cycle) linear infinite;
+}
+@keyframes g-indeterminate {
+  from {
+    translate: -100% 0;
+  }
+  to {
+    translate: 340% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class^='g-'],
+  [class^='g-'] * {
+    transition: none !important;
+    animation: none !important;
+  }
+  /* Indeterminate progress becomes a static bar. Its label carries the meaning. */
+  .g-progress--indeterminate > span {
+    width: 100%;
+  }
+}
+
+/* Windows high contrast and other forced-colour modes replace every colour above. Restore the
+   cues that were carried by fill alone: selection, the current nav item and pressed toggles. */
+@media (forced-colors: active) {
+  .g-table tbody tr.is-selected,
+  .g-palette [role='option'][aria-selected='true'],
+  .g-nav [aria-current='page'],
+  .g-seg button[aria-pressed='true'] {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+  .g-table tbody tr.is-selected :is(.g-entity, .g-sev) {
+    color: HighlightText;
+  }
+  .g-btn,
+  .g-seg,
+  .g-field {
+    border-color: ButtonText;
+  }
+  .g-root :focus-visible {
+    outline-color: Highlight;
+  }
+}
+</style>
+<style>
+/* ---- mock-up page chrome (not part of the app) ---- */
+html,body{margin:0;background:var(--gauge-bg-0);color:var(--gauge-fg-1);font:13px/1.45 var(--gauge-sans)}
+.mk-bar{display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--gauge-line);background:var(--gauge-bg-1);flex-wrap:wrap}
+.mk-bar strong{color:var(--gauge-fg-0);margin-right:8px}
+.mk-note{max-width:1440px;margin:12px auto 0;padding:0 16px;color:var(--gauge-fg-2)}
+.mk-note b{color:var(--gauge-fg-0)}
+.stage{max-width:1440px;margin:12px auto 32px;padding:0 16px}
+.screen{display:none}
+.screen.on{display:block}
+
+/* ---- app frame ---- */
+.win{border:1px solid var(--gauge-line-2);border-radius:var(--gauge-r-3);overflow:hidden;background:var(--gauge-bg-0);height:860px;display:grid;grid-template-rows:36px auto 1fr 24px;box-shadow:0 8px 28px var(--gauge-shadow)}
+.tb{display:flex;align-items:center;gap:10px;padding:0 10px;background:var(--gauge-bg-2);border-bottom:1px solid var(--gauge-line)}
+.tb .app{font-weight:600;color:var(--gauge-fg-0)}
+.tb .crumb{color:var(--gauge-fg-2)}
+.tb .goto{margin-left:auto;display:flex;align-items:center;gap:8px;width:360px;height:24px;padding:0 8px;border:1px solid var(--gauge-line-ctl);border-radius:var(--gauge-r-2);background:var(--gauge-bg-3);color:var(--gauge-fg-3)}
+.tb .goto .g-kbd{margin-left:auto}
+.tb .caps{display:flex;gap:14px;color:var(--gauge-fg-2);padding-left:12px;font-size:12px}
+.sb{display:flex;align-items:center;gap:16px;padding:0 10px;background:var(--gauge-bg-2);border-top:1px solid var(--gauge-line);color:var(--gauge-fg-2);font-size:12px}
+.sb .r{margin-left:auto;display:flex;gap:14px}
+.mono{font-family:var(--gauge-mono);font-size:12px}
+.num{font-variant-numeric:tabular-nums;text-align:right}
+.q{color:var(--gauge-fg-3)}
+.lbl{color:var(--gauge-fg-2)}
+a,.link{color:var(--gauge-accent);text-decoration:none;cursor:pointer}
+
+/* ---- PR header ---- */
+.prh{padding:10px 14px 0;background:var(--gauge-bg-1);border-bottom:1px solid var(--gauge-line)}
+.prh h1{margin:0;font-size:15px;font-weight:600;color:var(--gauge-fg-0)}
+.prh .meta{color:var(--gauge-fg-2);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap}
+.shrink{display:flex;align-items:center;gap:18px;margin-top:10px;padding:8px 10px;background:var(--gauge-bg-2);border:1px solid var(--gauge-line);border-radius:var(--gauge-r-3)}
+.shrink .big{font-size:15px;font-weight:600;color:var(--gauge-fg-0)}
+.shrink .bar{flex:1;height:8px;border-radius:2px;overflow:hidden;display:flex;background:var(--gauge-bg-3);min-width:160px}
+.shrink .bar i{display:block;height:100%}
+.bar .read{background:var(--gauge-accent)}
+.bar .boil{background:var(--gauge-line-2)}
+.bar .mech{background:var(--gauge-bg-4)}
+.key{display:flex;gap:12px;color:var(--gauge-fg-2);font-size:12px;white-space:nowrap}
+.key span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.key .k-read::before{background:var(--gauge-accent)}
+.key .k-boil::before{background:var(--gauge-line-2)}
+.key .k-mech::before{background:var(--gauge-bg-4);outline:1px solid var(--gauge-line-2)}
+.tabs{display:flex;gap:2px;margin-top:8px}
+.tabs button{border:0;background:none;color:var(--gauge-fg-2);font:inherit;padding:6px 12px;border-bottom:2px solid transparent;cursor:pointer}
+.tabs button[aria-selected=true]{color:var(--gauge-fg-0);font-weight:600;border-bottom-color:var(--gauge-accent)}
+.tabs .g-count{margin-left:6px;color:var(--gauge-fg-3)}
+
+/* ---- three panes ---- */
+.panes{display:grid;grid-template-columns:300px 1fr 300px;min-height:0}
+.pane{min-height:0;overflow:auto}
+.left{border-right:1px solid var(--gauge-line);background:var(--gauge-bg-0)}
+.mid{background:var(--gauge-bg-1)}
+.right{border-left:1px solid var(--gauge-line);background:var(--gauge-bg-0)}
+.ph{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--gauge-line);background:var(--gauge-bg-2);position:sticky;top:0;z-index:2}
+.ph h2{margin:0;font-size:13px;font-weight:600;color:var(--gauge-fg-0)}
+.ph .sp{margin-left:auto}
+.prog{padding:10px 12px;border-bottom:1px solid var(--gauge-line)}
+.prog .g-progress{margin-top:6px}
+.meter{height:4px;background:var(--gauge-bg-3);border-radius:2px;overflow:hidden;margin-top:6px}
+.meter i{display:block;height:100%;background:var(--gauge-accent)}
+
+/* slice list */
+.slices{list-style:none;margin:0;padding:4px 0}
+.slices li{position:relative;padding:7px 12px 7px 14px;cursor:pointer;border-bottom:1px solid transparent}
+.slices li:hover{background:var(--gauge-bg-2)}
+.slices li.sel{background:var(--gauge-sel);color:var(--gauge-sel-fg);box-shadow:inset 2px 0 0 var(--gauge-sel-edge)}
+.slices li.sel .q,.slices li.sel .lbl{color:var(--gauge-sel-fg);opacity:.85}
+.slices .t{display:flex;align-items:center;gap:6px}
+.slices .t b{font-weight:600;color:inherit}
+.slices .t .st{margin-left:auto;font-size:12px;white-space:nowrap}
+.slices .s{display:flex;gap:10px;font-size:12px;color:var(--gauge-fg-2);margin-top:1px}
+.slices .grp{padding:10px 12px 4px;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--gauge-fg-3);cursor:default}
+.slices .grp:hover{background:none}
+.done{color:var(--gauge-ok)}
+.flagtxt{color:var(--gauge-warn)}
+.sel .flagtxt,.sel .done{color:var(--gauge-sel-warn)}
+
+/* diff */
+.slicehead{padding:12px 16px;border-bottom:1px solid var(--gauge-line);background:var(--gauge-bg-1)}
+.slicehead h2{margin:0;font-size:14px;color:var(--gauge-fg-0)}
+.slicehead .meta{color:var(--gauge-fg-2);display:flex;gap:12px;flex-wrap:wrap;margin-top:2px}
+.slicehead .acts{display:flex;gap:8px;margin-top:8px;align-items:center}
+.order{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--gauge-fg-3);align-items:center}
+.order span{padding:1px 6px;border:1px solid var(--gauge-line-2);border-radius:var(--gauge-r-1);color:var(--gauge-fg-2)}
+.order span.cur{border-color:var(--gauge-accent);color:var(--gauge-fg-0)}
+.file{margin:12px 16px;border:1px solid var(--gauge-line);border-radius:var(--gauge-r-3);background:var(--gauge-bg-0);overflow:hidden}
+.fh{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--gauge-bg-2);border-bottom:1px solid var(--gauge-line)}
+.fh .n{color:var(--gauge-fg-3);font-size:12px;width:16px}
+.fh .p{font-family:var(--gauge-mono);font-size:12px;color:var(--gauge-fg-0)}
+.fh .why{color:var(--gauge-fg-2);font-size:12px}
+.fh .why::before{content:"↳ ";color:var(--gauge-fg-3)}
+.fh .sp{margin-left:auto;display:flex;gap:10px;align-items:center;font-size:12px;color:var(--gauge-fg-2)}
+.fh .new{font-size:11px;padding:0 5px;border:1px solid var(--gauge-line-2);border-radius:var(--gauge-r-1);color:var(--gauge-fg-2)}
+.code{font-family:var(--gauge-mono);font-size:12px;line-height:1.6}
+.ln{display:grid;grid-template-columns:44px 18px 1fr;white-space:pre}
+.ln .no{color:var(--gauge-fg-3);text-align:right;padding-right:8px;user-select:none}
+.ln .mk{color:var(--gauge-fg-3);user-select:none}
+.ln.add{background:var(--gauge-ok-dim)}
+.ln.add .mk{color:var(--gauge-ok)}
+.ln.del{background:var(--gauge-crit-dim)}
+.ln.del .mk{color:var(--gauge-crit)}
+.kw{color:var(--gauge-accent)}
+.str{color:var(--gauge-val-str)}
+.ty{color:var(--gauge-code)}
+.cm{color:var(--gauge-fg-3)}
+.hunk{padding:3px 10px;color:var(--gauge-fg-3);background:var(--gauge-bg-1);border-top:1px solid var(--gauge-line);border-bottom:1px solid var(--gauge-line);font-family:var(--gauge-mono);font-size:11.5px}
+
+/* folds */
+.fold{font-family:var(--gauge-sans);display:flex;align-items:center;gap:10px;padding:6px 10px;font-size:12.5px;cursor:pointer;border-top:1px solid var(--gauge-line);border-bottom:1px solid var(--gauge-line)}
+.fold:hover{background:var(--gauge-bg-2)}
+.fold .chev{color:var(--gauge-fg-3);width:10px}
+.fold .kind{font-weight:600;white-space:nowrap}
+.fold .sum{color:var(--gauge-fg-1)}
+.fold .sum code{font-family:var(--gauge-mono);font-size:12px;color:var(--gauge-fg-0)}
+.fold .ct{margin-left:auto;color:var(--gauge-fg-3);white-space:nowrap}
+.fold.mech{background:var(--gauge-bg-2)}
+.fold.mech .kind{color:var(--gauge-fg-0)}
+.fold.mech .kind::before{content:"✓ ";color:var(--gauge-ok)}
+.fold.boil{background:repeating-linear-gradient(-45deg,var(--gauge-bg-1) 0 6px,var(--gauge-bg-2) 6px 12px);border-left:3px dashed var(--gauge-line-ctl)}
+.fold.boil .kind{color:var(--gauge-fg-0)}
+.fold.open{border-bottom:1px dashed var(--gauge-line-2)}
+
+/* inline flag */
+.flag{display:flex;gap:10px;align-items:flex-start;margin:0 0 0 62px;padding:6px 10px;background:var(--gauge-warn-dim);border-left:3px solid var(--gauge-warn);font-family:var(--gauge-sans);font-size:12.5px;white-space:normal}
+.flag .g-sev{flex:none}
+.flag .what{color:var(--gauge-fg-0)}
+.flag .why2{color:var(--gauge-fg-2)}
+
+/* since */
+.banner{display:flex;gap:12px;align-items:center;margin:0;padding:8px 16px;background:var(--gauge-accent-dim);border-bottom:1px solid var(--gauge-line);color:var(--gauge-fg-0)}
+.banner .sp{margin-left:auto;display:flex;gap:8px}
+.changed{color:var(--gauge-accent);font-size:12px;white-space:nowrap}
+.sel .changed{color:var(--gauge-sel-fg)}
+
+/* inspector */
+.sec{padding:10px 12px;border-bottom:1px solid var(--gauge-line)}
+.sec h3{margin:0 0 6px;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--gauge-fg-3);font-weight:600}
+.edges{list-style:none;margin:0;padding:0}
+.edges li{padding:4px 0;font-size:12.5px;border-bottom:1px dashed var(--gauge-line)}
+.edges li:last-child{border-bottom:0}
+.edges .from{font-family:var(--gauge-mono);font-size:11.5px;color:var(--gauge-fg-0)}
+.edges .via{color:var(--gauge-fg-2)}
+.flist{list-style:none;margin:0;padding:0}
+.flist li{display:flex;gap:8px;padding:5px 0;font-size:12.5px;border-bottom:1px dashed var(--gauge-line)}
+.flist li:last-child{border-bottom:0}
+.flist .loc{font-family:var(--gauge-mono);font-size:11.5px;color:var(--gauge-fg-2)}
+.facts{display:grid;grid-template-columns:1fr auto;gap:3px 12px;font-size:12.5px}
+.facts dt{color:var(--gauge-fg-2)}
+.facts dd{margin:0;color:var(--gauge-fg-0);font-variant-numeric:tabular-nums;text-align:right}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12.5px;align-items:center}
+
+/* inbox */
+.inbox{display:grid;grid-template-columns:200px 1fr;min-height:0}
+.inbox .g-nav{border-right:1px solid var(--gauge-line);height:100%;box-sizing:border-box}
+.ib{overflow:auto;background:var(--gauge-bg-1)}
+.ibsec{margin:14px 16px}
+.ibsec h2{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:13px;color:var(--gauge-fg-0)}
+.ibsec h2 .q{font-weight:400}
+.ibsec h2 .sp{margin-left:auto}
+.rows{border:1px solid var(--gauge-line);border-radius:var(--gauge-r-3);background:var(--gauge-bg-0);overflow:hidden}
+.row{display:grid;grid-template-columns:18px 1fr 210px 150px 110px;gap:12px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--gauge-line)}
+.row:last-child{border-bottom:0}
+.row:hover{background:var(--gauge-bg-2)}
+.row.sel{background:var(--gauge-sel);color:var(--gauge-sel-fg);box-shadow:inset 2px 0 0 var(--gauge-sel-edge)}
+.row.sel .q,.row.sel .lbl{color:var(--gauge-sel-fg);opacity:.85}
+.row .ttl{color:var(--gauge-fg-0);font-weight:600}
+.row.sel .ttl{color:var(--gauge-sel-fg)}
+.row .sub{font-size:12px;color:var(--gauge-fg-2)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--gauge-accent)}
+.dot.off{background:none}
+.lbr{font-family:var(--gauge-mono);font-size:12px}
+</style>
+</head>
+<body class="g-root">
+
+<div class="mk-bar" role="tablist" aria-label="Mock-up screens">
+  <strong>Kelpie Review: overhaul mock-ups</strong>
+  <div class="g-seg" id="screens">
+    <button aria-pressed="true" data-s="s1">1 · Inbox</button>
+    <button aria-pressed="false" data-s="s2">2 · Slice</button>
+    <button aria-pressed="false" data-s="s3">3 · Fold opened</button>
+    <button aria-pressed="false" data-s="s4">4 · Since my last look</button>
+    <button aria-pressed="false" data-s="s5">5 · Unlinked</button>
+  </div>
+  <span style="margin-left:auto"></span>
+  <div class="g-seg" id="theme">
+    <button aria-pressed="true" data-t="dark">Dark</button>
+    <button aria-pressed="false" data-t="light">Light</button>
+  </div>
+</div>
+<p class="mk-note" id="note"></p>
+
+<div class="stage">
+
+<!-- =============================== 1 INBOX =============================== -->
+<section class="screen on" id="s1" data-note="<b>Inbox stays home, with a new Local branches section.</b> Pull requests you've opened show how far the shrink got (changed lines → lines to read) and your progress through their slices. Local branches show commits since you last looked. Posting is off for local branches.">
+<div class="win">
+  <div class="tb"><span class="app">Kelpie Review</span><span class="crumb">Inbox</span>
+    <div class="goto">Go to a pull request or local branch…<span class="g-kbd">Ctrl K</span></div>
+    <div class="caps"><span>—</span><span>☐</span><span>✕</span></div></div>
+  <div></div>
+  <div class="inbox">
+    <nav class="g-nav" aria-label="Inbox">
+      <a aria-current="page">Review requested <span class="g-count">3</span></a>
+      <a>Your pull requests <span class="g-count">1</span></a>
+      <a>Watched <span class="g-count">5</span></a>
+      <hr>
+      <a>Local branches <span class="g-count">3</span></a>
+      <hr>
+      <a>Settings</a>
+    </nav>
+    <div class="ib">
+      <div class="ibsec">
+        <h2>Review requested <span class="q">3</span><span class="sp"><button class="g-btn g-btn--ghost">Refresh</button></span></h2>
+        <div class="rows">
+          <div class="row sel"><span class="dot"></span>
+            <div><div class="ttl">Add order editing, customer notes and CSV export</div><div class="sub"><span class="lbr">contoso/orders-portal#412</span> · jbrown · 2 pushes since you looked</div></div>
+            <div class="sub">4,212 changed → <b>1,180 to read</b></div>
+            <div class="sub">3 of 8 slices reviewed<div class="meter"><i style="width:37%"></i></div></div>
+            <div class="sub num">2 h ago</div></div>
+          <div class="row"><span class="dot"></span>
+            <div><div class="ttl">Migrate invoice pages to the new layout</div><div class="sub"><span class="lbr">contoso/orders-portal#409</span> · agent/copilot · new</div></div>
+            <div class="sub q">Not analysed yet</div>
+            <div class="sub q">—</div>
+            <div class="sub num">5 h ago</div></div>
+          <div class="row"><span class="dot off"></span>
+            <div><div class="ttl">Fix rounding in VAT summary</div><div class="sub"><span class="lbr">contoso/billing#88</span> · mkhan</div></div>
+            <div class="sub">36 changed → <b>22 to read</b></div>
+            <div class="sub"><span class="done">✓</span> 1 of 1 slices reviewed<div class="meter"><i style="width:100%"></i></div></div>
+            <div class="sub num">Yesterday</div></div>
+        </div>
+      </div>
+
+      <div class="ibsec">
+        <h2>Local branches <span class="q">3</span><span class="sp"><button class="g-btn">Open local branch…</button></span></h2>
+        <div class="rows">
+          <div class="row"><span class="dot"></span>
+            <div><div class="ttl">feature/customer-portal-search</div><div class="sub"><span class="lbr">C:\Dev\work\orders-portal</span> · against <span class="lbr">main</span> · 6 commits since you looked</div></div>
+            <div class="sub">2,960 changed → <b>740 to read</b></div>
+            <div class="sub">0 of 5 slices reviewed<div class="meter"><i style="width:0"></i></div></div>
+            <div class="sub num">20 min ago</div></div>
+          <div class="row"><span class="dot off"></span>
+            <div><div class="ttl">claude/refactor-pricing-rules</div><div class="sub"><span class="lbr">C:\Dev\work\billing</span> · against <span class="lbr">develop</span></div></div>
+            <div class="sub">1,104 changed → <b>310 to read</b></div>
+            <div class="sub">4 of 6 slices reviewed<div class="meter"><i style="width:66%"></i></div></div>
+            <div class="sub num">Tue</div></div>
+          <div class="row"><span class="dot off"></span>
+            <div><div class="ttl">spike/razor-pages-auth</div><div class="sub"><span class="lbr">C:\Dev\work\orders-portal</span> · against <span class="lbr">main</span></div></div>
+            <div class="sub">212 changed → <b>180 to read</b></div>
+            <div class="sub"><span class="done">✓</span> 2 of 2 slices reviewed<div class="meter"><i style="width:100%"></i></div></div>
+            <div class="sub num">Last week</div></div>
+        </div>
+      </div>
+
+      <div class="ibsec">
+        <h2>Your pull requests <span class="q">1</span></h2>
+        <div class="rows">
+          <div class="row"><span class="dot off"></span>
+            <div><div class="ttl">Bump EF Core to 10.0.2</div><div class="sub"><span class="lbr">contoso/orders-portal#405</span> · approved by mkhan</div></div>
+            <div class="sub">640 changed → <b>14 to read</b></div>
+            <div class="sub q">Your own pull request</div>
+            <div class="sub num">Mon</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="sb"><span>Engine ready</span><span>Signed in to GitHub</span><div class="r"><span>Inbox refreshed 1 min ago</span></div></div>
+</div>
+</section>
+
+<!-- shared PR chrome is repeated per screen so each screen stands alone -->
+
+<!-- =============================== 2 SLICE =============================== -->
+<section class="screen" id="s2" data-note="<b>The PR as feature slices, inline in the diff.</b> Left: slices with what's left to read, flags, and reviewed marks. Centre: one slice at a time, files in dependency order, each saying why it's in the slice. Proven mechanical changes and summarised boilerplate are folded where they sit. Flags are written next to the line. Right: why these files belong together, the flags in this slice, and the keys.">
+<div class="win">
+  <div class="tb"><span class="app">Kelpie Review</span><span class="crumb">contoso/orders-portal#412</span>
+    <div class="goto">Go to a pull request or local branch…<span class="g-kbd">Ctrl K</span></div>
+    <div class="caps"><span>—</span><span>☐</span><span>✕</span></div></div>
+  <div class="prh">
+    <h1>Add order editing, customer notes and CSV export</h1>
+    <div class="meta"><span>jbrown wants to merge 14 commits into <span class="mono">main</span></span><span>·</span><span>58 files</span><span>·</span><span>Checks passing</span></div>
+    <div class="shrink">
+      <div><div class="big">1,180 lines to read</div><div class="lbl">of 4,212 changed</div></div>
+      <div class="bar" aria-hidden="true"><i class="read" style="width:28%"></i><i class="boil" style="width:38.5%"></i><i class="mech" style="width:33.5%"></i></div>
+      <div class="key"><span class="k-read">To read 1,180</span><span class="k-boil">Boilerplate, summarised 1,622</span><span class="k-mech">Mechanical, proven 1,410</span></div>
+    </div>
+    <div class="tabs" role="tablist"><button>Conversation<span class="g-count">6</span></button><button>Commits<span class="g-count">14</span></button><button>Checks</button><button aria-selected="true">Slices<span class="g-count">8</span></button><button>Files<span class="g-count">58</span></button></div>
+  </div>
+  <div class="panes">
+    <div class="pane left">
+      <div class="ph"><h2>Slices</h2><span class="sp"><div class="g-seg"><button aria-pressed="true">All</button><button aria-pressed="false">Since last look</button></div></span></div>
+      <div class="prog"><div class="lbl">3 of 8 slices reviewed · 760 lines left</div><div class="meter"><i style="width:37%"></i></div></div>
+      <ul class="slices">
+        <li class="grp">Pages</li>
+        <li class="sel"><div class="t"><b>Orders / Edit</b><span class="st flagtxt">3 flags</span></div><div class="s"><span>9 files</span><span>412 to read</span><span>of 1,306</span></div></li>
+        <li><div class="t"><b>Orders / Export</b><span class="st flagtxt">1 flag</span></div><div class="s"><span>6 files</span><span>220 to read</span><span>of 640</span></div></li>
+        <li><div class="t"><b>Customers / Notes</b><span class="st q">Not reviewed</span></div><div class="s"><span>7 files</span><span>128 to read</span><span>of 702</span></div></li>
+        <li><div class="t"><b>Customers / Index</b><span class="st done">✓ Reviewed</span></div><div class="s"><span>4 files</span><span>88 to read</span></div></li>
+        <li><div class="t"><b>Admin / Settings</b><span class="st done">✓ Reviewed</span></div><div class="s"><span>3 files</span><span>64 to read</span></div></li>
+        <li class="grp">Across slices</li>
+        <li><div class="t"><b>Shared</b><span class="st done">✓ Reviewed</span></div><div class="s"><span>5 files</span><span>132 to read</span><span>used by 4 slices</span></div></li>
+        <li><div class="t"><b>Unlinked</b><span class="st q">Not reviewed</span></div><div class="s"><span>3 files</span><span>136 to read</span><span>nothing in this PR uses them</span></div></li>
+        <li class="grp">Nothing to read</li>
+        <li><div class="t"><b>Mechanical only</b><span class="st q">21 files</span></div><div class="s"><span>renames, moves, formatting, imports · 1,150 lines, all proven</span></div></li>
+      </ul>
+    </div>
+
+    <div class="pane mid">
+      <div class="slicehead">
+        <h2>Orders / Edit</h2>
+        <div class="meta"><span class="mono">Pages/Orders/Edit.cshtml</span><span>·</span><span>handlers <span class="mono">OnGetAsync</span>, <span class="mono">OnPostSaveAsync</span></span><span>·</span><span>412 of 1,306 lines to read</span></div>
+        <div class="order">Read in this order:
+          <span>Order.cs</span>›<span>OrderEditInput.cs</span>›<span class="cur">OrderService.cs</span>›<span>Edit.cshtml.cs</span>›<span>Edit.cshtml</span>›<span>orders-edit.js</span>›<span>OrderServiceTests.cs</span></div>
+      </div>
+
+      <div class="file">
+        <div class="fh"><span class="n">1</span><span class="p">Data/Entities/Order.cs</span><span class="why">entity loaded by OrderService</span><span class="sp">+3</span></div>
+        <div class="code">
+          <div class="fold boil"><span class="chev">▸</span><span class="kind">Boilerplate · Summarised</span><span class="sum"><code>Order</code>: +3 properties <code>Notes</code>, <code>EditedAt</code>, <code>EditedBy</code></span><span class="ct">3 lines</span></div>
+        </div>
+      </div>
+
+      <div class="file">
+        <div class="fh"><span class="n">2</span><span class="p">Pages/Orders/OrderEditInput.cs</span><span class="new">new</span><span class="why">[BindProperty] on EditModel</span><span class="sp">+64</span></div>
+        <div class="code">
+          <div class="fold boil"><span class="chev">▸</span><span class="kind">Boilerplate · Summarised</span><span class="sum"><code>OrderEditInput</code>: 11 properties · <code>[Required]</code> ×3 · <code>[StringLength(500)]</code> on <code>Notes</code></span><span class="ct">64 lines</span></div>
+        </div>
+      </div>
+
+      <div class="file">
+        <div class="fh"><span class="n">3</span><span class="p">Services/OrderService.cs</span><span class="why">injected into EditModel</span><span class="sp"><span class="flagtxt">1 flag</span>+58 −31</span></div>
+        <div class="code">
+          <div class="fold mech"><span class="chev">▸</span><span class="kind">Mechanical · Proven</span><span class="sum">rename <code>GetOrder</code> → <code>GetOrderAsync</code>, 12 call sites, nothing else changed</span><span class="ct">24 lines</span></div>
+          <div class="hunk">@@ -88,14 +88,22 @@ public async Task&lt;Result&gt; UpdateAsync(int id, OrderEditInput input)</div>
+          <div class="ln"><span class="no">88</span><span class="mk"> </span><span>    <span class="kw">var</span> order = <span class="kw">await</span> _db.Orders.FindAsync(id);</span></div>
+          <div class="ln del"><span class="no">89</span><span class="mk">−</span><span>    <span class="kw">if</span> (order <span class="kw">is null</span>) <span class="kw">return</span> Result.NotFound();</span></div>
+          <div class="flag"><span class="g-sev g-sev--warn">Flag</span><span><span class="what">Guard removed.</span> <span class="why2">The null check on <code class="mono">order</code> is gone, and nothing replaces it before <code class="mono">order.Notes</code> on line 92.</span></span></div>
+          <div class="ln add"><span class="no">89</span><span class="mk">+</span><span>    order.Status = input.Status;</span></div>
+          <div class="ln add"><span class="no">90</span><span class="mk">+</span><span>    order.DeliveryDate = input.DeliveryDate;</span></div>
+          <div class="ln add"><span class="no">91</span><span class="mk">+</span><span>    <span class="kw">if</span> (input.Status == OrderStatus.Cancelled &amp;&amp; order.Invoiced)</span></div>
+          <div class="ln add"><span class="no">92</span><span class="mk">+</span><span>        order.Notes += <span class="str">$" Cancelled after invoicing by </span>{_user.Name}<span class="str">"</span>;</span></div>
+          <div class="ln add"><span class="no">93</span><span class="mk">+</span><span>    order.EditedAt = _clock.UtcNow;</span></div>
+          <div class="ln"><span class="no">94</span><span class="mk"> </span><span>    <span class="kw">await</span> _db.SaveChangesAsync();</span></div>
+        </div>
+      </div>
+
+      <div class="file">
+        <div class="fh"><span class="n">4</span><span class="p">Pages/Orders/Edit.cshtml.cs</span><span class="why">PageModel of Orders/Edit</span><span class="sp"><span class="flagtxt">1 flag</span>+41 −6</span></div>
+        <div class="code">
+          <div class="hunk">@@ -12,6 +12,7 @@ namespace OrdersPortal.Pages.Orders</div>
+          <div class="ln add"><span class="no">12</span><span class="mk">+</span><span>[<span class="ty">IgnoreAntiforgeryToken</span>]</span></div>
+          <div class="flag"><span class="g-sev g-sev--warn">Flag</span><span><span class="what">Antiforgery switched off for this page.</span> <span class="why2"><code class="mono">[IgnoreAntiforgeryToken]</code> added. <code class="mono">OnPostSaveAsync</code> changes data and is called from <span class="mono">orders-edit.js</span>.</span></span></div>
+          <div class="ln"><span class="no">13</span><span class="mk"> </span><span><span class="kw">public class</span> <span class="ty">EditModel</span>(<span class="ty">OrderService</span> orders) : <span class="ty">PageModel</span></span></div>
+          <div class="fold boil"><span class="chev">▸</span><span class="kind">Boilerplate · Summarised</span><span class="sum">2 bound properties: <code>Input</code> (<code>OrderEditInput</code>), <code>StatusOptions</code></span><span class="ct">9 lines</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane right">
+      <div class="ph"><h2>Orders / Edit</h2><span class="sp"><button class="g-btn g-btn--primary">Mark reviewed <span class="g-kbd" style="margin-left:4px">R</span></button></span></div>
+      <div class="sec"><h3>To read</h3>
+        <dl class="facts"><dt>Changed</dt><dd>1,306</dd><dt>Boilerplate, summarised</dt><dd>634</dd><dt>Mechanical, proven</dt><dd>260</dd><dt>To read</dt><dd><b>412</b></dd></dl></div>
+      <div class="sec"><h3>Flags in this slice · 3</h3>
+        <ul class="flist">
+          <li><span class="g-sev g-sev--warn">Flag</span><span>Antiforgery switched off<br><span class="loc">Edit.cshtml.cs:12</span></span></li>
+          <li><span class="g-sev g-sev--warn">Flag</span><span>Guard removed<br><span class="loc">OrderService.cs:89</span></span></li>
+          <li><span class="g-sev g-sev--warn">Flag</span><span>Test skipped: <span class="mono">Update_rejects_cancelled_invoiced</span><br><span class="loc">OrderServiceTests.cs:140</span></span></li>
+        </ul></div>
+      <div class="sec"><h3>Why these files are together</h3>
+        <ul class="edges">
+          <li><span class="from">Edit.cshtml</span> <span class="via">has PageModel</span> <span class="from">EditModel</span></li>
+          <li><span class="from">EditModel</span> <span class="via">injects</span> <span class="from">OrderService</span></li>
+          <li><span class="from">OrderService</span> <span class="via">loads</span> <span class="from">Order</span></li>
+          <li><span class="from">Edit.cshtml</span> <span class="via">loads script</span> <span class="from">orders-edit.js</span></li>
+          <li><span class="from">orders-edit.js</span> <span class="via">posts to</span> <span class="from">?handler=Save</span> → <span class="from">OnPostSaveAsync</span></li>
+          <li><span class="from">OrderServiceTests</span> <span class="via">tests</span> <span class="from">OrderService.UpdateAsync</span></li>
+        </ul></div>
+      <div class="sec"><h3>Keys</h3>
+        <div class="keys"><span class="g-kbd">J</span><span>Next slice</span><span class="g-kbd">K</span><span>Previous slice</span><span class="g-kbd">N</span><span>Next file in reading order</span><span class="g-kbd">Space</span><span>Open or close a fold</span><span class="g-kbd">F</span><span>Next flag</span><span class="g-kbd">L</span><span>Since my last look</span></div></div>
+    </div>
+  </div>
+  <div class="sb"><span>Head <span class="mono">9f3e2a1</span></span><span>3 of 8 slices reviewed</span><div class="r"><span>Pending review: 2 comments</span><span>Engine ready</span></div></div>
+</div>
+</section>
+
+<!-- =============================== 3 FOLD OPEN =============================== -->
+<section class="screen" id="s3" data-note="<b>A fold, opened.</b> Boilerplate is summarised, not proven, so it is always one key away. The summary line stays on top while the fold is open, and the striped, dashed edge sets it apart from proven-mechanical folds (✓). Below that, the page markup and its jQuery, with the link from the script's AJAX call to the handler written on the file header.">
+<div class="win">
+  <div class="tb"><span class="app">Kelpie Review</span><span class="crumb">contoso/orders-portal#412</span>
+    <div class="goto">Go to a pull request or local branch…<span class="g-kbd">Ctrl K</span></div>
+    <div class="caps"><span>—</span><span>☐</span><span>✕</span></div></div>
+  <div class="prh">
+    <h1>Add order editing, customer notes and CSV export</h1>
+    <div class="meta"><span>jbrown wants to merge 14 commits into <span class="mono">main</span></span><span>·</span><span>58 files</span></div>
+    <div class="tabs" role="tablist"><button>Conversation<span class="g-count">6</span></button><button>Commits<span class="g-count">14</span></button><button>Checks</button><button aria-selected="true">Slices<span class="g-count">8</span></button><button>Files<span class="g-count">58</span></button></div>
+  </div>
+  <div class="panes" style="grid-template-columns:300px 1fr">
+    <div class="pane left">
+      <div class="ph"><h2>Slices</h2></div>
+      <ul class="slices">
+        <li class="grp">Pages</li>
+        <li class="sel"><div class="t"><b>Orders / Edit</b><span class="st flagtxt">3 flags</span></div><div class="s"><span>9 files</span><span>412 to read</span></div></li>
+        <li><div class="t"><b>Orders / Export</b><span class="st flagtxt">1 flag</span></div><div class="s"><span>6 files</span><span>220 to read</span></div></li>
+        <li><div class="t"><b>Customers / Notes</b><span class="st q">Not reviewed</span></div><div class="s"><span>7 files</span><span>128 to read</span></div></li>
+        <li><div class="t"><b>Customers / Index</b><span class="st done">✓ Reviewed</span></div><div class="s"><span>4 files</span><span>88 to read</span></div></li>
+        <li><div class="t"><b>Admin / Settings</b><span class="st done">✓ Reviewed</span></div><div class="s"><span>3 files</span><span>64 to read</span></div></li>
+      </ul>
+    </div>
+    <div class="pane mid">
+      <div class="file">
+        <div class="fh"><span class="n">2</span><span class="p">Pages/Orders/OrderEditInput.cs</span><span class="new">new</span><span class="why">[BindProperty] on EditModel</span><span class="sp">+64</span></div>
+        <div class="code">
+          <div class="fold boil open"><span class="chev">▾</span><span class="kind">Boilerplate · Summarised</span><span class="sum"><code>OrderEditInput</code>: 11 properties · <code>[Required]</code> ×3 · <code>[StringLength(500)]</code> on <code>Notes</code></span><span class="ct">Close <span class="g-kbd">Space</span></span></div>
+          <div class="ln add"><span class="no">1</span><span class="mk">+</span><span><span class="kw">namespace</span> OrdersPortal.Pages.Orders;</span></div>
+          <div class="ln add"><span class="no">2</span><span class="mk">+</span><span></span></div>
+          <div class="ln add"><span class="no">3</span><span class="mk">+</span><span><span class="kw">public sealed class</span> <span class="ty">OrderEditInput</span></span></div>
+          <div class="ln add"><span class="no">4</span><span class="mk">+</span><span>{</span></div>
+          <div class="ln add"><span class="no">5</span><span class="mk">+</span><span>    [<span class="ty">Required</span>] <span class="kw">public int</span> Id { <span class="kw">get</span>; <span class="kw">set</span>; }</span></div>
+          <div class="ln add"><span class="no">6</span><span class="mk">+</span><span>    [<span class="ty">Required</span>] <span class="kw">public</span> <span class="ty">OrderStatus</span> Status { <span class="kw">get</span>; <span class="kw">set</span>; }</span></div>
+          <div class="ln add"><span class="no">7</span><span class="mk">+</span><span>    [<span class="ty">Required</span>, <span class="ty">DataType</span>(DataType.Date)] <span class="kw">public</span> <span class="ty">DateOnly</span> DeliveryDate { <span class="kw">get</span>; <span class="kw">set</span>; }</span></div>
+          <div class="ln add"><span class="no">8</span><span class="mk">+</span><span>    [<span class="ty">StringLength</span>(<span class="str">500</span>)] <span class="kw">public string</span>? Notes { <span class="kw">get</span>; <span class="kw">set</span>; }</span></div>
+          <div class="ln add"><span class="no">9</span><span class="mk">+</span><span>    <span class="kw">public string</span>? Reference { <span class="kw">get</span>; <span class="kw">set</span>; }</span></div>
+          <div class="ln add"><span class="no">10</span><span class="mk">+</span><span>    <span class="cm">// … 6 more auto-properties</span></span></div>
+          <div class="ln add"><span class="no">64</span><span class="mk">+</span><span>}</span></div>
+        </div>
+      </div>
+
+      <div class="file">
+        <div class="fh"><span class="n">5</span><span class="p">Pages/Orders/Edit.cshtml</span><span class="why">page Orders/Edit · route <span class="mono">@page "{id:int}"</span></span><span class="sp"><span class="flagtxt">1 flag</span>+38 −12</span></div>
+        <div class="code">
+          <div class="hunk">@@ -30,6 +30,14 @@</div>
+          <div class="ln"><span class="no">30</span><span class="mk"> </span><span>&lt;<span class="kw">form</span> method=<span class="str">"post"</span> asp-page-handler=<span class="str">"Save"</span> id=<span class="str">"order-edit"</span>&gt;</span></div>
+          <div class="ln add"><span class="no">31</span><span class="mk">+</span><span>  &lt;<span class="kw">div</span> class=<span class="str">"notes-preview"</span>&gt;@Html.Raw(Model.Input.Notes)&lt;/<span class="kw">div</span>&gt;</span></div>
+          <div class="flag"><span class="g-sev g-sev--warn">Flag</span><span><span class="what">Raw output added.</span> <span class="why2"><code class="mono">@Html.Raw</code> writes <code class="mono">Input.Notes</code> without encoding. Notes are typed in by users (<span class="mono">OrderEditInput.cs:8</span>).</span></span></div>
+          <div class="ln add"><span class="no">32</span><span class="mk">+</span><span>  &lt;<span class="kw">partial</span> name=<span class="str">"_StatusPicker"</span> model=<span class="str">"Model.StatusOptions"</span> /&gt;</span></div>
+          <div class="fold boil"><span class="chev">▸</span><span class="kind">Boilerplate · Summarised</span><span class="sum">form fields bound with <code>asp-for</code>: Status, DeliveryDate, Notes, Reference, 7 more</span><span class="ct">28 lines</span></div>
+        </div>
+      </div>
+
+      <div class="file">
+        <div class="fh"><span class="n">6</span><span class="p">wwwroot/js/orders-edit.js</span><span class="new">new</span><span class="why">loaded by Edit.cshtml (<span class="mono">@section Scripts</span>) · posts to <span class="mono">OnPostSaveAsync</span></span><span class="sp">+52</span></div>
+        <div class="code">
+          <div class="ln add"><span class="no">14</span><span class="mk">+</span><span>$(<span class="str">'#order-edit'</span>).on(<span class="str">'submit'</span>, <span class="kw">function</span> (e) {</span></div>
+          <div class="ln add"><span class="no">15</span><span class="mk">+</span><span>  e.preventDefault();</span></div>
+          <div class="ln add"><span class="no">16</span><span class="mk">+</span><span>  $.post(<span class="str">'?handler=Save'</span>, $(<span class="kw">this</span>).serialize())</span></div>
+          <div class="ln add"><span class="no">17</span><span class="mk">+</span><span>    .done(r =&gt; $(<span class="str">'.notes-preview'</span>).html(r.notes))</span></div>
+          <div class="ln add"><span class="no">18</span><span class="mk">+</span><span>    .fail(() =&gt; {});</span></div>
+          <div class="flag"><span class="g-sev g-sev--warn">Flag</span><span><span class="what">Error swallowed.</span> <span class="why2">An empty <code class="mono">.fail</code> handler: a failed save shows nothing to the user.</span></span></div>
+          <div class="ln add"><span class="no">19</span><span class="mk">+</span><span>});</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="sb"><span>Head <span class="mono">9f3e2a1</span></span><span>3 of 8 slices reviewed</span><div class="r"><span>Engine ready</span></div></div>
+</div>
+</section>
+
+<!-- =============================== 4 SINCE =============================== -->
+<section class="screen" id="s4" data-note="<b>Since my last look, after the agent re-pushed.</b> Only slices that changed are listed, each cut down to the range diff. A slice you'd marked reviewed whose code changed loses the mark and says so. Slices that didn't change are counted, not listed.">
+<div class="win">
+  <div class="tb"><span class="app">Kelpie Review</span><span class="crumb">contoso/orders-portal#412</span>
+    <div class="goto">Go to a pull request or local branch…<span class="g-kbd">Ctrl K</span></div>
+    <div class="caps"><span>—</span><span>☐</span><span>✕</span></div></div>
+  <div class="prh">
+    <h1>Add order editing, customer notes and CSV export</h1>
+    <div class="meta"><span>jbrown pushed 2 commits since you last looked</span></div>
+    <div class="tabs" role="tablist"><button>Conversation<span class="g-count">6</span></button><button>Commits<span class="g-count">16</span></button><button>Checks</button><button aria-selected="true">Slices<span class="g-count">8</span></button><button>Files<span class="g-count">58</span></button></div>
+  </div>
+  <div class="panes">
+    <div class="pane left">
+      <div class="ph"><h2>Slices</h2><span class="sp"><div class="g-seg"><button aria-pressed="false">All</button><button aria-pressed="true">Since last look</button></div></span></div>
+      <div class="prog"><div class="lbl">3 slices changed · 96 lines to read</div><div class="q" style="font-size:12px">5 slices unchanged since <span class="mono">9f3e2a1</span></div></div>
+      <ul class="slices">
+        <li class="sel"><div class="t"><b>Admin / Settings</b><span class="st changed">Changed after review</span></div><div class="s"><span>1 file</span><span>34 to read</span></div></li>
+        <li><div class="t"><b>Orders / Edit</b><span class="st changed">Changed</span></div><div class="s"><span>2 files</span><span>48 to read</span><span>2 flags fixed</span></div></li>
+        <li><div class="t"><b>Shared</b><span class="st changed">Changed after review</span></div><div class="s"><span>1 file</span><span>14 to read</span></div></li>
+      </ul>
+    </div>
+    <div class="pane mid">
+      <div class="banner"><span><b>Since your last look</b> · <span class="mono">9f3e2a1</span> → <span class="mono">c47d0b8</span> · Tue 14:02 → today 09:41</span><span class="sp"><button class="g-btn g-btn--ghost">Show whole slice</button></span></div>
+      <div class="slicehead">
+        <h2>Admin / Settings</h2>
+        <div class="meta"><span>You marked this reviewed on Tue. 1 file changed since, so the mark was cleared.</span></div>
+        <div class="acts"><button class="g-btn g-btn--primary">Mark reviewed again <span class="g-kbd" style="margin-left:4px">R</span></button><span class="q">34 lines in this range</span></div>
+      </div>
+      <div class="file">
+        <div class="fh"><span class="n">2</span><span class="p">Pages/Admin/Settings.cshtml.cs</span><span class="why">PageModel of Admin/Settings</span><span class="sp"><span class="flagtxt">1 flag</span>+18 −4</span></div>
+        <div class="code">
+          <div class="hunk">@@ -8,7 +8,6 @@ namespace OrdersPortal.Pages.Admin</div>
+          <div class="ln del"><span class="no">8</span><span class="mk">−</span><span>[<span class="ty">Authorize</span>(Roles = <span class="str">"Admin"</span>)]</span></div>
+          <div class="flag"><span class="g-sev g-sev--warn">Flag</span><span><span class="what">Authorisation removed.</span> <span class="why2"><code class="mono">[Authorize(Roles = "Admin")]</code> deleted from <code class="mono">SettingsModel</code>, and no folder convention in <span class="mono">Program.cs</span> covers <span class="mono">/Admin</span>.</span></span></div>
+          <div class="ln"><span class="no">9</span><span class="mk"> </span><span><span class="kw">public class</span> <span class="ty">SettingsModel</span>(<span class="ty">SettingsStore</span> store) : <span class="ty">PageModel</span></span></div>
+          <div class="hunk">@@ -31,4 +30,20 @@ public async Task&lt;IActionResult&gt; OnPostAsync()</div>
+          <div class="ln add"><span class="no">30</span><span class="mk">+</span><span>    <span class="kw">if</span> (!ModelState.IsValid) <span class="kw">return</span> Page();</span></div>
+          <div class="ln add"><span class="no">31</span><span class="mk">+</span><span>    <span class="kw">await</span> store.SaveAsync(Input);</span></div>
+          <div class="fold mech"><span class="chev">▸</span><span class="kind">Mechanical · Proven</span><span class="sum">formatting only (line breaks in a method chain)</span><span class="ct">12 lines</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="pane right">
+      <div class="ph"><h2>What changed</h2></div>
+      <div class="sec"><h3>Pushes since your last look</h3>
+        <ul class="flist">
+          <li><span class="mono">a1e9f02</span><span>Address review: restore null guard, re-enable antiforgery</span></li>
+          <li><span class="mono">c47d0b8</span><span>Tidy admin settings page</span></li>
+        </ul></div>
+      <div class="sec"><h3>Flags</h3>
+        <ul class="flist">
+          <li><span class="g-sev g-sev--ok">Fixed</span><span>Guard removed<br><span class="loc">OrderService.cs:89</span></span></li>
+          <li><span class="g-sev g-sev--ok">Fixed</span><span>Antiforgery switched off<br><span class="loc">Edit.cshtml.cs:12</span></span></li>
+          <li><span class="g-sev g-sev--warn">New</span><span>Authorisation removed<br><span class="loc">Settings.cshtml.cs:8</span></span></li>
+        </ul></div>
+      <div class="sec"><h3>Your marks</h3>
+        <dl class="facts"><dt>Still valid</dt><dd>2</dd><dt>Cleared by changes</dt><dd>2</dd><dt>Not yet reviewed</dt><dd>4</dd></dl></div>
+    </div>
+  </div>
+  <div class="sb"><span>Head <span class="mono">c47d0b8</span></span><span>2 of 8 slices reviewed</span><div class="r"><span>Engine ready</span></div></div>
+</div>
+</section>
+
+<!-- =============================== 5 UNLINKED =============================== -->
+<section class="screen" id="s5" data-note="<b>Unlinked: changed code no page, handler or test in this PR reaches.</b> This is often where out-of-scope rewrites turn up, so it is never hidden or folded. Each file says how it fails to connect, and when its lines were last touched.">
+<div class="win">
+  <div class="tb"><span class="app">Kelpie Review</span><span class="crumb">claude/refactor-pricing-rules · local</span>
+    <div class="goto">Go to a pull request or local branch…<span class="g-kbd">Ctrl K</span></div>
+    <div class="caps"><span>—</span><span>☐</span><span>✕</span></div></div>
+  <div class="prh">
+    <h1>claude/refactor-pricing-rules</h1>
+    <div class="meta"><span class="mono">C:\Dev\work\billing</span><span>·</span><span>against <span class="mono">develop</span></span><span>·</span><span>Local branch: comments stay on this machine</span></div>
+    <div class="tabs" role="tablist"><button>Commits<span class="g-count">9</span></button><button aria-selected="true">Slices<span class="g-count">6</span></button><button>Files<span class="g-count">31</span></button></div>
+  </div>
+  <div class="panes">
+    <div class="pane left">
+      <div class="ph"><h2>Slices</h2></div>
+      <div class="prog"><div class="lbl">4 of 6 slices reviewed · 136 lines left</div><div class="meter"><i style="width:66%"></i></div></div>
+      <ul class="slices">
+        <li class="grp">Pages</li>
+        <li><div class="t"><b>Pricing / Rules</b><span class="st done">✓ Reviewed</span></div><div class="s"><span>8 files</span><span>96 to read</span></div></li>
+        <li><div class="t"><b>Pricing / Preview</b><span class="st done">✓ Reviewed</span></div><div class="s"><span>4 files</span><span>42 to read</span></div></li>
+        <li><div class="t"><b>Quotes / Create</b><span class="st done">✓ Reviewed</span></div><div class="s"><span>5 files</span><span>36 to read</span></div></li>
+        <li class="grp">Across slices</li>
+        <li><div class="t"><b>Shared</b><span class="st done">✓ Reviewed</span></div><div class="s"><span>2 files</span><span>0 to read</span></div></li>
+        <li class="sel"><div class="t"><b>Unlinked</b><span class="st q">Not reviewed</span></div><div class="s"><span>3 files</span><span>136 to read</span></div></li>
+      </ul>
+    </div>
+    <div class="pane mid">
+      <div class="slicehead">
+        <h2>Unlinked</h2>
+        <div class="meta"><span>3 changed files that nothing in this branch reaches. Were these part of the task?</span></div>
+      </div>
+      <div class="file">
+        <div class="fh"><span class="n">1</span><span class="p">Infrastructure/StringHelpers.cs</span><span class="why">no changed page, handler or test uses it</span><span class="sp">+71 −84</span></div>
+        <div class="code">
+          <div class="flag" style="margin-left:0"><span class="g-sev">Note</span><span><span class="what">Rewrites 84 lines last changed in March 2024.</span> <span class="why2">Used by 23 unchanged files outside this branch.</span></span></div>
+          <div class="hunk">@@ -12,22 +12,19 @@ public static class StringHelpers</div>
+          <div class="ln del"><span class="no">12</span><span class="mk">−</span><span>    <span class="kw">public static string</span> Truncate(<span class="kw">this string</span> s, <span class="kw">int</span> max) =&gt;</span></div>
+          <div class="ln del"><span class="no">13</span><span class="mk">−</span><span>        s.Length &lt;= max ? s : s[..max] + <span class="str">"…"</span>;</span></div>
+          <div class="ln add"><span class="no">12</span><span class="mk">+</span><span>    <span class="kw">public static string</span> Truncate(<span class="kw">this string</span>? s, <span class="kw">int</span> max)</span></div>
+          <div class="ln add"><span class="no">13</span><span class="mk">+</span><span>    {</span></div>
+          <div class="ln add"><span class="no">14</span><span class="mk">+</span><span>        <span class="kw">if</span> (<span class="kw">string</span>.IsNullOrEmpty(s)) <span class="kw">return string</span>.Empty;</span></div>
+          <div class="ln add"><span class="no">15</span><span class="mk">+</span><span>        <span class="kw">return</span> s.Length &lt;= max ? s : s[..(max - <span class="str">1</span>)] + <span class="str">"…"</span>;</span></div>
+          <div class="ln add"><span class="no">16</span><span class="mk">+</span><span>    }</span></div>
+        </div>
+      </div>
+      <div class="file">
+        <div class="fh"><span class="n">2</span><span class="p">Infrastructure/DateFormatting.cs</span><span class="new">new</span><span class="why">nothing calls it</span><span class="sp">+38</span></div>
+        <div class="code">
+          <div class="ln add"><span class="no">5</span><span class="mk">+</span><span><span class="kw">public static string</span> FormatShortDate(<span class="ty">DateTime</span> d) =&gt; d.ToString(<span class="str">"dd/MM/yyyy"</span>);</span></div>
+        </div>
+      </div>
+      <div class="file">
+        <div class="fh"><span class="n">3</span><span class="p">.editorconfig</span><span class="why">build configuration</span><span class="sp"><span class="flagtxt">1 flag</span>+2 −2</span></div>
+        <div class="code">
+          <div class="ln del"><span class="no">41</span><span class="mk">−</span><span>dotnet_diagnostic.CA2007.severity = error</span></div>
+          <div class="ln add"><span class="no">41</span><span class="mk">+</span><span>dotnet_diagnostic.CA2007.severity = none</span></div>
+          <div class="flag"><span class="g-sev g-sev--warn">Flag</span><span><span class="what">Analyser rule switched off.</span> <span class="why2">CA2007 went from error to none. This branch has 6 new <code class="mono">await</code>s without <code class="mono">ConfigureAwait</code>.</span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="pane right">
+      <div class="ph"><h2>Unlinked</h2><span class="sp"><button class="g-btn g-btn--primary">Mark reviewed <span class="g-kbd" style="margin-left:4px">R</span></button></span></div>
+      <div class="sec"><h3>Why these are unlinked</h3>
+        <p style="margin:0;font-size:12.5px">A file lands here when no changed page, handler, endpoint or test reaches it through code links. Shared files used by unchanged code don't count.</p></div>
+      <div class="sec"><h3>Local branch</h3>
+        <p style="margin:0;font-size:12.5px">Comments you write here stay on this machine. Copy them as a list to hand back to the agent.</p>
+        <div style="margin-top:8px"><button class="g-btn">Copy comments</button></div></div>
+    </div>
+  </div>
+  <div class="sb"><span>Local · head <span class="mono">5b2c9e0</span></span><span>4 of 6 slices reviewed</span><div class="r"><span>Engine ready</span></div></div>
+</div>
+</section>
+
+</div>
+
+<script>
+const note = document.getElementById('note');
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id===id));
+  document.querySelectorAll('#screens button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.s===id));
+  note.innerHTML = document.getElementById(id).dataset.note;
+  history.replaceState(null,'','#'+id);
+}
+document.querySelectorAll('#screens button').forEach(b=>b.onclick=()=>show(b.dataset.s));
+document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{
+  document.documentElement.dataset.theme=b.dataset.t;
+  document.querySelectorAll('#theme button').forEach(x=>x.setAttribute('aria-pressed', x===b));
+});
+const params = new URLSearchParams(location.search);
+if (params.get('theme')) document.querySelector(`#theme [data-t="${params.get('theme')}"]`)?.click();
+show(location.hash.slice(1) || 's1');
+</script>
+</body>
+</html>
