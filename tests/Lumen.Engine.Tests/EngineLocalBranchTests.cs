@@ -159,6 +159,33 @@ public sealed class EngineLocalBranchTests : IAsyncLifetime
 
     private TimeSpan? SnapshotAt { get; set; }
 
+    /// <summary>
+    /// Opt-in, local git only: LUMEN_SLICE_REPLAY=&lt;clone&gt;|&lt;base&gt;|&lt;head&gt; opens that branch through the engine and
+    /// prints its slices, flags and timings (used for andrew-crm#58 in docs/overhaul.md).
+    /// </summary>
+    [Fact]
+    public async Task ReplaysALocalBranchAndPrintsItsSlices()
+    {
+        if (Environment.GetEnvironmentVariable("LUMEN_SLICE_REPLAY")?.Split('|') is not [var clone, var baseRef, var headRef])
+        {
+            return;
+        }
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var events = await WatchAsync(new LocalBranchRef { ClonePath = clone, BaseRef = baseRef, HeadRef = headRef }, e => SnapshotAt ??= stopwatch.Elapsed);
+        Assert.DoesNotContain(events, e => e.Failed is not null);
+        var ready = events.Single(e => e.SlicesReady is not null).SlicesReady;
+        var flags = events.Single(e => e.FlagsReady is not null).FlagsReady.Flags;
+        var files = events.First(e => e.Snapshot is not null).Snapshot.Files.Count;
+        Console.WriteLine($"REPLAY {files} files; files after {SnapshotAt!.Value.TotalMilliseconds:N0} ms, done after {stopwatch.ElapsedMilliseconds:N0} ms (slicer {ready.DurationMs} ms); fell back: {ready.FellBack} {ready.FallbackReason}");
+        foreach (var slice in ready.Slices)
+        {
+            Console.WriteLine($"REPLAY   {slice.Kind,-28} {slice.Title,-40} {slice.Files.Count,3} files");
+        }
+
+        Console.WriteLine($"REPLAY flags: {string.Join(", ", flags.GroupBy(f => f.Kind).Select(g => $"{g.Key} {g.Count()}"))}");
+    }
+
     [Fact]
     public async Task TheFixturesPlantedFlagsArriveAndNoFoldHidesOne()
     {

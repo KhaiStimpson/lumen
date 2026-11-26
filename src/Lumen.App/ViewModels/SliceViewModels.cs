@@ -139,6 +139,9 @@ public sealed partial class SliceViewModel : ObservableObject
     /// <summary>"handlers OnGetAsync, OnPostSaveAsync".</summary>
     public string SectionsLabel => HasSections ? "handlers " + string.Join(", ", Model.Sections) : "";
 
+    /// <summary>" · handlers Page, OnPostSave" after the caption, or nothing.</summary>
+    public string SectionsSuffix => HasSections ? " · " + SectionsLabel : "";
+
     public string SeedPath => Model.SeedPath;
 
     public string FilesLabel => Files.Count == 1 ? "1 file" : string.Create(CultureInfo.InvariantCulture, $"{Files.Count} files");

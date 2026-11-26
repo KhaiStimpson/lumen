@@ -45,10 +45,38 @@ public sealed partial class PullRequestViewModel
     public string ReviewKindLabel => IsLocal ? "Local branch" : "Pull request";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasCurrentSlice), nameof(CurrentSliceFlags), nameof(CurrentSliceFlagCount))]
+    [NotifyPropertyChangedFor(nameof(HasCurrentSlice), nameof(CurrentSliceFlags), nameof(CurrentSliceFlagCount), nameof(IsMechanicalSlice), nameof(MechanicalGroups))]
     public partial SliceViewModel? CurrentSlice { get; private set; }
 
     public bool HasCurrentSlice => CurrentSlice is not null;
+
+    public bool IsMechanicalSlice => CurrentSlice?.IsMechanicalOnly == true;
+
+    /// <summary>
+    /// "Mechanical only" as groups, not files (docs/overhaul.md, UI): "Renamed `GetOrder`→`GetOrderAsync` · 12 sites",
+    /// "Database migration · 3 files". Largest first.
+    /// </summary>
+    public IReadOnlyList<string> MechanicalGroups
+    {
+        get
+        {
+            if (CurrentSlice is not { IsMechanicalOnly: true } slice || Triage is not { } triage)
+            {
+                return [];
+            }
+
+            var paths = slice.Files.Select(f => f.Path).ToHashSet(StringComparer.Ordinal);
+            var hunks = triage.Hunks.Where(h => paths.Contains(h.Path) && h.Fold == FoldKind.Mechanical).ToList();
+            var groups = triage.Groups.ToDictionary(g => g.Id, StringComparer.Ordinal);
+            var grouped = hunks.Where(h => h.GroupId.Length > 0 && groups.ContainsKey(h.GroupId)).GroupBy(h => h.GroupId)
+                .Select(g => (Lines: g.Sum(h => h.ChangedLines), Text: string.Create(CultureInfo.InvariantCulture,
+                    $"{groups[g.Key].Title} · {groups[g.Key].MemberCount} site{(groups[g.Key].MemberCount == 1 ? "" : "s")}")));
+            var rest = hunks.Where(h => h.GroupId.Length == 0 || !groups.ContainsKey(h.GroupId)).GroupBy(h => h.Reasons.FirstOrDefault() ?? "Mechanical")
+                .Select(g => (Lines: g.Sum(h => h.ChangedLines), Text: string.Create(CultureInfo.InvariantCulture,
+                    $"{g.Key} · {g.Select(h => h.Path).Distinct().Count()} file{(g.Select(h => h.Path).Distinct().Count() == 1 ? "" : "s")}")));
+            return [.. grouped.Concat(rest).OrderByDescending(g => g.Lines).Select(g => g.Text)];
+        }
+    }
 
     public MarkReviewedViewModel MarkReviewed { get; } = new();
 

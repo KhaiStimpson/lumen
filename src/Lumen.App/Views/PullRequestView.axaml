@@ -270,7 +270,7 @@
                 <TextBlock Classes="h2" Text="{Binding CurrentSlice.Title, FallbackValue=''}" TextTrimming="CharacterEllipsis" />
                 <TextBlock Classes="caption" TextTrimming="CharacterEllipsis">
                   <Run Text="{Binding CurrentSlice.Caption, FallbackValue='', Mode=OneWay}" FontFamily="{StaticResource CodeFont}" FontSize="11.5" />
-                  <Run Text="{Binding CurrentSlice.SectionsLabel, FallbackValue='', Mode=OneWay, StringFormat=' · {0}'}" />
+                  <Run Text="{Binding CurrentSlice.SectionsSuffix, FallbackValue='', Mode=OneWay}" />
                   <Run Text=" · " /><Run Text="{Binding CurrentSlice.LinesLabel, FallbackValue='', Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" />
                 </TextBlock>
               </StackPanel>
@@ -311,8 +311,16 @@
               <Border Grid.Column="1" Background="{DynamicResource Bar.Boilerplate}" ToolTip.Tip="Boilerplate, not verified" />
               <Border Grid.Column="2" Background="{DynamicResource Bar.Mechanical}" CornerRadius="0,3,3,0" ToolTip.Tip="Mechanical, proven" />
             </Grid>
+            <!-- Mechanical only: its groups, not its files -->
+            <ItemsControl Name="MechanicalGroups" ItemsSource="{Binding MechanicalGroups}" IsVisible="{Binding IsMechanicalSlice}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <TextBlock Classes="caption" Margin="0,1" views:CodeText.Text="{Binding}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
             <!-- Read in this order -->
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding !IsMechanicalSlice}">
               <TextBlock Classes="caption" Text="Read in this order:" VerticalAlignment="Center" Margin="0,0,4,0" />
               <ItemsControl Name="ReadingOrder" ItemsSource="{Binding CurrentSlice.Files, FallbackValue={x:Null}}">
                 <ItemsControl.ItemsPanel>

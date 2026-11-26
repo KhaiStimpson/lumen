@@ -190,6 +190,30 @@ public sealed class SliceTests
     }
 
     [AvaloniaFact]
+    public async Task MechanicalOnlyListsItsGroupsNotItsFiles()
+    {
+        var pr = await Fixture.LoadAsync(Fixture.CreateRefactorSource());
+        try
+        {
+            var group = pr.Triage!.Groups.First(g => pr.Triage.Hunks.Any(h => h.GroupId == g.Id && h.Fold == FoldKind.Mechanical));
+            var members = pr.Triage.Hunks.Where(h => h.GroupId == group.Id && h.Fold == FoldKind.Mechanical).Select(h => h.Path).Distinct().ToList();
+            var ready = new SlicesReady();
+            var slice = new Slice { Id = "m", Title = "Mechanical only", Kind = SliceKind.MechanicalOnly };
+            slice.Files.AddRange(members.Select((p, i) => new SliceFile { Path = p, Order = i, Why = "every change is proven mechanical" }));
+            ready.Slices.Add(slice);
+            await pr.ApplyAsync(new PullRequestEvent { SlicesReady = ready });
+            await pr.SelectSliceAsync(pr.Slices.Single());
+
+            Assert.True(pr.IsMechanicalSlice);
+            Assert.Contains($"{group.Title} · {group.MemberCount} site{(group.MemberCount == 1 ? "" : "s")}", pr.MechanicalGroups);
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task AFlagCardMarkedNewRendersWithoutWritingItsLabelBack()
     {
         // Run.Text binds two-way by default; with a StringFormat it once wrote "  · New" back into the label, forever.
