@@ -207,6 +207,44 @@ public sealed class SliceTests
     }
 
     [AvaloniaFact]
+    public async Task MarkReviewedCountsBoilerplateFoldsNobodyOpenedUntilTheyAreOpened()
+    {
+        var source = Fixture.CreateAuditSource();
+        var pr = await Fixture.LoadAsync(source);
+        try
+        {
+            // Make one folded hunk a boilerplate fold: summarised, not proven, so somebody should open it.
+            var triage = pr.Triage!.Clone();
+            var hunk = triage.Hunks.First(DiffFolds.Folds);
+            hunk.Fold = FoldKind.Boilerplate;
+            await pr.ApplyAsync(new PullRequestEvent { TriageReady = triage });
+            var ready = new SlicesReady();
+            var slice = new Slice { Id = "s", Title = "Audit", Kind = SliceKind.Feature, SeedPath = hunk.Path };
+            slice.Files.Add(new SliceFile { Path = hunk.Path, Order = 1, Why = "entry point" });
+            ready.Slices.Add(slice);
+            ready.Units.Add(new UnitFingerprint { Unit = hunk.Path, Path = hunk.Path, Fingerprint = "fp", OpenLines = 3 });
+            await pr.ApplyAsync(new PullRequestEvent { SlicesReady = ready });
+            await Fixture.WaitUntilAsync(() => pr.SelectedFile?.Path == hunk.Path && pr.CurrentDiff is not null);
+
+            await pr.MarkSliceReviewedAsync();
+            Assert.True(pr.MarkReviewed.IsArmed);
+            Assert.Equal("1 fold not opened", pr.MarkReviewed.Hint);
+            Assert.Empty(source.MarkRequests);
+
+            // Opening the slice's folds clears the hint: the next press marks at once.
+            pr.MarkReviewed.IsArmed = false;
+            pr.OpenSliceFolds();
+            await pr.MarkSliceReviewedAsync();
+            Assert.False(pr.MarkReviewed.IsArmed);
+            Assert.Equal([hunk.Path], Assert.Single(source.MarkRequests).Units);
+        }
+        finally
+        {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task OpenAllFoldsInTheSliceOpensEveryFoldInItsFiles()
     {
         var pr = await Fixture.LoadAsync(Fixture.CreateAuditSource());
