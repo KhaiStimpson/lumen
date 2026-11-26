@@ -18,6 +18,10 @@ checks, comments on any line (single or multi-line, with suggestions) gathered i
 Comment / Approve / Request changes, existing threads inline in the diff, split view, whitespace toggle and find in
 diff. Local branches (an agent's output before there is a pull request) open the same way, read-only.
 
+![Feature slices, a red flag and the right pane](docs/screenshots/overhaul/dark-1920-slice-with-pane.png)
+
+More screenshots, dark and light: [docs/screenshots/overhaul](docs/screenshots/overhaul).
+
 ## Run it
 
 Prerequisites: .NET 10 SDK, Git, and the GitHub CLI signed in (`gh auth login`).
@@ -32,7 +36,9 @@ src/Lumen.App/bin/Debug/net10.0/Lumen.exe --pr https://github.com/KhaiStimpson/a
 
 Or start `Lumen.exe` with no arguments: the home screen is the **inbox** (review requested, your own, and
 watched repositories, with unread and new-since-your-last-visit marks), refreshed in the background. Paste a pull request URL (or `owner/repo#123`) into the go-to box
-(`Ctrl+K`) to open anything else. Repositories to watch beyond your own requests are under **Settings → Inbox**.
+(`Ctrl+K`) to open anything else. A clone's folder opens it as a local branch: `C:\work\shop` (working tree
+against the default branch), `C:\work\shop@feature/x` or `C:\work\shop@feature/x..develop`; it is read with
+`git show` and a private index, so your working tree and index are never touched. Repositories to watch beyond your own requests are under **Settings → Inbox**.
 
 The app starts the review engine (`engine/Lumen.Engine.exe` next to it) as a separate process and talks to it
 over a per-user named pipe with gRPC. The engine keeps a blobless clone and a worktree per PR head under
@@ -44,6 +50,8 @@ over a per-user named pipe with gRPC. The engine keeps a blobless clone and a wo
 |---|---|
 | `--pr <url or owner/repo#n>` | Open a pull request on start |
 | `--fixture tests/fixtures/andrew-crm-58` | Replay a recorded session instead of GitHub (no network) |
+| `--fixture tests/fixtures/razor-pages-app-pr --pr contoso/shop#42` | The synthetic Razor Pages change, sliced and flagged |
+| `--fixture tests/fixtures/razor-pages-app-local` | The same change as a local branch, after a follow-up commit (open it from the inbox) |
 | `--theme Light\|Dark` | Force a theme (default follows the OS; toggle in the title bar) |
 | `--reduced-motion` | Reduced-motion equivalents for every transition (also follows the OS setting) |
 | `--capture <dir> --capture-script slice,fold,flag,dark` | Render states to PNGs and exit (design review without a human) |
@@ -105,7 +113,7 @@ pending until you submit it.
 | `Lumen.Contracts` | `review_engine.proto` and the pipe/socket channel factory |
 | `Lumen.Domain` | Review targets, pull requests, diffs, folds; unified diff parser; ports |
 | `Lumen.Analysis` | Fold pipeline seams and the mechanical file classifier |
-| `Lumen.Roslyn` | Mechanical proofs (rename, move, formatting, imports, comments, ripple, migrations), the repository index |
+| `Lumen.Roslyn` | Mechanical proofs (rename, move, formatting, imports, comments, ripple, migrations), boilerplate folds, the link resolver and slicer, red-flag detectors |
 | `Lumen.GitHub` | REST and GraphQL client (inbox, details, threads, pending reviews, Viewed) and `gh` token source |
 | `Lumen.Repository` | git CLI: blobless clone, PR fetch, merge-base, worktrees, diff; read-only local clones |
 | `Lumen.Storage` | SQLite: visits, folds, reviewed marks and cache, keyed by review target |
@@ -123,7 +131,10 @@ Opt-in suites that touch the network or a local clone:
 | `LUMEN_LIVE_PR=owner/repo#n` | Full engine against real GitHub (read-only) |
 | `LUMEN_LIVE_PR` + `LUMEN_RECORD_FIXTURE=<dir>` | Re-record a UI fixture |
 | `LUMEN_LIVE_PENDING_PR=owner/repo#n` | Creates and deletes a pending review on a scratch PR (never submits) — run only on a PR you own |
-| `LUMEN_TRIAGE_SWEEP=<local clone>` | Prints every proven-mechanical fold over the clone's recent commits, for a hand-read safety sweep (local git only) |
+| `LUMEN_TRIAGE_SWEEP=<local clone>` | Prints every proven-mechanical and boilerplate fold and every red flag over the clone's recent commits, for a hand-read safety sweep (local git only) |
+| `LUMEN_SLICE_REPLAY=<clone>\|<base>\|<head>` | Opens a local branch through the engine and prints its slices, flags and timings (local git only) |
+| `LUMEN_RECORD_RAZOR=<tests/fixtures>` | Re-records the Razor Pages fixtures through the engine (no network) |
+| `LUMEN_SLICE_PROBE=1` | Prints the fixture's link graph, for reading by hand |
 
 ## Part of Kelpie
 
