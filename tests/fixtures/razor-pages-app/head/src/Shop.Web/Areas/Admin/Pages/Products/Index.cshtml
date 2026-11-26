@@ -1,0 +1,35 @@
+@page
+@model Shop.Web.Areas.Admin.Pages.Products.IndexModel
+@{
+    ViewData["Title"] = "Catalogue";
+}
+
+<h1>Catalogue</h1>
+
+<p>
+    <a asp-page="/Import" class="btn btn-outline-secondary">Import from legacy CSV</a>
+</p>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>SKU</th>
+            <th>Name</th>
+            <th class="text-end">Price</th>
+            <th class="text-end">Stock</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var product in Model.Products)
+        {
+            <tr>
+                <td>@product.Sku</td>
+                <td>@product.Name</td>
+                <td class="text-end">@product.Price.ToString("C")</td>
+                <td class="text-end">@product.StockLevel</td>
+                <td><a asp-page="./Edit" asp-route-id="@product.Id">Edit</a></td>
+            </tr>
+        }
+    </tbody>
+</table>

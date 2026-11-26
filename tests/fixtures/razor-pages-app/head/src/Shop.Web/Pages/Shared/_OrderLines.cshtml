@@ -1,0 +1,33 @@
+@model IList<OrderLine>
+
+<table id="order-lines" class="table table-sm align-middle">
+    <thead>
+        <tr>
+            <th>Product</th>
+            <th class="text-end">Qty</th>
+            <th class="text-end">Unit price</th>
+            <th class="text-end">Discount</th>
+            <th class="text-end">Line total</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var line in Model)
+        {
+            <tr class="order-line" data-line-id="@line.Id" data-unit-price="@line.UnitPrice" data-discount="@line.Discount">
+                <td class="line-product">@line.Product?.Name</td>
+                <td class="text-end line-qty">@line.Quantity</td>
+                <td class="text-end line-unit-price">@line.UnitPrice.ToString("C")</td>
+                <td class="text-end line-discount">@line.Discount.ToString("C")</td>
+                <td class="text-end line-total"></td>
+            </tr>
+        }
+    </tbody>
+    <tfoot>
+        <tr>
+            <th colspan="4" class="text-end">Lines total</th>
+            <th id="order-lines-total" class="text-end"></th>
+        </tr>
+    </tfoot>
+</table>
+
+<script src="~/js/partials/order-lines.js" asp-append-version="true"></script>

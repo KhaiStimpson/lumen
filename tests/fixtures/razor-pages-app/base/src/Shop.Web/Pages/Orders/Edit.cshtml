@@ -1,0 +1,40 @@
+@page "{id:int}"
+@model Shop.Web.Pages.Orders.EditModel
+@{
+    ViewData["Title"] = $"Edit {Model.Order.Number}";
+}
+
+<h1>Edit order @Model.Order.Number</h1>
+<p class="text-muted">@Model.Order.Customer?.Name · placed @Model.Order.PlacedOn.ToString("d")</p>
+
+<form id="order-edit-form" method="post" asp-page-handler="Save" asp-route-id="@Model.Order.Id">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <input type="hidden" asp-for="Input.RowVersion" />
+
+    <div class="mb-3">
+        <label asp-for="Input.Status" class="form-label"></label>
+        <select asp-for="Input.Status" class="form-select" asp-items="Html.GetEnumSelectList<OrderStatus>()"></select>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Input.ShippingCost" class="form-label"></label>
+        <currency-input asp-for="Input.ShippingCost" />
+        <span asp-validation-for="Input.ShippingCost" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Input.Notes" class="form-label"></label>
+        <textarea asp-for="Input.Notes" class="form-control" rows="3"></textarea>
+    </div>
+
+    <partial name="_OrderLines" model="Model.Order.Lines" />
+
+    <p class="fs-5">Total: <strong id="order-total">@Model.Order.Total.ToString("C")</strong></p>
+
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-page="./Details" asp-route-id="@Model.Order.Id" class="btn btn-link">Cancel</a>
+</form>
+
+@section Scripts {
+    <script src="~/js/pages/orders-edit.js" asp-append-version="true"></script>
+}

@@ -1,0 +1,28 @@
+@page
+@model Shop.Web.Areas.Admin.Pages.ImportModel
+@{
+    ViewData["Title"] = "Import products";
+}
+
+<h1>Import products from legacy CSV</h1>
+
+<form method="post" enctype="multipart/form-data">
+    <div class="mb-3">
+        <input type="file" name="upload" accept=".csv" class="form-control" required />
+    </div>
+    <button type="submit" class="btn btn-primary">Import</button>
+</form>
+
+@if (Model.Result is not null)
+{
+    <div class="alert alert-info mt-3">Imported @Model.Result.Imported products.</div>
+    @if (Model.Result.Errors.Count > 0)
+    {
+        <ul class="text-danger">
+            @foreach (var error in Model.Result.Errors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    }
+}

@@ -1,0 +1,498 @@
+{
+  "fixture": "razor-pages-app",
+  "description": "Contoso Shop (.NET 10 Razor Pages + jQuery). base/ is the tree before the change, head/ the full tree after it. Paths are repo-relative (relative to base/ or head/).",
+  "baseline": {
+    "changedFiles": 75,
+    "changedLines": 3097,
+    "addedLines": 2949,
+    "removedLines": 148,
+    "linesAfterMechanicalFolds": 2404,
+    "note": "From `git -c core.autocrlf=false diff --no-index --numstat base head`. linesAfterMechanicalFolds subtracts the added+removed lines of every folds.mechanical entry with fold=true (693 lines); ripple call-site files stay open."
+  },
+  "slices": [
+    {
+      "name": "Orders/Edit page",
+      "seed": "src/Shop.Web/Pages/Orders/Edit.cshtml",
+      "seedKind": "RazorPage",
+      "files": [
+        "src/Shop.Web/Pages/Orders/Edit.cshtml",
+        "src/Shop.Web/Pages/Orders/Edit.cshtml.cs",
+        "src/Shop.Web/Pages/Shared/_OrderLines.cshtml",
+        "src/Shop.Web/wwwroot/js/partials/order-lines.js",
+        "src/Shop.Web/wwwroot/js/pages/orders-edit.js",
+        "src/Shop.Web/TagHelpers/CurrencyInputTagHelper.cs",
+        "tests/Shop.Web.Tests/Pages/OrdersEditModelTests.cs"
+      ],
+      "members": [
+        "src/Shop.Web/Pages/Orders/Edit.cshtml.cs::EditModel.OnGetAsync",
+        "src/Shop.Web/Pages/Orders/Edit.cshtml.cs::EditModel.OnGetLinesAsync",
+        "src/Shop.Web/Pages/Orders/Edit.cshtml.cs::EditModel.OnPostSaveAsync",
+        "tests/Shop.Web.Tests/Pages/OrdersEditModelTests.cs::OrdersEditModelTests.OnGetAsync_returns_not_found_for_unknown_order",
+        "tests/Shop.Web.Tests/Pages/OrdersEditModelTests.cs::OrdersEditModelTests.OnGetAsync_fills_input_from_order",
+        "tests/Shop.Web.Tests/Pages/OrdersEditModelTests.cs::OrdersEditModelTests.OnPostSaveAsync_saves_input_onto_order"
+      ],
+      "handlers": ["OnGetAsync", "OnGetLinesAsync", "OnPostSaveAsync"],
+      "why": {
+        "src/Shop.Web/Pages/Orders/Edit.cshtml": "seed: @page \"{id:int}\" with @model Shop.Web.Pages.Orders.EditModel",
+        "src/Shop.Web/Pages/Orders/Edit.cshtml.cs": "code-behind EditModel in namespace Shop.Web.Pages.Orders",
+        "src/Shop.Web/Pages/Shared/_OrderLines.cshtml": "page renders <partial name=\"_OrderLines\">",
+        "src/Shop.Web/wwwroot/js/partials/order-lines.js": "_OrderLines partial loads partials/order-lines.js",
+        "src/Shop.Web/wwwroot/js/pages/orders-edit.js": "page loads pages/orders-edit.js in @section Scripts; $.post('?handler=Save') -> OnPostSaveAsync, $.getJSON('?handler=Lines') -> OnGetLinesAsync, #order-edit-form/#refresh-lines/#order-total declared only in Orders/Edit.cshtml",
+        "src/Shop.Web/TagHelpers/CurrencyInputTagHelper.cs": "page uses <currency-input asp-for=\"Input.ShippingCost\" /> (HtmlTargetElement \"currency-input\")",
+        "tests/Shop.Web.Tests/Pages/OrdersEditModelTests.cs": "test constructs Shop.Web.Pages.Orders.EditModel (using Shop.Web.Pages.Orders)"
+      }
+    },
+    {
+      "name": "Orders/Details page",
+      "seed": "src/Shop.Web/Pages/Orders/Details.cshtml",
+      "seedKind": "RazorPage",
+      "files": [
+        "src/Shop.Web/Pages/Orders/Details.cshtml.cs",
+        "src/Shop.Web/Pages/Shared/_OrderLines.cshtml",
+        "src/Shop.Web/wwwroot/js/partials/order-lines.js"
+      ],
+      "members": [
+        "src/Shop.Web/Pages/Orders/Details.cshtml.cs::DetailsModel.OnGetAsync"
+      ],
+      "handlers": ["OnGetAsync"],
+      "why": {
+        "src/Shop.Web/Pages/Orders/Details.cshtml.cs": "code-behind DetailsModel changed (GetOrder -> GetOrderAsync call site only); Details.cshtml itself is unchanged but is the page identity",
+        "src/Shop.Web/Pages/Shared/_OrderLines.cshtml": "unchanged Details.cshtml renders <partial name=\"_OrderLines\">",
+        "src/Shop.Web/wwwroot/js/partials/order-lines.js": "_OrderLines partial loads partials/order-lines.js"
+      }
+    },
+    {
+      "name": "Orders/BulkEdit page",
+      "seed": "src/Shop.Web/Pages/Orders/BulkEdit.cshtml",
+      "seedKind": "RazorPage",
+      "files": [
+        "src/Shop.Web/Pages/Orders/BulkEdit.cshtml",
+        "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs",
+        "src/Shop.Web/Models/Orders/BulkEditInput.cs",
+        "src/Shop.Web/wwwroot/js/pages/orders-bulk-edit.js",
+        "src/Shop.Web/wwwroot/lib/jquery-bulkselect/jquery.bulkselect.min.js",
+        "tests/Shop.Web.Tests/Pages/BulkEditModelTests.cs"
+      ],
+      "members": [
+        "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs::BulkEditModel.Input",
+        "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs::BulkEditModel.Status",
+        "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs::BulkEditModel.ReturnPage",
+        "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs::BulkEditModel.Orders",
+        "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs::BulkEditModel.OnGetAsync",
+        "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs::BulkEditModel.OnGetSummaryAsync",
+        "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs::BulkEditModel.OnPostApplyAsync",
+        "src/Shop.Web/Models/Orders/BulkEditInput.cs::BulkEditInput",
+        "tests/Shop.Web.Tests/Pages/BulkEditModelTests.cs::BulkEditModelTests.OnPostApplyAsync_passes_selection_to_service",
+        "tests/Shop.Web.Tests/Pages/BulkEditModelTests.cs::BulkEditModelTests.OnPostApplyAsync_returns_422_when_model_invalid",
+        "tests/Shop.Web.Tests/Pages/BulkEditModelTests.cs::BulkEditModelTests.OnGetAsync_loads_summaries_for_status_filter"
+      ],
+      "handlers": ["OnGetAsync", "OnGetSummaryAsync", "OnPostApplyAsync"],
+      "why": {
+        "src/Shop.Web/Pages/Orders/BulkEdit.cshtml": "seed: @page \"{status?}\" with @model Shop.Web.Pages.Orders.BulkEditModel",
+        "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs": "code-behind BulkEditModel",
+        "src/Shop.Web/Models/Orders/BulkEditInput.cs": "[BindProperty] public BulkEditInput Input",
+        "src/Shop.Web/wwwroot/js/pages/orders-bulk-edit.js": "page loads pages/orders-bulk-edit.js in @section Scripts; $.post('?handler=Apply') -> OnPostApplyAsync, $.getJSON('?handler=Summary') -> OnGetSummaryAsync; #bulk-edit-table/#bulk-apply declared only in BulkEdit.cshtml",
+        "src/Shop.Web/wwwroot/lib/jquery-bulkselect/jquery.bulkselect.min.js": "page loads ~/lib/jquery-bulkselect/jquery.bulkselect.min.js in @section Scripts (vendored, folds as Vendored)",
+        "tests/Shop.Web.Tests/Pages/BulkEditModelTests.cs": "test constructs BulkEditModel"
+      }
+    },
+    {
+      "name": "Orders/Checkout page",
+      "seed": "src/Shop.Web/Pages/Orders/Checkout.cshtml",
+      "seedKind": "RazorPage",
+      "files": [
+        "src/Shop.Web/Pages/Orders/Checkout.cshtml",
+        "src/Shop.Web/Pages/Orders/Checkout.cshtml.cs",
+        "src/Shop.Web/Services/CartService.cs"
+      ],
+      "members": [
+        "src/Shop.Web/Pages/Orders/Checkout.cshtml.cs::CheckoutModel.ExpressCheckoutLimit",
+        "src/Shop.Web/Pages/Orders/Checkout.cshtml.cs::CheckoutModel.OnPostExpressAsync"
+      ],
+      "handlers": ["OnGet", "OnPostPlaceAsync", "OnPostExpressAsync"],
+      "why": {
+        "src/Shop.Web/Pages/Orders/Checkout.cshtml": "seed: @page with @model Shop.Web.Pages.Orders.CheckoutModel; new asp-page-handler=\"Express\" button",
+        "src/Shop.Web/Pages/Orders/Checkout.cshtml.cs": "code-behind CheckoutModel",
+        "src/Shop.Web/Services/CartService.cs": "CheckoutModel injects CartService (concrete class); change is formatting-only"
+      }
+    },
+    {
+      "name": "Customers/Edit page",
+      "seed": "src/Shop.Web/Pages/Customers/Edit.cshtml",
+      "seedKind": "RazorPage",
+      "files": [
+        "src/Shop.Web/Pages/Customers/Edit.cshtml",
+        "src/Shop.Web/Pages/Customers/Edit.cshtml.cs",
+        "src/Shop.Web/Pages/Customers/_CustomerNotes.cshtml",
+        "src/Shop.Web/wwwroot/js/partials/customer-notes.js",
+        "src/Shop.Web/Services/ICustomerService.cs",
+        "src/Shop.Web/Services/CustomerService.cs",
+        "src/Shop.Web/Services/CustomerNoteService.cs",
+        "src/Shop.Web/Models/Customers/CustomerNoteDto.cs",
+        "src/Shop.Web/Data/Entities/CustomerNote.cs",
+        "tests/Shop.Web.Tests/Pages/CustomersEditModelTests.cs",
+        "tests/Shop.Web.Tests/Services/CustomerNoteServiceTests.cs"
+      ],
+      "members": [
+        "src/Shop.Web/Pages/Customers/Edit.cshtml.cs::EditModel.EditModel",
+        "src/Shop.Web/Pages/Customers/Edit.cshtml.cs::EditModel.Notes",
+        "src/Shop.Web/Pages/Customers/Edit.cshtml.cs::EditModel.OnGetAsync",
+        "src/Shop.Web/Pages/Customers/Edit.cshtml.cs::EditModel.OnPostAsync",
+        "src/Shop.Web/Pages/Customers/Edit.cshtml.cs::EditModel.OnGetNotesAsync",
+        "src/Shop.Web/Pages/Customers/Edit.cshtml.cs::EditModel.OnPostAddNoteAsync",
+        "src/Shop.Web/Pages/Customers/Edit.cshtml.cs::EditModel.OnPostPinNoteAsync",
+        "src/Shop.Web/Pages/Customers/Edit.cshtml.cs::EditModel.InputModel.IsAdmin",
+        "src/Shop.Web/Services/CustomerService.cs::CustomerService.GetDisplayName",
+        "src/Shop.Web/Services/CustomerNoteService.cs::CustomerNoteService.ListAsync",
+        "src/Shop.Web/Services/CustomerNoteService.cs::CustomerNoteService.AddAsync",
+        "src/Shop.Web/Services/CustomerNoteService.cs::CustomerNoteService.SetPinnedAsync",
+        "src/Shop.Web/Services/CustomerNoteService.cs::CustomerNoteService.DeleteAsync",
+        "src/Shop.Web/Models/Customers/CustomerNoteDto.cs::CustomerNoteDto",
+        "src/Shop.Web/Data/Entities/CustomerNote.cs::CustomerNote",
+        "tests/Shop.Web.Tests/Pages/CustomersEditModelTests.cs::CustomersEditModelTests.OnPostAsync_copies_input_onto_customer",
+        "tests/Shop.Web.Tests/Pages/CustomersEditModelTests.cs::CustomersEditModelTests.OnPostAddNoteAsync_rejects_empty_note",
+        "tests/Shop.Web.Tests/Services/CustomerNoteServiceTests.cs::CustomerNoteServiceTests.AddAsync_trims_body_and_stamps_author",
+        "tests/Shop.Web.Tests/Services/CustomerNoteServiceTests.cs::CustomerNoteServiceTests.DeleteAsync_soft_deletes_so_the_query_filter_hides_the_note",
+        "tests/Shop.Web.Tests/Services/CustomerNoteServiceTests.cs::CustomerNoteServiceTests.SetPinnedAsync_returns_false_for_unknown_note"
+      ],
+      "handlers": ["OnGetAsync", "OnPostAsync", "OnGetNotesAsync", "OnPostAddNoteAsync", "OnPostPinNoteAsync"],
+      "why": {
+        "src/Shop.Web/Pages/Customers/Edit.cshtml": "seed: @page \"{id:int}\" with @model Shop.Web.Pages.Customers.EditModel",
+        "src/Shop.Web/Pages/Customers/Edit.cshtml.cs": "code-behind EditModel in namespace Shop.Web.Pages.Customers",
+        "src/Shop.Web/Pages/Customers/_CustomerNotes.cshtml": "page renders <partial name=\"_CustomerNotes\">; OnGetNotesAsync returns Partial(\"_CustomerNotes\")",
+        "src/Shop.Web/wwwroot/js/partials/customer-notes.js": "_CustomerNotes partial loads partials/customer-notes.js; '?handler=AddNote' -> OnPostAddNoteAsync, '?handler=PinNote' -> OnPostPinNoteAsync",
+        "src/Shop.Web/Services/ICustomerService.cs": "EditModel injects ICustomerService",
+        "src/Shop.Web/Services/CustomerService.cs": "ICustomerService has exactly one implementation, CustomerService",
+        "src/Shop.Web/Services/CustomerNoteService.cs": "EditModel injects CustomerNoteService (concrete class)",
+        "src/Shop.Web/Models/Customers/CustomerNoteDto.cs": "EditModel.Notes and CustomerNoteService return CustomerNoteDto",
+        "src/Shop.Web/Data/Entities/CustomerNote.cs": "CustomerNoteService queries and creates CustomerNote",
+        "tests/Shop.Web.Tests/Pages/CustomersEditModelTests.cs": "test constructs Shop.Web.Pages.Customers.EditModel (using Shop.Web.Pages.Customers)",
+        "tests/Shop.Web.Tests/Services/CustomerNoteServiceTests.cs": "test constructs CustomerNoteService"
+      }
+    },
+    {
+      "name": "Invoices/Export page",
+      "seed": "src/Shop.Web/Pages/Invoices/Export.cshtml",
+      "seedKind": "RazorPage",
+      "files": [
+        "src/Shop.Web/Pages/Invoices/Export.cshtml",
+        "src/Shop.Web/Pages/Invoices/Export.cshtml.cs",
+        "src/Shop.Web/Models/Invoices/InvoiceExportRequest.cs",
+        "src/Shop.Web/Models/Invoices/InvoiceExportRow.cs",
+        "src/Shop.Web/Services/IInvoiceExportService.cs",
+        "src/Shop.Web/Services/InvoiceExportService.cs",
+        "src/Shop.Web/Services/ExportFileNamer.cs",
+        "src/Shop.Web/Services/InvoiceService.cs",
+        "src/Shop.Web/wwwroot/js/pages/invoices-export.js",
+        "tests/Shop.Web.Tests/Services/InvoiceExportServiceTests.cs"
+      ],
+      "members": [
+        "src/Shop.Web/Pages/Invoices/Export.cshtml.cs::ExportModel.Input",
+        "src/Shop.Web/Pages/Invoices/Export.cshtml.cs::ExportModel.OnGet",
+        "src/Shop.Web/Pages/Invoices/Export.cshtml.cs::ExportModel.OnPostPreviewAsync",
+        "src/Shop.Web/Pages/Invoices/Export.cshtml.cs::ExportModel.OnPostDownloadAsync",
+        "src/Shop.Web/Models/Invoices/InvoiceExportRequest.cs::InvoiceExportRequest",
+        "src/Shop.Web/Models/Invoices/InvoiceExportRow.cs::InvoiceExportRow",
+        "src/Shop.Web/Services/IInvoiceExportService.cs::IInvoiceExportService",
+        "src/Shop.Web/Services/IInvoiceExportService.cs::ExportFile",
+        "src/Shop.Web/Services/InvoiceExportService.cs::InvoiceExportService.PreviewAsync",
+        "src/Shop.Web/Services/InvoiceExportService.cs::InvoiceExportService.ExportCsvAsync",
+        "src/Shop.Web/Services/InvoiceExportService.cs::InvoiceExportService.LoadRowsAsync",
+        "src/Shop.Web/Services/InvoiceExportService.cs::InvoiceExportService.ToRow",
+        "src/Shop.Web/Services/ExportFileNamer.cs::ExportFileNamer.ForInvoices",
+        "src/Shop.Web/Services/InvoiceService.cs::InvoiceService.GetInvoicesForPeriodAsync",
+        "tests/Shop.Web.Tests/Services/InvoiceExportServiceTests.cs::InvoiceExportServiceTests.PreviewAsync_maps_invoice_fields_onto_rows",
+        "tests/Shop.Web.Tests/Services/InvoiceExportServiceTests.cs::InvoiceExportServiceTests.ExportCsvAsync_names_file_from_clock_and_range",
+        "tests/Shop.Web.Tests/Services/InvoiceExportServiceTests.cs::InvoiceExportServiceTests.ExportCsvAsync_writes_header_and_respects_max_rows"
+      ],
+      "handlers": ["OnGet", "OnPostPreviewAsync", "OnPostDownloadAsync"],
+      "why": {
+        "src/Shop.Web/Pages/Invoices/Export.cshtml": "seed: @page with @model Shop.Web.Pages.Invoices.ExportModel",
+        "src/Shop.Web/Pages/Invoices/Export.cshtml.cs": "code-behind ExportModel",
+        "src/Shop.Web/Models/Invoices/InvoiceExportRequest.cs": "[BindProperty] public InvoiceExportRequest Input",
+        "src/Shop.Web/Models/Invoices/InvoiceExportRow.cs": "IInvoiceExportService.PreviewAsync returns InvoiceExportRow",
+        "src/Shop.Web/Services/IInvoiceExportService.cs": "ExportModel injects IInvoiceExportService",
+        "src/Shop.Web/Services/InvoiceExportService.cs": "IInvoiceExportService has exactly one implementation, InvoiceExportService",
+        "src/Shop.Web/Services/ExportFileNamer.cs": "InvoiceExportService injects ExportFileNamer",
+        "src/Shop.Web/Services/InvoiceService.cs": "InvoiceExportService injects InvoiceService (calls GetInvoicesForPeriodAsync); also in the Invoices/Index slice (2 slices, not Shared)",
+        "src/Shop.Web/wwwroot/js/pages/invoices-export.js": "page loads pages/invoices-export.js in @section Scripts; $.post('?handler=Preview') -> OnPostPreviewAsync; #invoice-export-form declared only in Export.cshtml",
+        "tests/Shop.Web.Tests/Services/InvoiceExportServiceTests.cs": "test constructs InvoiceExportService"
+      }
+    },
+    {
+      "name": "Invoices/Index page",
+      "seed": "src/Shop.Web/Pages/Invoices/Index.cshtml",
+      "seedKind": "RazorPage",
+      "files": [
+        "src/Shop.Web/Pages/Invoices/Index.cshtml",
+        "src/Shop.Web/Services/InvoiceService.cs"
+      ],
+      "members": [],
+      "handlers": ["OnGetAsync"],
+      "why": {
+        "src/Shop.Web/Pages/Invoices/Index.cshtml": "seed: markup changed (adds asp-page=\"./Export\" link; the link is shown but does not merge Export into this slice)",
+        "src/Shop.Web/Services/InvoiceService.cs": "unchanged IndexModel injects InvoiceService (file-level reach; at member level IndexModel only calls the unchanged ListRecentAsync)"
+      }
+    },
+    {
+      "name": "Admin/Dashboard page",
+      "seed": "src/Shop.Web/Areas/Admin/Pages/Dashboard.cshtml",
+      "seedKind": "RazorPage",
+      "files": [
+        "src/Shop.Web/Areas/Admin/Pages/Dashboard.cshtml",
+        "src/Shop.Web/Areas/Admin/Pages/Dashboard.cshtml.cs",
+        "src/Shop.Web/Services/DashboardService.cs",
+        "src/Shop.Web/Models/Admin/DashboardStats.cs",
+        "src/Shop.Web/wwwroot/js/pages/admin-dashboard.js",
+        "src/Shop.Web/wwwroot/js/pages/admin-dashboard.charts.js",
+        "tests/Shop.Web.Tests/Services/DashboardServiceTests.cs"
+      ],
+      "members": [
+        "src/Shop.Web/Areas/Admin/Pages/Dashboard.cshtml.cs::DashboardModel.DrilldownPage",
+        "src/Shop.Web/Areas/Admin/Pages/Dashboard.cshtml.cs::DashboardModel.OnGetAsync",
+        "src/Shop.Web/Areas/Admin/Pages/Dashboard.cshtml.cs::DashboardModel.OnGetStatsAsync",
+        "src/Shop.Web/Areas/Admin/Pages/Dashboard.cshtml.cs::DashboardModel.OnGetTopProductsAsync",
+        "src/Shop.Web/Services/DashboardService.cs::DashboardService.GetStatsAsync",
+        "src/Shop.Web/Services/DashboardService.cs::DashboardService.GetTopProductsAsync",
+        "src/Shop.Web/Models/Admin/DashboardStats.cs::DashboardStats.AverageOrderValue",
+        "tests/Shop.Web.Tests/Services/DashboardServiceTests.cs::DashboardServiceTests.GetStatsAsync_sums_revenue_and_ignores_cancelled_orders",
+        "tests/Shop.Web.Tests/Services/DashboardServiceTests.cs::DashboardServiceTests.GetStatsAsync_groups_orders_by_status",
+        "tests/Shop.Web.Tests/Services/DashboardServiceTests.cs::DashboardServiceTests.GetStatsAsync_totals_unpaid_invoices_only",
+        "tests/Shop.Web.Tests/Services/DashboardServiceTests.cs::DashboardServiceTests.GetStatsAsync_returns_cached_stats_within_cache_window"
+      ],
+      "handlers": ["OnGetAsync", "OnGetStatsAsync", "OnGetTopProductsAsync"],
+      "why": {
+        "src/Shop.Web/Areas/Admin/Pages/Dashboard.cshtml": "seed: Area page @page with @model Shop.Web.Areas.Admin.Pages.DashboardModel",
+        "src/Shop.Web/Areas/Admin/Pages/Dashboard.cshtml.cs": "code-behind DashboardModel",
+        "src/Shop.Web/Services/DashboardService.cs": "DashboardModel injects DashboardService (concrete class, registered with a factory lambda)",
+        "src/Shop.Web/Models/Admin/DashboardStats.cs": "DashboardModel.Stats and DashboardService.GetStatsAsync use DashboardStats",
+        "src/Shop.Web/wwwroot/js/pages/admin-dashboard.js": "page loads <script asp-src-include=\"~/js/pages/admin-dashboard*.js\">; '?handler=Stats' -> OnGetStatsAsync, '?handler=TopProducts' -> OnGetTopProductsAsync",
+        "src/Shop.Web/wwwroot/js/pages/admin-dashboard.charts.js": "matched by asp-src-include=\"~/js/pages/admin-dashboard*.js\"",
+        "tests/Shop.Web.Tests/Services/DashboardServiceTests.cs": "test constructs DashboardService"
+      }
+    },
+    {
+      "name": "Admin/Products/Edit page",
+      "seed": "src/Shop.Web/Areas/Admin/Pages/Products/Edit.cshtml",
+      "seedKind": "RazorPage",
+      "files": [
+        "src/Shop.Web/Areas/Admin/Pages/Products/Edit.cshtml",
+        "src/Shop.Web/Areas/Admin/Pages/Products/Edit.cshtml.cs",
+        "src/Shop.Web/Data/Repositories/ProductRepository.cs",
+        "src/Shop.Web/TagHelpers/CurrencyInputTagHelper.cs"
+      ],
+      "members": [
+        "src/Shop.Web/Areas/Admin/Pages/Products/Edit.cshtml.cs::EditModel.OnPostArchiveAsync",
+        "src/Shop.Web/Data/Repositories/ProductRepository.cs::ProductRepository.ArchiveAsync"
+      ],
+      "handlers": ["OnGetAsync", "OnPostAsync", "OnPostArchiveAsync"],
+      "why": {
+        "src/Shop.Web/Areas/Admin/Pages/Products/Edit.cshtml": "seed: @page \"{id:int}\" with @model Shop.Web.Areas.Admin.Pages.Products.EditModel; adds asp-page-handler=\"Archive\" button",
+        "src/Shop.Web/Areas/Admin/Pages/Products/Edit.cshtml.cs": "code-behind EditModel in namespace Shop.Web.Areas.Admin.Pages.Products (third EditModel)",
+        "src/Shop.Web/Data/Repositories/ProductRepository.cs": "EditModel injects ProductRepository (concrete class)",
+        "src/Shop.Web/TagHelpers/CurrencyInputTagHelper.cs": "page uses <currency-input asp-for=\"Input.Price\" />"
+      }
+    }
+  ],
+  "shared": [
+    "src/Shop.Web/Services/IOrderService.cs",
+    "src/Shop.Web/Services/OrderService.cs",
+    "src/Shop.Web/Data/Repositories/IOrderRepository.cs",
+    "src/Shop.Web/Data/Repositories/OrderRepository.cs",
+    "src/Shop.Web/Services/PricingCalculator.cs",
+    "src/Shop.Web/Data/Entities/Order.cs",
+    "src/Shop.Web/Data/Entities/OrderStatus.cs",
+    "src/Shop.Web/Models/Orders/OrderSummaryDto.cs",
+    "src/Shop.Web/Data/ShopDbContext.cs",
+    "src/Shop.Web/Infrastructure/AjaxResults.cs",
+    "tests/Shop.Web.Tests/Services/OrderServiceTests.cs"
+  ],
+  "sharedWhy": {
+    "src/Shop.Web/Services/IOrderService.cs": "injected by Orders/Edit, Orders/Details, Orders/BulkEdit, Orders/Checkout and Admin/Dashboard (5 slices)",
+    "src/Shop.Web/Services/OrderService.cs": "only implementation of IOrderService (5 slices)",
+    "src/Shop.Web/Data/Repositories/IOrderRepository.cs": "OrderService injects IOrderRepository (5 slices)",
+    "src/Shop.Web/Data/Repositories/OrderRepository.cs": "only implementation of IOrderRepository (5 slices)",
+    "src/Shop.Web/Services/PricingCalculator.cs": "OrderService injects PricingCalculator (5 slices)",
+    "src/Shop.Web/Data/Entities/Order.cs": "used by IOrderService/OrderService/repositories (5+ slices)",
+    "src/Shop.Web/Data/Entities/OrderStatus.cs": "used by IOrderService signatures, BulkEdit, Checkout, Dashboard (5+ slices)",
+    "src/Shop.Web/Models/Orders/OrderSummaryDto.cs": "returned by IOrderService.GetSummariesAsync (5 slices)",
+    "src/Shop.Web/Data/ShopDbContext.cs": "reached through every repository/service (all 9 slices)",
+    "src/Shop.Web/Infrastructure/AjaxResults.cs": "used directly by Orders/Edit, Orders/BulkEdit, Invoices/Export and Admin/Dashboard PageModels (4 slices)",
+    "tests/Shop.Web.Tests/Services/OrderServiceTests.cs": "tests OrderService, which is Shared"
+  },
+  "unlinked": {
+    "usedOutside": [
+      "src/Shop.Web/Services/BankTransferPaymentGateway.cs",
+      "src/Shop.Web/Services/LegacyCsvImporter.cs",
+      "src/Shop.Web/wwwroot/js/site.js",
+      "src/Shop.Web/wwwroot/css/site.css"
+    ],
+    "usedOutsideWhy": {
+      "src/Shop.Web/Services/BankTransferPaymentGateway.cs": "one of two IPaymentGateway implementations, so only a possible link from Orders/Checkout; unchanged caller: tests/Shop.Web.Tests/Services/BankTransferPaymentGatewayTests.cs",
+      "src/Shop.Web/Services/LegacyCsvImporter.cs": "the unrelated rewrite; unchanged caller: src/Shop.Web/Areas/Admin/Pages/Import.cshtml.cs (and the unchanged registration line in Program.cs)",
+      "src/Shop.Web/wwwroot/js/site.js": "loaded only by the unchanged Pages/Shared/_Layout.cshtml (site-wide script, never joins a page slice)",
+      "src/Shop.Web/wwwroot/css/site.css": "loaded only by the unchanged Pages/Shared/_Layout.cshtml"
+    },
+    "nothingUses": [
+      "src/Shop.Web/Infrastructure/SlugHelper.cs",
+      "src/Shop.Web/Mapping/ShopMappingProfile.cs",
+      "src/Shop.Web/Mapping/OrderMappingProfile.cs",
+      "src/Shop.Web/Program.cs",
+      "src/Shop.Web/Shop.Web.csproj",
+      "src/Shop.Web/appsettings.Development.json"
+    ],
+    "nothingUsesWhy": {
+      "src/Shop.Web/Infrastructure/SlugHelper.cs": "new static helper, no references anywhere",
+      "src/Shop.Web/Mapping/ShopMappingProfile.cs": "AutoMapper profile, discovered by assembly scan only; no type references it",
+      "src/Shop.Web/Mapping/OrderMappingProfile.cs": "AutoMapper profile, discovered by assembly scan only; no type references it",
+      "src/Shop.Web/Program.cs": "host entry point; no seed reaches it and no code references Program (doubt: a tool may put host/config files in their own group)",
+      "src/Shop.Web/Shop.Web.csproj": "project file; not code (doubt: as above)",
+      "src/Shop.Web/appsettings.Development.json": "configuration; not code (doubt: as above)"
+    }
+  },
+  "mechanicalOnly": [
+    "src/Shop.Web/libman.json",
+    "src/Shop.Web/wwwroot/lib/jquery-bulkselect/jquery.bulkselect.js",
+    "src/Shop.Web/Data/Migrations/20261120093000_AddCustomerNotes.cs",
+    "src/Shop.Web/Data/Migrations/20261120093000_AddCustomerNotes.Designer.cs",
+    "src/Shop.Web/Data/Migrations/ShopDbContextModelSnapshot.cs"
+  ],
+  "possibleLinks": [
+    { "from": "src/Shop.Web/Pages/Orders/Checkout.cshtml.cs", "to": "src/Shop.Web/Services/BankTransferPaymentGateway.cs", "why": "CheckoutModel injects IPaymentGateway, which has two implementations (BankTransferPaymentGateway, CardPaymentGateway)" },
+    { "from": "src/Shop.Web/Pages/Orders/Checkout.cshtml.cs", "to": "src/Shop.Web/Services/CardPaymentGateway.cs", "why": "second IPaymentGateway implementation (file unchanged)" },
+    { "from": "src/Shop.Web/wwwroot/js/pages/admin-dashboard.js", "to": "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs", "why": "concatenated URL '/Orders/' + ordersSection + '?handler=Summary' could resolve to BulkEditModel.OnGetSummaryAsync" },
+    { "from": "src/Shop.Web/Areas/Admin/Pages/Dashboard.cshtml", "to": "src/Shop.Web/Pages/Orders/BulkEdit.cshtml", "why": "Url.Page(Model.DrilldownPage, ...) is built from a property, not a literal" },
+    { "from": "src/Shop.Web/Pages/Orders/BulkEdit.cshtml", "to": "src/Shop.Web/Pages/Orders/Index.cshtml", "why": "Url.Page(Model.ReturnPage, ...) is built from a property (target unchanged)" },
+    { "from": "src/Shop.Web/wwwroot/js/partials/customer-notes.js", "to": "src/Shop.Web/Pages/Customers/Edit.cshtml.cs", "why": "$.get($panel.data('url')) reads a data-url attribute (the attribute is a literal Url.Page(\"./Edit\", \"Notes\") -> OnGetNotesAsync, but the JS link itself is data-url); both files are already in the Customers/Edit slice for other reasons" }
+  ],
+  "pageLinks": [
+    { "from": "src/Shop.Web/Pages/Invoices/Index.cshtml", "to": "src/Shop.Web/Pages/Invoices/Export.cshtml", "via": "asp-page=\"./Export\"" },
+    { "from": "src/Shop.Web/Pages/Orders/BulkEdit.cshtml", "to": "src/Shop.Web/Pages/Orders/Edit.cshtml", "via": "asp-page=\"./Edit\"" },
+    { "from": "src/Shop.Web/Areas/Admin/Pages/Dashboard.cshtml", "to": "src/Shop.Web/Pages/Orders/Edit.cshtml", "via": "asp-area=\"\" asp-page=\"/Orders/Edit\"" },
+    { "from": "src/Shop.Web/Pages/Orders/Checkout.cshtml.cs", "to": "src/Shop.Web/Pages/Orders/Details.cshtml", "via": "RedirectToPage(\"./Details\")" },
+    { "from": "src/Shop.Web/Pages/Orders/Edit.cshtml", "to": "src/Shop.Web/Pages/Orders/Details.cshtml", "via": "asp-page=\"./Details\"" }
+  ],
+  "mustNotMerge": [
+    { "file": "src/Shop.Web/Pages/Customers/Edit.cshtml.cs", "notInSlice": "Orders/Edit page", "why": "different EditModel (Shop.Web.Pages.Customers)" },
+    { "file": "src/Shop.Web/Pages/Orders/Edit.cshtml.cs", "notInSlice": "Customers/Edit page", "why": "different EditModel (Shop.Web.Pages.Orders)" },
+    { "file": "src/Shop.Web/Areas/Admin/Pages/Products/Edit.cshtml.cs", "notInSlice": "Orders/Edit page", "why": "different EditModel (Shop.Web.Areas.Admin.Pages.Products)" },
+    { "file": "src/Shop.Web/Areas/Admin/Pages/Products/Edit.cshtml.cs", "notInSlice": "Customers/Edit page", "why": "different EditModel" },
+    { "file": "src/Shop.Web/Pages/Orders/Edit.cshtml.cs", "notInSlice": "Admin/Products/Edit page", "why": "different EditModel; also only a page link from the dashboard" },
+    { "file": "tests/Shop.Web.Tests/Pages/CustomersEditModelTests.cs", "notInSlice": "Orders/Edit page", "why": "`new EditModel(...)` resolves to Shop.Web.Pages.Customers.EditModel via its using" },
+    { "file": "tests/Shop.Web.Tests/Pages/OrdersEditModelTests.cs", "notInSlice": "Customers/Edit page", "why": "`new EditModel(...)` resolves to Shop.Web.Pages.Orders.EditModel via its using" },
+    { "file": "tests/Shop.Web.Tests/Pages/OrdersEditModelTests.cs", "notInSlice": "Admin/Products/Edit page", "why": "different EditModel" },
+    { "file": "src/Shop.Web/Services/BankTransferPaymentGateway.cs", "notInSlice": "Orders/Checkout page", "why": "IPaymentGateway has two implementations: possible link only" },
+    { "file": "src/Shop.Web/wwwroot/js/site.js", "notInSlice": "Orders/Edit page", "why": "site-wide script loaded by _Layout; orders-edit.js calling Shop.toast/Shop.formatMoney does not make it a page script" },
+    { "file": "src/Shop.Web/wwwroot/js/site.js", "notInSlice": "Admin/Dashboard page", "why": "site-wide script; admin-dashboard.js calling Shop.debounce does not pull it in" },
+    { "file": "src/Shop.Web/wwwroot/js/site.js", "notInSlice": "Customers/Edit page", "why": "site-wide script; customer-notes.js calling Shop.antiforgeryToken does not pull it in" },
+    { "file": "src/Shop.Web/wwwroot/css/site.css", "notInSlice": "Orders/BulkEdit page", "why": "site-wide stylesheet loaded by _Layout, even though it styles #bulk-edit-table" },
+    { "file": "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs", "notInSlice": "Admin/Dashboard page", "why": "only reachable through a concatenated URL (possible link)" },
+    { "file": "src/Shop.Web/Pages/Orders/BulkEdit.cshtml", "notInSlice": "Admin/Dashboard page", "why": "only reachable through Url.Page built from a variable (possible link)" },
+    { "file": "src/Shop.Web/Pages/Invoices/Export.cshtml", "notInSlice": "Invoices/Index page", "why": "asp-page link between pages is shown but never merges" },
+    { "file": "src/Shop.Web/Pages/Invoices/Export.cshtml.cs", "notInSlice": "Invoices/Index page", "why": "asp-page link between pages is shown but never merges" },
+    { "file": "src/Shop.Web/Pages/Orders/Edit.cshtml", "notInSlice": "Admin/Dashboard page", "why": "asp-page link only" },
+    { "file": "src/Shop.Web/Pages/Orders/Details.cshtml.cs", "notInSlice": "Orders/Checkout page", "why": "RedirectToPage link only" },
+    { "file": "src/Shop.Web/Mapping/ShopMappingProfile.cs", "notInSlice": "Customers/Edit page", "why": "the profile references CustomerNote/CustomerNoteDto, not the other way round; nothing references the profile" },
+    { "file": "src/Shop.Web/TagHelpers/CurrencyInputTagHelper.cs", "notInSlice": "SHARED", "why": "reached by exactly two slices (Orders/Edit, Admin/Products/Edit), below the 3-slice Shared threshold" },
+    { "file": "src/Shop.Web/Pages/Shared/_OrderLines.cshtml", "notInSlice": "SHARED", "why": "reached by exactly two slices (Orders/Edit, Orders/Details)" },
+    { "file": "src/Shop.Web/Services/InvoiceService.cs", "notInSlice": "SHARED", "why": "reached by exactly two slices (Invoices/Export, Invoices/Index)" }
+  ],
+  "folds": {
+    "mechanical": [
+      { "path": "src/Shop.Web/Data/Entities/Order.cs", "kind": "Move", "fold": true, "note": "enum OrderStatus (base lines 34-41, plus the blank line 33 before it) moved unchanged to Data/Entities/OrderStatus.cs; nothing else changed" },
+      { "path": "src/Shop.Web/Data/Entities/OrderStatus.cs", "kind": "Move", "fold": true, "note": "new file holding the moved enum, same namespace, byte-identical body" },
+      { "path": "src/Shop.Web/Services/CartService.cs", "kind": "Formatting", "fold": true, "note": "K&R/2-space to Allman/4-space; token stream identical" },
+      { "path": "src/Shop.Web/TagHelpers/CurrencyInputTagHelper.cs", "kind": "ImportsOnly", "fold": true, "note": "removed unused `using System.Text;` (base line 2)" },
+      { "path": "src/Shop.Web/Services/ICustomerService.cs", "kind": "CommentsOnly", "fold": true, "note": "XML doc comments and one line comment added" },
+      { "path": "src/Shop.Web/libman.json", "kind": "Vendored", "fold": true, "note": "adds the jquery-bulkselect@2.1.0 library entry" },
+      { "path": "src/Shop.Web/wwwroot/lib/jquery-bulkselect/jquery.bulkselect.js", "kind": "Vendored", "fold": true, "note": "wwwroot/lib/**" },
+      { "path": "src/Shop.Web/wwwroot/lib/jquery-bulkselect/jquery.bulkselect.min.js", "kind": "Vendored", "fold": true, "note": "*.min.js under wwwroot/lib/**; loaded by Orders/BulkEdit so it sits in that slice, folded" },
+      { "path": "src/Shop.Web/Data/Migrations/20261120093000_AddCustomerNotes.cs", "kind": "Migration", "fold": true, "note": "Up is additive (CreateTable + CreateIndex). Down has the standard DropTable of the table Up creates; if the classifier treats any DropTable as destructive it stays expanded" },
+      { "path": "src/Shop.Web/Data/Migrations/20261120093000_AddCustomerNotes.Designer.cs", "kind": "Generated", "fold": true, "note": "// <auto-generated /> migration designer (Migration also acceptable). The usual #pragma warning disable 612, 618 lines were left out deliberately so the generated file carries no WarningsSilenced flag" },
+      { "path": "src/Shop.Web/Data/Migrations/ShopDbContextModelSnapshot.cs", "kind": "Migration", "fold": true, "note": "model snapshot gains the CustomerNote entity (// <auto-generated />, so Generated also acceptable)" },
+      { "path": "src/Shop.Web/Pages/Orders/Details.cshtml.cs", "kind": "Ripple", "fold": false, "note": "only change is the GetOrder -> GetOrderAsync call site (line 21). Proven mechanical, but ripple call sites stay open per the doc. Rename is an acceptable label" },
+      { "path": "tests/Shop.Web.Tests/Pages/OrdersEditModelTests.cs", "kind": "Ripple", "fold": false, "note": "only changes are three Setup(s => s.GetOrder(...)) -> GetOrderAsync call sites (lines 20, 31, 45). Stays open as a ripple" }
+    ],
+    "mechanicalHunks": [
+      { "path": "src/Shop.Web/Services/IOrderService.cs", "side": "head", "line": 8, "kind": "Rename", "note": "declaration rename GetOrder -> GetOrderAsync inside a file with other changes" },
+      { "path": "src/Shop.Web/Services/OrderService.cs", "side": "head", "line": 20, "kind": "Rename", "note": "implementation rename inside a file with other changes" },
+      { "path": "src/Shop.Web/Pages/Orders/Edit.cshtml.cs", "side": "head", "line": 29, "kind": "Ripple", "note": "call site; same at head line 69 (line 49 is in the new OnGetLinesAsync)" },
+      { "path": "tests/Shop.Web.Tests/Services/OrderServiceTests.cs", "side": "head", "line": 25, "kind": "Ripple", "note": "call site; the test method name GetOrder_returns_order_from_repository was intentionally left as is" }
+    ],
+    "boilerplate": [
+      { "path": "src/Shop.Web/Program.cs", "startLine": 62, "endLine": 64, "shape": "DiRegistration", "note": "3 registrations: 2 scoped, 1 singleton (IInvoiceExportService->InvoiceExportService, CustomerNoteService, ExportFileNamer). Base line 52 (AddScoped<IPaymentGateway, CardPaymentGateway>) was removed from the same block; it moved into the if/else below" },
+      { "path": "src/Shop.Web/Models/Invoices/InvoiceExportRow.cs", "startLine": 5, "endLine": 34, "shape": "Dto", "note": "auto-properties without initialisers; attributes: Display, DataType" },
+      { "path": "src/Shop.Web/Models/Orders/OrderSummaryDto.cs", "startLine": 6, "endLine": 23, "shape": "Dto", "note": "init-only auto-properties; attributes: Display, DataType" },
+      { "path": "src/Shop.Web/Mapping/ShopMappingProfile.cs", "startLine": 12, "endLine": 14, "shape": "Mapping", "note": "three plain CreateMap<A,B>() calls" },
+      { "path": "src/Shop.Web/Services/InvoiceExportService.cs", "startLine": 73, "endLine": 78, "shape": "Mapping", "note": "plain row.X = invoice.X assignments; lines 80-84 after the blank line are not plain and must stay open" },
+      { "path": "tests/Shop.Web.Tests/Services/InvoiceExportServiceTests.cs", "startLine": 34, "endLine": 51, "shape": "TestArrange", "note": "object construction only (Customer, Order, Invoice, InvoiceExportRequest)" },
+      { "path": "tests/Shop.Web.Tests/Pages/CustomersEditModelTests.cs", "startLine": 28, "endLine": 35, "shape": "TestArrange", "note": "object construction only; the mock Setup at line 37 is outside the range" }
+    ],
+    "mustNotFold": [
+      { "path": "src/Shop.Web/Models/Customers/CustomerNoteDto.cs", "startLine": 5, "endLine": 21, "why": "initialiser: DTO with exactly one property initialiser (line 15: Author = \"system\")" },
+      { "path": "src/Shop.Web/Mapping/OrderMappingProfile.cs", "startLine": 11, "endLine": 13, "why": "Ignore: mapping block with one ForMember(...Ignore())" },
+      { "path": "src/Shop.Web/Models/Admin/DashboardStats.cs", "startLine": 5, "endLine": 29, "why": "computed getter: AverageOrderValue => ... (line 28)" },
+      { "path": "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs", "startLine": 26, "endLine": 27, "why": "SupportsGet: [BindProperty(SupportsGet = true)] Status" },
+      { "path": "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs", "startLine": 23, "endLine": 24, "why": "bindable: [BindProperty] Input, with initialiser" },
+      { "path": "src/Shop.Web/Models/Orders/BulkEditInput.cs", "startLine": 6, "endLine": 19, "why": "bindable: looks like a validation-only DTO but it is the [BindProperty] model of BulkEditModel" },
+      { "path": "src/Shop.Web/Models/Invoices/InvoiceExportRequest.cs", "startLine": 5, "endLine": 26, "why": "bindable ([BindProperty] model of ExportModel) and initialiser (Delimiter = \",\")" },
+      { "path": "src/Shop.Web/Data/Entities/CustomerNote.cs", "startLine": 5, "endLine": 24, "why": "bindable: entity properties (also has initialisers)" },
+      { "path": "src/Shop.Web/Program.cs", "startLine": 66, "endLine": 69, "why": "registration with a lambda body (DashboardService factory)" },
+      { "path": "src/Shop.Web/Program.cs", "startLine": 71, "endLine": 78, "why": "registration inside if: IPaymentGateway chosen by Payments:BankTransferEnabled" },
+      { "path": "src/Shop.Web/Program.cs", "startLine": 37, "endLine": 43, "why": "flagged (CORS policy)" },
+      { "path": "tests/Shop.Web.Tests/Services/InvoiceExportServiceTests.cs", "startLine": 70, "endLine": 78, "why": "mock Setup: arrange contains clock.Setup(...).Returns(...)" },
+      { "path": "tests/Shop.Web.Tests/Pages/BulkEditModelTests.cs", "startLine": 20, "endLine": 29, "why": "mock Setup: arrange starts with _orderService.Setup(...).ReturnsAsync(2)" },
+      { "path": "src/Shop.Web/Pages/Customers/Edit.cshtml.cs", "startLine": 104, "endLine": 105, "why": "bindable + flagged: new IsAdmin on the [BindProperty] InputModel" },
+      { "path": "src/Shop.Web/Pages/Invoices/Export.cshtml", "startLine": 9, "endLine": 46, "why": "Razor markup: form with asp-for fields" },
+      { "path": "src/Shop.Web/Pages/Customers/Edit.cshtml", "startLine": 33, "endLine": 36, "why": "Razor markup: asp-for=\"Input.IsAdmin\" checkbox" },
+      { "path": "src/Shop.Web/Services/OrderService.cs", "startLine": 102, "endLine": 110, "why": "not a plain mapping: object initialiser with CustomerName = o.Customer?.Name" },
+      { "path": "src/Shop.Web/Services/InvoiceExportService.cs", "startLine": 80, "endLine": 84, "why": "not plain a.X = b.X: ?. chains, renamed targets and a computed value" },
+      { "path": "src/Shop.Web/Services/DashboardService.cs", "startLine": 68, "endLine": 80, "why": "flagged region (pragma + FromSqlRaw)" }
+    ]
+  },
+  "flags": [
+    { "kind": "WeakenedTests", "path": "tests/Shop.Web.Tests/Services/OrderServiceTests.cs", "side": "head", "line": 42, "text": "[Fact(Skip = \"Flaky since the bulk edit refactor, re-enable later\")]", "note": "skips SaveAsync_rejects_null_order, which fails because the null guard was removed" },
+    { "kind": "AntiforgeryOff", "path": "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs", "side": "head", "line": 11, "text": "[IgnoreAntiforgeryToken]", "note": "on BulkEditModel" },
+    { "kind": "AntiforgeryOff", "path": "src/Shop.Web/wwwroot/js/pages/orders-bulk-edit.js", "side": "head", "line": 37, "text": "$.post('?handler=Apply', {", "note": "jQuery POST with an object literal: no serialised form and no RequestVerificationToken header" },
+    { "kind": "AuthorisationLoosened", "path": "src/Shop.Web/Program.cs", "side": "base", "line": 13, "text": "options.Conventions.AuthorizeFolder(\"/Invoices\");", "note": "AuthorizeFolder convention removed; /Invoices (including the new Export page) becomes anonymous" },
+    { "kind": "OverPosting", "path": "src/Shop.Web/Pages/Customers/Edit.cshtml.cs", "side": "head", "line": 105, "text": "public bool IsAdmin { get; set; }", "note": "new property on the existing [BindProperty] InputModel; mapped to customer.Role at line 60" },
+    { "kind": "GuardRemoved", "path": "src/Shop.Web/Pages/Customers/Edit.cshtml.cs", "side": "base", "line": 50, "text": "if (!ModelState.IsValid)", "note": "ModelState.IsValid check removed from OnPostAsync" },
+    { "kind": "GuardRemoved", "path": "src/Shop.Web/Services/OrderService.cs", "side": "base", "line": 31, "text": "if (order is null)", "note": "null guard (throw ArgumentNullException) removed from SaveAsync with no replacement" },
+    { "kind": "RawOutput", "path": "src/Shop.Web/Pages/Customers/_CustomerNotes.cshtml", "side": "head", "line": 12, "text": "<div class=\"note-body\">@Html.Raw(note.Body)</div>", "note": "@Html.Raw of user-typed note text" },
+    { "kind": "RawOutput", "path": "src/Shop.Web/wwwroot/js/partials/customer-notes.js", "side": "head", "line": 29, "text": "$list.html('<li class=\"list-group-item customer-note\" data-note-id=\"' + note.id + '\"><div class=\"note-body\">' + note.body + '</div><div class=\"small text-muted\">' + note.author + '</div></li>' + $list.html());", "note": "jQuery .html( built by concatenation" },
+    { "kind": "RawSql", "path": "src/Shop.Web/Services/DashboardService.cs", "side": "head", "line": 70, "text": ".FromSqlRaw($\"SELECT l.* FROM OrderLines l JOIN Orders o ON o.Id = l.OrderId WHERE o.Status = '{status}'\")", "note": "FromSqlRaw with interpolation; status comes from the OnGetTopProductsAsync query string" },
+    { "kind": "QuerySafety", "path": "src/Shop.Web/Services/DashboardService.cs", "side": "head", "line": 40, "text": ".IgnoreQueryFilters()", "note": "counts soft-deleted customers" },
+    { "kind": "SwallowedErrors", "path": "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs", "side": "head", "line": 64, "text": "catch (DbUpdateConcurrencyException)", "note": "empty catch (lines 64-66)" },
+    { "kind": "SwallowedErrors", "path": "src/Shop.Web/wwwroot/js/pages/orders-bulk-edit.js", "side": "head", "line": 26, "text": ".fail(function () {});", "note": "empty jQuery .fail" },
+    { "kind": "WarningsSilenced", "path": "src/Shop.Web/Services/DashboardService.cs", "side": "head", "line": 68, "text": "#pragma warning disable CS8602", "note": "restored at line 80" },
+    { "kind": "DependenciesAndBuild", "path": "src/Shop.Web/Shop.Web.csproj", "side": "head", "line": 12, "text": "<PackageReference Include=\"AutoMapper\" Version=\"14.0.0\" />", "note": "NuGet package added" },
+    { "kind": "DependenciesAndBuild", "path": "src/Shop.Web/Shop.Web.csproj", "side": "head", "line": 13, "text": "<PackageReference Include=\"CsvHelper\" Version=\"33.0.1\" />", "note": "NuGet package added" },
+    { "kind": "SecurityConfig", "path": "src/Shop.Web/Program.cs", "side": "head", "line": 27, "text": "options.Cookie.SameSite = SameSiteMode.None;", "note": "auth cookie SameSite Strict -> None (base line 28)" },
+    { "kind": "SecurityConfig", "path": "src/Shop.Web/Program.cs", "side": "head", "line": 40, "text": ".AllowAnyOrigin()", "acceptLines": [37, 38, 39, 40, 41, 42, 43, 91], "note": "new CORS policy allowing any origin (AddCors block lines 37-43, app.UseCors() at line 91); one flag for the CORS change, anchored on any of acceptLines" }
+  ],
+  "debatableFlags": [
+    { "kind": "OverPosting", "path": "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs", "side": "head", "line": 27, "text": "public OrderStatus? Status { get; set; }", "why": "bindable property on a brand-new page; the key treats Over-posting as a property added to an existing bindable model. Excluded from scoring either way" },
+    { "kind": "OverPosting", "path": "src/Shop.Web/Models/Orders/BulkEditInput.cs", "side": "head", "line": 14, "text": "public OrderStatus? NewStatus { get; set; }", "why": "properties of a brand-new [BindProperty] model; same reasoning (also lines 10 and 18)" },
+    { "kind": "OverPosting", "path": "src/Shop.Web/Models/Invoices/InvoiceExportRequest.cs", "side": "head", "line": 21, "text": "public bool IncludeHeader { get; set; }", "why": "properties of a brand-new [BindProperty] model (also lines 10, 15, 18, 25)" },
+    { "kind": "SecurityConfig", "path": "src/Shop.Web/Pages/Invoices/Export.cshtml.cs", "side": "head", "line": 10, "text": "[EnableCors(\"InvoiceExport\")]", "why": "CORS opt-in on a PageModel, outside Program.cs/appsettings, so outside the detector's stated scope" }
+  ],
+  "notFlagged": [
+    { "path": "src/Shop.Web/Services/CustomerService.cs", "side": "base", "line": 29, "text": "if (customer == null)", "why": "guard converted to ?. / ?? on the same expression: head line 29 `return customer?.Name.Trim() ?? string.Empty;`" },
+    { "path": "src/Shop.Web/Pages/Invoices/Export.cshtml.cs", "side": "head", "line": 64, "text": "catch (IOException ex)", "why": "catch logs (_logger.LogError at line 66)" },
+    { "path": "src/Shop.Web/Services/LegacyCsvImporter.cs", "side": "head", "line": 124, "text": "catch (Exception ex)", "why": "catch logs and rethrows" },
+    { "path": "src/Shop.Web/appsettings.Development.json", "side": "head", "line": 12, "text": "\"BankTransferEnabled\": true", "why": "appsettings non-security: feature/payment-method setting (same for Dashboard:CacheSeconds line 15 and InvoiceExport:MaxRows line 18)" },
+    { "path": "src/Shop.Web/wwwroot/js/partials/customer-notes.js", "side": "head", "line": 19, "text": "$panel.html(markup);", "why": ".html( with a server-rendered partial response, not built by concatenation" },
+    { "path": "src/Shop.Web/wwwroot/js/partials/customer-notes.js", "side": "head", "line": 41, "text": "type: 'POST',", "why": "jQuery POST that sends the RequestVerificationToken header (headers: headers() at line 44); same at lines 62/65" },
+    { "path": "src/Shop.Web/wwwroot/js/pages/invoices-export.js", "side": "head", "line": 39, "text": "$.post('?handler=Preview', $form.serialize())", "why": "jQuery POST with a serialised form (carries the antiforgery field)" },
+    { "path": "src/Shop.Web/wwwroot/js/pages/invoices-export.js", "side": "head", "line": 21, "text": ".append(cell(row.number))", "why": ".append( of an element built with .text(), not concatenated markup" },
+    { "path": "src/Shop.Web/wwwroot/js/partials/order-lines.js", "side": "head", "line": 38, "text": "$body.append($row);", "why": ".append( of a jQuery object, not concatenated markup" },
+    { "path": "src/Shop.Web/Services/LegacyCsvImporter.cs", "side": "head", "line": 36, "text": "ArgumentNullException.ThrowIfNull(csv);", "why": "unrelated rewrite adds a guard; it removes none (removed TryParse checks are re-implemented in ParseRow)" }
+  ],
+  "notes": [
+    "Reachability is file-level and crosses unchanged files (e.g. unchanged Details.cshtml -> _OrderLines partial; unchanged Invoices/IndexModel -> InvoiceService). Only changed files are listed.",
+    "The DbContext is treated as a sink: DbSet declarations in ShopDbContext do not pull every entity into every slice. If a slicer follows DbContext -> entities, CustomerNote.cs would move to Shared.",
+    "Tests join the slice of their subject (the type they construct). Under a literal 'tests that touch any of these' rule, OrdersEditModelTests and BulkEditModelTests also touch IOrderService (Shared) and could be argued into Shared.",
+    "Program.cs, Shop.Web.csproj and appsettings.Development.json are in unlinked.nothingUses because no code references them; a tool may reasonably give host/config files their own group.",
+    "_Layout.cshtml, _ViewStart, _ViewImports and the CartSummary view component are unchanged, so site.js/site.css never enter a slice."
+  ]
+}

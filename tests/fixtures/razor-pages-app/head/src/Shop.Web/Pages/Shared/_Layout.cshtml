@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] · Contoso Shop</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <script src="~/lib/jquery/jquery.min.js"></script>
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-sm navbar-dark bg-dark mb-3">
+            <div class="container">
+                <a class="navbar-brand" asp-area="" asp-page="/Index">Contoso Shop</a>
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" asp-area="" asp-page="/Orders/Index">Orders</a></li>
+                    <li class="nav-item"><a class="nav-link" asp-area="" asp-page="/Invoices/Index">Invoices</a></li>
+                    <li class="nav-item"><a class="nav-link" asp-area="Admin" asp-page="/Products/Index">Catalogue</a></li>
+                </ul>
+                <vc:cart-summary></vc:cart-summary>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container" role="main">
+        @RenderBody()
+    </main>
+
+    <div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+
+    <footer class="container text-muted small mt-5">
+        &copy; @DateTime.UtcNow.Year Contoso Ltd
+    </footer>
+
+    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/jquery-validation/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

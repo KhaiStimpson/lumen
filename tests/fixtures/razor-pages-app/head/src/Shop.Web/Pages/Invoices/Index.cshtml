@@ -1,0 +1,36 @@
+@page
+@model Shop.Web.Pages.Invoices.IndexModel
+@{
+    ViewData["Title"] = "Invoices";
+}
+
+<div class="d-flex justify-content-between align-items-center">
+    <h1>Invoices</h1>
+    <a asp-page="./Export" class="btn btn-outline-primary">Export to CSV</a>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Number</th>
+            <th>Order</th>
+            <th>Issued</th>
+            <th>Due</th>
+            <th class="text-end">Amount</th>
+            <th>Paid</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var invoice in Model.Invoices)
+        {
+            <tr>
+                <td>@invoice.Number</td>
+                <td><a asp-page="/Orders/Details" asp-route-id="@invoice.OrderId">@invoice.Order?.Number</a></td>
+                <td>@invoice.IssuedOn.ToString("d")</td>
+                <td>@invoice.DueOn.ToString("d")</td>
+                <td class="text-end">@invoice.Amount.ToString("C")</td>
+                <td>@(invoice.IsPaid ? "Yes" : "No")</td>
+            </tr>
+        }
+    </tbody>
+</table>

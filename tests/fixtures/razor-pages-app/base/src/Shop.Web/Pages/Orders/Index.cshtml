@@ -1,0 +1,44 @@
+@page "{status?}"
+@model Shop.Web.Pages.Orders.IndexModel
+@{
+    ViewData["Title"] = "Orders";
+}
+
+<h1>Orders</h1>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <select name="status" class="form-select" asp-items="Html.GetEnumSelectList<OrderStatus>()">
+            <option value="">All statuses</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-secondary">Filter</button>
+    </div>
+</form>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Number</th>
+            <th>Customer</th>
+            <th>Placed</th>
+            <th>Status</th>
+            <th class="text-end">Total</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var order in Model.Orders)
+        {
+            <tr>
+                <td><a asp-page="./Details" asp-route-id="@order.Id">@order.Number</a></td>
+                <td>@order.Customer?.Name</td>
+                <td>@order.PlacedOn.ToString("d")</td>
+                <td>@order.Status</td>
+                <td class="text-end">@order.Total.ToString("C")</td>
+                <td><a asp-page="./Edit" asp-route-id="@order.Id">Edit</a></td>
+            </tr>
+        }
+    </tbody>
+</table>
