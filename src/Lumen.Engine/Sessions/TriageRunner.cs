@@ -13,7 +13,7 @@ namespace Lumen.Engine.Sessions;
 public sealed partial class TriageRunner(ITriageStore store, ILogger<TriageRunner> logger)
 {
     /// <summary>Bump when a classifier changes what it proves, so cached triage from older rules is not reused.</summary>
-    public const string ClassifierVersion = "fold/1";
+    public const string ClassifierVersion = "fold/2";
 
     /// <summary>The cache version includes the classifier, mechanical path rules and the diff's merge base.</summary>
     public static string VersionFor(ReviewSettings settings, string mergeBaseSha)

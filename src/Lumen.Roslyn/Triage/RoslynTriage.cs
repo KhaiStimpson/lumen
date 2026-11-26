@@ -15,6 +15,9 @@ public static class RoslynTriage
         new RenameClassifier(),
         new MoveClassifier(),
         new RippleClassifier(),
+
+        // Not a proof: "Boilerplate · Not verified", only for the listed shapes, and only after every proof declined.
+        new BoilerplateClassifier(),
     ];
 
     public static TriagePipeline CreatePipeline() => new(Classifiers());
