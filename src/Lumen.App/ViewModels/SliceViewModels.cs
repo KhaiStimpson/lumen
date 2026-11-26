@@ -308,7 +308,7 @@ public sealed partial class MarkReviewedViewModel : ObservableObject
 }
 
 /// <summary>The inbox's local branch row.</summary>
-public sealed class LocalBranchItemViewModel(LocalBranchItem item, Func<LocalBranchRef, Task> open)
+public sealed class LocalBranchItemViewModel(LocalBranchItem item, Func<LocalBranchRef, Task> open, DateTimeOffset now)
 {
     public LocalBranchItem Model { get; } = item;
 
@@ -316,7 +316,13 @@ public sealed class LocalBranchItemViewModel(LocalBranchItem item, Func<LocalBra
 
     public string Detail => $"{Model.Ref.ClonePath} · against {Model.Ref.BaseRef}";
 
-    public string WhenLabel => Model.LastOpenedAt is null ? "" : InboxItemViewModel.Age(Model.LastOpenedAt.ToDateTimeOffset(), DateTimeOffset.UtcNow);
+    public string WhenLabel => Model.LastOpenedAt is null ? "" : InboxItemViewModel.Age(Model.LastOpenedAt.ToDateTimeOffset(), now);
+
+    public ReviewProgress Progress => Model.Progress ?? new ReviewProgress();
+
+    public string ShrinkLabel => Progress.Analysed ? ProgressText.Shrink(Progress) : "Not analysed yet";
+
+    public string SlicesLabel => ProgressText.Slices(Progress);
 
     public Task OpenAsync() => open(Model.Ref);
 }

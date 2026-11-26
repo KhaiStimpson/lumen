@@ -44,6 +44,15 @@ public sealed class PullRequestSession : IDisposable
     /// <summary>The head commit's triage; null until computed, or when it could not be.</summary>
     public TriageResult? Triage { get; private set; }
 
+    /// <summary>Feature slices; null until computed (or when slicing fell back).</summary>
+    public SliceResult? Slices { get; internal set; }
+
+    /// <summary>Fingerprints of each unit's normalised changed lines, by unit.</summary>
+    public IReadOnlyDictionary<string, Domain.UnitFingerprint> Units { get; internal set; } = new Dictionary<string, Domain.UnitFingerprint>(StringComparer.Ordinal);
+
+    /// <summary>Red flags at this head.</summary>
+    public IReadOnlyList<Domain.RedFlag> Flags { get; internal set; } = [];
+
     public bool IsFinished { get; private set; }
 
     public bool HasFailed { get; private set; }

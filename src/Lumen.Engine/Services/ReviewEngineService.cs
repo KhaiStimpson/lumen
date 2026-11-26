@@ -13,7 +13,11 @@ public sealed partial class ReviewEngineService(
     IGitHubClient gitHub,
     ReviewSettingsStore reviewSettings,
     Inbox.InboxService inbox,
-    ReviewActions actions) : ReviewEngine.ReviewEngineBase
+    ReviewActions actions,
+    IPullRequestVisitStore visits,
+    Overhaul.Tracking tracking,
+    Overhaul.ReviewProgressReader progress,
+    ILocalRepositories localRepositories) : ReviewEngine.ReviewEngineBase
 {
     private static readonly string Version =
         typeof(ReviewEngineService).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
@@ -26,7 +30,29 @@ public sealed partial class ReviewEngineService(
         IServerStreamWriter<PullRequestEvent> responseStream,
         ServerCallContext context)
     {
-        var session = sessions.GetOrStart(ProtoMapper.ToKey(request.PullRequest), request.Refresh);
+        PullRequestSession session;
+        if (request.Local is { ClonePath.Length: > 0 } local)
+        {
+            try
+            {
+                if (local.BaseRef.Length == 0)
+                {
+                    local = local.Clone();
+                    local.BaseRef = await localRepositories.DefaultBaseAsync(local.ClonePath, context.CancellationToken).ConfigureAwait(false);
+                }
+
+                session = sessions.GetOrStart(ProtoMapper.FromProto(local), request.Refresh);
+            }
+            catch (ArgumentException ex)
+            {
+                throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
+            }
+        }
+        else
+        {
+            session = sessions.GetOrStart(ProtoMapper.ToKey(request.PullRequest), request.Refresh);
+        }
+
         await foreach (var evt in session.SubscribeAsync(context.CancellationToken).ConfigureAwait(false))
         {
             await responseStream.WriteAsync(evt, context.CancellationToken).ConfigureAwait(false);
@@ -79,7 +105,7 @@ public sealed partial class ReviewEngineService(
 
     public override async Task<PostReviewCommentReply> PostReviewComment(PostReviewCommentRequest request, ServerCallContext context)
     {
-        var session = RequireSession(request.PullRequest);
+        var session = RequirePostableSession(request.PullRequest);
         var snapshot = session.Snapshot
             ?? throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pull request is still loading."));
 
@@ -98,7 +124,7 @@ public sealed partial class ReviewEngineService(
 
     public override async Task<SetFileViewedReply> SetFileViewed(SetFileViewedRequest request, ServerCallContext context)
     {
-        var session = RequireSession(request.PullRequest);
+        var session = RequirePostableSession(request.PullRequest);
         var snapshot = session.Snapshot
             ?? throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pull request is still loading."));
         if (snapshot.FindFile(request.Path) is null)
@@ -246,7 +272,7 @@ public sealed partial class ReviewEngineService(
 
     public override async Task<Contracts.PullRequestDetails> GetPullRequestDetails(GetPullRequestDetailsRequest request, ServerCallContext context)
     {
-        var session = RequireSession(request.PullRequest);
+        var session = RequirePostableSession(request.PullRequest);
         if (request.Refresh || session.Details is null)
         {
             await sessions.RefreshDetailsAsync(session, context.CancellationToken).ConfigureAwait(false);
@@ -274,7 +300,7 @@ public sealed partial class ReviewEngineService(
 
     public override async Task<Contracts.TimelineItem> PostIssueComment(PostIssueCommentRequest request, ServerCallContext context)
     {
-        var session = RequireSession(request.PullRequest);
+        var session = RequirePostableSession(request.PullRequest);
         var item = await Run(() => actions.PostIssueCommentAsync(session, request.Body, context.CancellationToken)).ConfigureAwait(false);
         return ProtoMapper.ToProto(item);
     }
@@ -283,14 +309,14 @@ public sealed partial class ReviewEngineService(
 
     public override async Task<Contracts.ReviewThread> ReplyToThread(ReplyToThreadRequest request, ServerCallContext context)
     {
-        var session = RequireSession(request.PullRequest);
+        var session = RequirePostableSession(request.PullRequest);
         var thread = await Run(() => actions.ReplyAsync(session, request.ThreadId, request.Body, context.CancellationToken)).ConfigureAwait(false);
         return ProtoMapper.ToProto(thread);
     }
 
     public override async Task<Contracts.ReviewThread> SetThreadResolved(SetThreadResolvedRequest request, ServerCallContext context)
     {
-        var session = RequireSession(request.PullRequest);
+        var session = RequirePostableSession(request.PullRequest);
         var thread = await Run(() => actions.SetResolvedAsync(session, request.ThreadId, request.Resolved, context.CancellationToken)).ConfigureAwait(false);
         return ProtoMapper.ToProto(thread);
     }
@@ -299,14 +325,14 @@ public sealed partial class ReviewEngineService(
 
     public override async Task<Contracts.PendingReview> GetPendingReview(GetPendingReviewRequest request, ServerCallContext context)
     {
-        var session = RequireSession(request.PullRequest);
+        var session = RequirePostableSession(request.PullRequest);
         await sessions.RefreshReviewStateAsync(session, context.CancellationToken).ConfigureAwait(false);
         return ProtoMapper.ToProto(session.PendingReview);
     }
 
     public override async Task<Contracts.PendingReview> AddPendingComment(AddPendingCommentRequest request, ServerCallContext context)
     {
-        var session = RequireSession(request.PullRequest);
+        var session = RequirePostableSession(request.PullRequest);
         var snapshot = session.Snapshot
             ?? throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pull request is still loading."));
         var comment = NewComment(session.Key, snapshot.HeadSha, request.Path, request.Line, request.Body, request.Side, request.StartLine, request.StartSide);
@@ -317,21 +343,21 @@ public sealed partial class ReviewEngineService(
 
     public override async Task<Contracts.PendingReview> UpdatePendingComment(UpdatePendingCommentRequest request, ServerCallContext context)
     {
-        var session = RequireSession(request.PullRequest);
+        var session = RequirePostableSession(request.PullRequest);
         var pending = await Run(() => actions.UpdatePendingAsync(session, request.CommentId, request.Body, context.CancellationToken)).ConfigureAwait(false);
         return ProtoMapper.ToProto(pending);
     }
 
     public override async Task<Contracts.PendingReview> DeletePendingComment(DeletePendingCommentRequest request, ServerCallContext context)
     {
-        var session = RequireSession(request.PullRequest);
+        var session = RequirePostableSession(request.PullRequest);
         var pending = await Run(() => actions.DeletePendingAsync(session, request.CommentId, context.CancellationToken)).ConfigureAwait(false);
         return ProtoMapper.ToProto(pending);
     }
 
     public override async Task<SubmitReviewReply> SubmitReview(SubmitReviewRequest request, ServerCallContext context)
     {
-        var session = RequireSession(request.PullRequest);
+        var session = RequirePostableSession(request.PullRequest);
         var reviewEvent = request.Event switch
         {
             Contracts.ReviewEvent.Approve => Domain.ReviewEvent.Approve,
@@ -382,6 +408,42 @@ public sealed partial class ReviewEngineService(
                 },
                 ex.Message));
         }
+    }
+
+    // ---------------------------------------------------------------- overhaul: local branches and marks
+
+    public override async Task<LocalBranches> ListLocalBranches(ListLocalBranchesRequest request, ServerCallContext context)
+    {
+        var reply = new LocalBranches();
+        var recorded = await visits.GetVisitsAsync(context.CancellationToken).ConfigureAwait(false);
+        foreach (var visit in recorded.Values.Where(v => v.Target is LocalBranchTarget).OrderByDescending(v => v.LastOpenedAt))
+        {
+            var target = (LocalBranchTarget)visit.Target;
+            reply.Items.Add(new LocalBranchItem
+            {
+                Ref = ProtoMapper.ToProto(target),
+                DisplayName = target.DisplayName,
+                LastOpenedAt = visit.LastOpenedAt is { } at ? Google.Protobuf.WellKnownTypes.Timestamp.FromDateTimeOffset(at) : null,
+                Progress = await progress.ReadAsync(target, null, 0, context.CancellationToken).ConfigureAwait(false),
+            });
+        }
+
+        return reply;
+    }
+
+    public override Task<MarksUpdated> SetMarked(SetMarkedRequest request, ServerCallContext context) =>
+        Run(() => tracking.SetMarkedAsync(RequireSession(request.PullRequest), [.. request.Units], request.Marked, context.CancellationToken));
+
+    public override Task<SinceLastLook> GetSinceLastLook(GetSinceLastLookRequest request, ServerCallContext context) =>
+        Run(() => tracking.SinceLastLookAsync(RequireSession(request.PullRequest), context.CancellationToken));
+
+    /// <summary>Posting, threads and the pending review exist only for pull requests; a local branch never reaches GitHub.</summary>
+    private PullRequestSession RequirePostableSession(PullRequestRef pullRequest)
+    {
+        var session = RequireSession(pullRequest);
+        return session.Target.CanPost
+            ? session
+            : throw new RpcException(new Status(StatusCode.FailedPrecondition, "This is a local branch: nothing is posted to GitHub."));
     }
 
     private PullRequestSession RequireSession(PullRequestRef pullRequest) =>

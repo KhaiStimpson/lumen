@@ -474,6 +474,20 @@ message InboxItem {
   string head_sha = 14;
   // Never opened in Lumen.
   bool is_new = 15;
+  // How far the shrink got: "4,212 changed" alone until analysed, then "→ 1,180 to read" and slice progress.
+  ReviewProgress progress = 16;
+}
+
+// What the last analysis of a review target found, for the inbox. Absent figures mean "not analysed yet".
+message ReviewProgress {
+  bool analysed = 1;
+  int32 changed_lines = 2;
+  int32 to_read_lines = 3;
+  // The head has moved since the analysis: the to-read figure is out of date.
+  bool out_of_date = 4;
+  int32 slices_total = 5;
+  int32 slices_reviewed = 6;
+  string analysed_head = 7;
 }
 
 message InboxSection {
@@ -921,6 +935,7 @@ message LocalBranchItem {
   LocalBranchRef ref = 1;
   string display_name = 2;
   google.protobuf.Timestamp last_opened_at = 3;
+  ReviewProgress progress = 4;
 }
 
 message LocalBranches {

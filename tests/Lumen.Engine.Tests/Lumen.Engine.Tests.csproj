@@ -21,7 +21,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Lumen.Engine\Lumen.Engine.csproj" />
-    <ProjectReference Include="..\..\src\Lumen.Models\Lumen.Models.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" LinkBase="Shared" />
+  </ItemGroup>
 </Project>

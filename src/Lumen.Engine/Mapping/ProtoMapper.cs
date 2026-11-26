@@ -199,6 +199,17 @@ public static partial class ProtoMapper
         _ => D.FoldKind.Open,
     };
 
+    public static Contracts.RedFlag ToProto(D.RedFlag flag) => new()
+    {
+        Id = flag.Id,
+        Kind = (Contracts.FlagKind)flag.Kind,
+        Path = flag.Path,
+        Side = flag.Side == D.DiffSide.Left ? Contracts.DiffSide.Left : Contracts.DiffSide.Right,
+        Line = flag.Line,
+        Message = flag.Message,
+        Member = flag.Member,
+    };
+
     public static FileDiff ToProto(ChangedFile file)
     {
         var diff = new FileDiff { Path = file.Path };

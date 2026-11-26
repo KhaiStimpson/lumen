@@ -17,6 +17,8 @@ public sealed partial class PullRequestSessionManager(
     ReviewSettingsStore reviewSettings,
     TriageRunner triage,
     IPullRequestVisitStore visits,
+    ILocalRepositories localRepositories,
+    Overhaul.OverhaulAnalysis overhaul,
     EngineOptions options,
     TimeProvider time,
     ILogger<PullRequestSessionManager> logger) : IDisposable
@@ -26,17 +28,21 @@ public sealed partial class PullRequestSessionManager(
 
     public PullRequestSession? Find(PullRequestKey key) => _sessions.GetValueOrDefault(key);
 
-    public PullRequestSession GetOrStart(PullRequestKey key, bool refresh)
+    public PullRequestSession GetOrStart(PullRequestKey key, bool refresh) => GetOrStart(new PullRequestTarget(key), refresh);
+
+    /// <summary>A pull request or a local branch; a local session is found later by its synthetic key.</summary>
+    public PullRequestSession GetOrStart(ReviewTarget target, bool refresh)
     {
         lock (_startGate)
         {
+            var key = new PullRequestSession(target).Key;
             if (_sessions.TryGetValue(key, out var existing) && !(refresh && existing.IsFinished) && !existing.HasFailed)
             {
                 return existing;
             }
 
             existing?.Cancel();
-            var session = new PullRequestSession(key);
+            var session = new PullRequestSession(target);
             _sessions[key] = session;
             session.Completion = Task.Run(() => RunAsync(session));
             return session;
@@ -51,32 +57,14 @@ public sealed partial class PullRequestSessionManager(
 
         try
         {
-            Progress(session, "github", "Fetching pull request…");
-            var (info, viewer, reviewState, viewed) = await LoadFromGitHubAsync(key, ct).ConfigureAwait(false);
-            var threads = reviewState.Threads;
-
-            var checkout = await workspace.CheckoutAsync(
-                key,
-                info.BaseSha,
-                info.HeadSha,
-                new InlineProgress(message => Progress(session, "repository", message)),
-                ct).ConfigureAwait(false);
+            var (snapshot, checkout, _, viewed) = session.Target is LocalBranchTarget local
+                ? await LoadLocalAsync(session, local, ct).ConfigureAwait(false)
+                : await LoadPullRequestAsync(session, ct).ConfigureAwait(false);
 
             // Resolved once, so this run never sees a settings change half-applied; Re-analyse picks up the next one.
             var settings = reviewSettings.Resolve(key.Repository);
-
-            Progress(session, "diff", "Reading changes…");
-            var files = ChangedFiles.FromUnifiedDiff(await checkout.GetDiffAsync(ct).ConfigureAwait(false), settings.MechanicalPaths);
-            var snapshot = new Domain.PullRequestSnapshot(key, info.BaseSha, info.HeadSha, checkout.MergeBaseSha, info.Metadata, files, threads);
-            session.SetSnapshot(snapshot, checkout);
-            session.ViewerLogin = viewer;
-            session.Publish(new PullRequestEvent { Snapshot = ProtoMapper.ToProto(snapshot, viewer, viewed) });
-            session.SetReviewState(reviewState, force: true);
-            LogSnapshotReady(logger, key, files.Count, stopwatch.ElapsedMilliseconds);
-            await RecordOpenedAsync(session, info.HeadSha, ct).ConfigureAwait(false);
-
-            // The conversation, commits and checks come separately: the diff never waits for them.
-            _ = Task.Run(() => FollowAsync(session), CancellationToken.None);
+            LogSnapshotReady(logger, key, snapshot.Files.Count, stopwatch.ElapsedMilliseconds);
+            await RecordOpenedAsync(session, snapshot.HeadSha, ct).ConfigureAwait(false);
             SessionReady?.Invoke(session);
 
             // Triage needs only the snapshot and never blocks the review: null means unavailable.
@@ -87,6 +75,9 @@ public sealed partial class PullRequestSessionManager(
             {
                 session.Publish(new PullRequestEvent { TriageReady = ProtoMapper.ToProto(triageResult, snapshot, viewed) });
             }
+
+            // Slices, red flags and reviewed marks (docs/overhaul.md). Each degrades on its own: the review never waits on them.
+            await overhaul.RunAsync(session, snapshot, checkout, settings, triageResult, ct).ConfigureAwait(false);
 
             session.Publish(new PullRequestEvent { Complete = new AnalysisComplete { DurationMs = stopwatch.ElapsedMilliseconds } });
             LogAnalysisComplete(logger, key, stopwatch.ElapsedMilliseconds);
@@ -114,7 +105,69 @@ public sealed partial class PullRequestSessionManager(
         }
     }
 
-    /// <summary>Raised once a session's snapshot is published (the walkthrough starts from here).</summary>
+    /// <summary>GitHub, then the blobless clone's worktree at the head; publishes the snapshot and starts following.</summary>
+    private async Task<(Domain.PullRequestSnapshot Snapshot, IPullRequestCheckout Checkout, string Viewer, IReadOnlySet<string> Viewed)> LoadPullRequestAsync(
+        PullRequestSession session,
+        CancellationToken ct)
+    {
+        var key = session.Key;
+        Progress(session, "github", "Fetching pull request…");
+        var (info, viewer, reviewState, viewed) = await LoadFromGitHubAsync(key, ct).ConfigureAwait(false);
+        var checkout = await workspace.CheckoutAsync(
+            key,
+            info.BaseSha,
+            info.HeadSha,
+            new InlineProgress(message => Progress(session, "repository", message)),
+            ct).ConfigureAwait(false);
+
+        Progress(session, "diff", "Reading changes…");
+        var settings = reviewSettings.Resolve(key.Repository);
+        var files = ChangedFiles.FromUnifiedDiff(await checkout.GetDiffAsync(ct).ConfigureAwait(false), settings.MechanicalPaths);
+        var snapshot = new Domain.PullRequestSnapshot(key, info.BaseSha, info.HeadSha, checkout.MergeBaseSha, info.Metadata, files, reviewState.Threads);
+        session.SetSnapshot(snapshot, checkout);
+        session.ViewerLogin = viewer;
+        session.Publish(new PullRequestEvent { Snapshot = ProtoMapper.ToProto(snapshot, viewer, viewed) });
+        session.SetReviewState(reviewState, force: true);
+
+        // The conversation, commits and checks come separately: the diff never waits for them.
+        _ = Task.Run(() => FollowAsync(session), CancellationToken.None);
+        return (snapshot, checkout, viewer, viewed);
+    }
+
+    /// <summary>A local clone, read-only: no GitHub, no threads, no posting (docs/overhaul.md, Inputs).</summary>
+    private async Task<(Domain.PullRequestSnapshot Snapshot, IPullRequestCheckout Checkout, string Viewer, IReadOnlySet<string> Viewed)> LoadLocalAsync(
+        PullRequestSession session,
+        LocalBranchTarget target,
+        CancellationToken ct)
+    {
+        Progress(session, "repository", target.HeadKind == LocalHeadKind.WorkingTree ? "Snapshotting the working tree…" : "Reading the branch…");
+        var local = await localRepositories.OpenAsync(target, ct).ConfigureAwait(false);
+        var checkout = local.Checkout;
+
+        Progress(session, "diff", "Reading changes…");
+        var settings = reviewSettings.Resolve(session.Key.Repository);
+        var files = ChangedFiles.FromUnifiedDiff(await checkout.GetDiffAsync(ct).ConfigureAwait(false), settings.MechanicalPaths);
+        var metadata = new PullRequestMetadata(
+            $"{local.HeadLabel} vs {target.BaseRef}",
+            local.Author,
+            "local",
+            false,
+            target.BaseRef,
+            local.HeadLabel,
+            "",
+            local.HasUncommittedChanges ? "Includes uncommitted changes in the working tree." : null,
+            time.GetUtcNow());
+        var snapshot = new Domain.PullRequestSnapshot(session.Key, checkout.BaseSha, checkout.HeadSha, checkout.MergeBaseSha, metadata, files, [])
+        {
+            Target = target,
+        };
+        session.SetSnapshot(snapshot, checkout);
+        session.Publish(new PullRequestEvent { Snapshot = ProtoMapper.ToProto(snapshot, "", new HashSet<string>()) });
+        session.SetReviewState(new ReviewThreadsResult([], null), force: true);
+        return (snapshot, checkout, "", new HashSet<string>());
+    }
+
+    /// <summary>Raised once a session's snapshot is published.</summary>
     public event Action<PullRequestSession>? SessionReady;
 
     /// <summary>Remembers the previous visit (for "since last review"), then records this one.</summary>

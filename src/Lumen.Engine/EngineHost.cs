@@ -85,7 +85,11 @@ public static class EngineHost
         services.AddSingleton(sp => new ReviewSettingsStore(sp.GetRequiredService<EngineSettingsStore>(), options.DataDirectory));
         services.AddSingleton<ISecretStore>(_ => OperatingSystem.IsWindows() ? new WindowsCredentialStore() : new UnavailableSecretStore());
 
+        services.AddSingleton<ILocalRepositories>(_ => new GitLocalRepositories(options.DataDirectory));
         services.AddSingleton<TriageRunner>();
+        services.AddSingleton<Overhaul.OverhaulAnalysis>();
+        services.AddSingleton<Overhaul.Tracking>();
+        services.AddSingleton<Overhaul.ReviewProgressReader>();
         services.AddSingleton<PullRequestSessionManager>();
         services.AddSingleton<ReviewActions>();
         services.AddSingleton<Inbox.InboxService>();

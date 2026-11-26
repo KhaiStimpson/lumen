@@ -85,6 +85,14 @@ internal sealed class GitPullRequestCheckout : IPullRequestCheckout
         return result.Succeeded;
     }
 
+    public async Task<string?> MergeBaseOfAsync(string first, string second, CancellationToken cancellationToken)
+    {
+        ValidateSha(first);
+        ValidateSha(second);
+        var result = await git.RunAsync(gitDir, ["merge-base", first, second], cancellationToken, throwOnError: false).ConfigureAwait(false);
+        return result.Succeeded && result.StandardOutput.Trim() is { Length: > 0 } sha ? sha : null;
+    }
+
     public async Task<bool> EnsureCommitAsync(string sha, CancellationToken cancellationToken)
     {
         ValidateSha(sha);

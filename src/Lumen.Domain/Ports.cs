@@ -121,6 +121,9 @@ public interface IPullRequestCheckout
     /// <summary>True when <paramref name="ancestor"/> is reachable from <paramref name="descendant"/>.</summary>
     Task<bool> IsAncestorAsync(string ancestor, string descendant, CancellationToken cancellationToken) => Task.FromResult(true);
 
+    /// <summary>The best common ancestor of two commits; null when they share no history.</summary>
+    Task<string?> MergeBaseOfAsync(string first, string second, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
+
     /// <summary>Makes sure a commit is available locally (fetching it by SHA if needed); false if GitHub no longer has it.</summary>
     Task<bool> EnsureCommitAsync(string sha, CancellationToken cancellationToken) => Task.FromResult(true);
 }

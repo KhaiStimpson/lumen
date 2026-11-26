@@ -27,7 +27,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _source = source;
         _settings = settings;
         _settingsPath = settingsPath;
-        Home = new InboxViewModel(source, settings.RecentPullRequests, OpenAsync);
+        Home = new InboxViewModel(source, settings.RecentPullRequests, OpenAsync, openLocal: OpenLocalAsync);
         InboxSettings = new InboxSettingsViewModel(source);
         InboxSettings.Saved += async (_, _) => await Home.RefreshAsync().ConfigureAwait(true);
         Palette = new CommandPaletteViewModel(PaletteSources);
@@ -181,9 +181,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public async Task OpenAsync(string reference)
     {
+        if (TryParseLocal(reference) is { } local)
+        {
+            await OpenLocalAsync(local).ConfigureAwait(true);
+            return;
+        }
+
         if (!PullRequestKey.TryParse(reference, out var key))
         {
-            Home.Error = "Use a GitHub pull request URL or owner/repo#123.";
+            Home.Error = "Use a GitHub pull request URL, owner/repo#123, or a local clone's folder.";
             return;
         }
 
@@ -215,6 +221,46 @@ public sealed partial class MainWindowViewModel : ObservableObject
         };
         Current = pullRequest;
         pullRequest.Start();
+    }
+
+    /// <summary>
+    /// A local clone from the go-to box: "C:\src\app" (the working tree against the default base), "C:\src\app@feature/x"
+    /// (a branch) or "C:\src\app@feature/x..main" (a branch against a named base).
+    /// </summary>
+    public static LocalBranchRef? TryParseLocal(string? reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return null;
+        }
+
+        var text = reference.Trim().Trim('"');
+        var at = text.LastIndexOf('@');
+        var (path, rest) = at > 2 ? (text[..at], text[(at + 1)..]) : (text, "");
+        if (!System.IO.Path.IsPathRooted(path) || !System.IO.Directory.Exists(path))
+        {
+            return null;
+        }
+
+        var range = rest.Split("..", 2);
+        return InboxViewModel.LocalRef(path, range[0], range.Length > 1 ? range[1] : "");
+    }
+
+    /// <summary>Opens a local clone read-only: same slicing, marks and flags; posting controls are hidden.</summary>
+    public async Task OpenLocalAsync(LocalBranchRef local)
+    {
+        if (PullRequest is { } existing)
+        {
+            await existing.DisposeAsync().ConfigureAwait(true);
+        }
+
+        Home.Error = null;
+        var review = new PullRequestViewModel(_source, new WatchPullRequestRequest { Local = local.Clone() })
+        {
+            IsSplitView = _settings.SplitView,
+        };
+        Current = review;
+        review.Start();
     }
 
     [RelayCommand]
