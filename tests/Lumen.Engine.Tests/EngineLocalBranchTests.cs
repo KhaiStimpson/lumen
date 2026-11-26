@@ -128,13 +128,66 @@ public sealed class EngineLocalBranchTests : IAsyncLifetime
         Assert.Contains("'nope'", Assert.Single(events, e => e.Failed is not null).Failed.Message, StringComparison.Ordinal);
     }
 
-    private async Task<List<PullRequestEvent>> WatchAsync(LocalBranchRef local)
+    [Fact]
+    public async Task TheFixtureArrivesAsSlicesSoonAfterItsFiles()
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var events = await WatchAsync(new LocalBranchRef { ClonePath = _repo.Root, BaseRef = "main", HeadRef = FixtureRepository.HeadBranch }, e => SnapshotAt ??= stopwatch.Elapsed);
+        var slicesAt = stopwatch.Elapsed;
+
+        var ready = Assert.Single(events, e => e.SlicesReady is not null).SlicesReady;
+        Assert.False(ready.FellBack, ready.FallbackReason);
+        Assert.Equal(9, ready.Slices.Count(s => s.Kind == Contracts.SliceKind.Feature));
+        Assert.Contains(ready.Slices, s => s.Kind == Contracts.SliceKind.Shared);
+        Assert.Contains(ready.Slices, s => s.Kind == Contracts.SliceKind.UnlinkedUnused);
+        Assert.Contains(ready.Slices, s => s.Kind == Contracts.SliceKind.MechanicalOnly);
+        var edit = ready.Slices.Single(s => s.SeedPath == "src/Shop.Web/Pages/Orders/Edit.cshtml");
+        Assert.Equal("Orders / Edit", edit.Title);
+        Assert.All(edit.Files, f => Assert.NotEmpty(f.Why));
+        Assert.NotEmpty(ready.Edges);
+
+        // Every changed file has a unit fingerprint; marks key on them.
+        var snapshot = events.First(e => e.Snapshot is not null).Snapshot;
+        Assert.All(snapshot.Files, f => Assert.Contains(ready.Units, u => u.Path == f.Path));
+
+        // Files first, slices within the budget (measured: see docs/overhaul.md, Phase 4 results).
+        var kinds = events.Select(e => e.EventCase).ToList();
+        Assert.True(kinds.IndexOf(PullRequestEvent.EventOneofCase.Snapshot) < kinds.IndexOf(PullRequestEvent.EventOneofCase.SlicesReady));
+        Assert.True(slicesAt - SnapshotAt!.Value < TimeSpan.FromSeconds(3), $"slices took {(slicesAt - SnapshotAt.Value).TotalMilliseconds:N0} ms after the files");
+        Console.WriteLine($"Fixture: files after {SnapshotAt.Value.TotalMilliseconds:N0} ms, slices after {slicesAt.TotalMilliseconds:N0} ms (slicer {ready.DurationMs} ms)");
+    }
+
+    private TimeSpan? SnapshotAt { get; set; }
+
+    [Fact]
+    public async Task ARepositoryWithNoEntryPointsStaysOnTheFileList()
+    {
+        _repo.Git("checkout", "-q", "-b", "docs-only", "main");
+        _repo.Write("docs/notes.md", "# Notes\n");
+        _repo.Write("src/Shop.Web/Services/Notes.cs", "namespace Shop.Web.Services; public static class Notes { }");
+        _repo.Git("add", "-A");
+        _repo.Git("commit", "-q", "-m", "notes");
+
+        var events = await WatchAsync(new LocalBranchRef { ClonePath = _repo.Root, BaseRef = "main", HeadRef = "docs-only" });
+
+        var ready = Assert.Single(events, e => e.SlicesReady is not null).SlicesReady;
+        Assert.True(ready.FellBack);
+        Assert.Contains("file list", ready.FallbackReason, StringComparison.Ordinal);
+        Assert.Single(events, e => e.Complete is not null);
+    }
+
+    private async Task<List<PullRequestEvent>> WatchAsync(LocalBranchRef local, Action<PullRequestEvent>? onSnapshot = null)
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         using var call = Client.WatchPullRequest(new WatchPullRequestRequest { Local = local }, cancellationToken: cts.Token);
         var events = new List<PullRequestEvent>();
         await foreach (var evt in call.ResponseStream.ReadAllAsync(cts.Token))
         {
+            if (evt.Snapshot is not null)
+            {
+                onSnapshot?.Invoke(evt);
+            }
+
             events.Add(evt);
             if (evt.Complete is not null || evt.Failed is not null)
             {

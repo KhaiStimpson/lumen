@@ -259,8 +259,84 @@
         <views:ChecksView Grid.Row="2" Name="ChecksTab" IsVisible="{Binding IsChecksTab}" />
 
         <Grid Grid.Row="2" Name="FilesTab" RowDefinitions="Auto,Auto,Auto,*" IsVisible="{Binding IsFilesTab}">
-        <!-- Guided review header -->
-        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="22,12,22,8">
+        <StackPanel>
+        <!-- The current slice (docs/overhaul.md, UI): what it is, how much is left to read, the reading order, and its flags
+             (reachable here even with the right pane closed). -->
+        <Border Name="SliceHeader" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1" Padding="22,10,22,10"
+                IsVisible="{Binding HasCurrentSlice}">
+          <StackPanel Spacing="6">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+              <StackPanel Spacing="2">
+                <TextBlock Classes="h2" Text="{Binding CurrentSlice.Title, FallbackValue=''}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="caption" TextTrimming="CharacterEllipsis">
+                  <Run Text="{Binding CurrentSlice.Caption, FallbackValue=''}" FontFamily="{StaticResource CodeFont}" FontSize="11.5" />
+                  <Run Text="{Binding CurrentSlice.SectionsLabel, FallbackValue='', StringFormat=' · {0}'}" />
+                  <Run Text=" · " /><Run Text="{Binding CurrentSlice.LinesLabel, FallbackValue=''}" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" />
+                </TextBlock>
+              </StackPanel>
+              <Button Name="SliceFlags" Grid.Column="1" Classes="subtle" VerticalAlignment="Center" IsVisible="{Binding CurrentSlice.HasFlags, FallbackValue=False}"
+                      ToolTip.Tip="Flags in this slice (G)">
+                <TextBlock FontWeight="SemiBold" Foreground="{DynamicResource Gauge.Crit}" Text="{Binding CurrentSlice.FlagLabel, FallbackValue=''}" />
+                <Button.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedRight">
+                    <ItemsControl ItemsSource="{Binding CurrentSliceFlags}" MinWidth="280">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FlagViewModel">
+                          <Button Classes="row" Padding="8,5" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                  Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).SelectFlagCommand}" CommandParameter="{Binding}">
+                            <StackPanel Spacing="1">
+                              <TextBlock FontSize="12.5"><Run Text="Flag " FontWeight="SemiBold" Foreground="{DynamicResource Gauge.Crit}" /><Run Text="{Binding KindLabel}" /></TextBlock>
+                              <TextBlock Classes="caption tertiary" FontFamily="{StaticResource CodeFont}" FontSize="11.5" Text="{Binding LocationLabel}" />
+                            </StackPanel>
+                          </Button>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+              <Button Name="SliceMarkReviewed" Grid.Column="2" Classes="subtle" VerticalAlignment="Center" Command="{Binding MarkSliceReviewedCommand}"
+                      Classes.primary="{Binding MarkReviewed.IsArmed}" IsVisible="{Binding !IsRightPaneOpen}" ToolTip.Tip="Mark the slice reviewed (M)">
+                <TextBlock Text="{Binding MarkReviewed.Label}" />
+              </Button>
+            </Grid>
+            <!-- To read / boilerplate / mechanical; the segments are 3:1 apart and the words say the same -->
+            <Grid Name="SliceBar" Height="6" ClipToBounds="True">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="{Binding CurrentSlice.OpenLines, Converter={x:Static views:Converters.LinesToStar}, FallbackValue=0}" />
+                <ColumnDefinition Width="{Binding CurrentSlice.BoilerplateLines, Converter={x:Static views:Converters.LinesToStar}, FallbackValue=0}" />
+                <ColumnDefinition Width="{Binding CurrentSlice.MechanicalLines, Converter={x:Static views:Converters.LinesToStar}, FallbackValue=0}" />
+              </Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Background="{DynamicResource Bar.ToRead}" CornerRadius="3,0,0,3" ToolTip.Tip="To read" />
+              <Border Grid.Column="1" Background="{DynamicResource Bar.Boilerplate}" ToolTip.Tip="Boilerplate, not verified" />
+              <Border Grid.Column="2" Background="{DynamicResource Bar.Mechanical}" CornerRadius="0,3,3,0" ToolTip.Tip="Mechanical, proven" />
+            </Grid>
+            <!-- Read in this order -->
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Classes="caption" Text="Read in this order:" VerticalAlignment="Center" Margin="0,0,4,0" />
+              <ItemsControl Name="ReadingOrder" ItemsSource="{Binding CurrentSlice.Files, FallbackValue={x:Null}}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SliceFileViewModel">
+                    <Button Classes="crumb" Classes.current="{Binding IsCurrent}" Padding="5,1" Margin="0,0,2,0"
+                            Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).SelectSliceFileCommand}"
+                            CommandParameter="{Binding}" ToolTip.Tip="{Binding Why}">
+                      <TextBlock FontSize="11.5" FontFamily="{StaticResource CodeFont}">
+                        <Run Text="{Binding Name}" /><Run Text=" ✓" Foreground="{DynamicResource Gauge.Ok}" FontFamily="{StaticResource UiFont}"
+                                                          Classes.hidden="{Binding !IsMarked}" />
+                      </TextBlock>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- File header: its place in the reading order and why it is in the slice -->
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="22,12,22,8">
           <Grid ColumnDefinitions="Auto,Auto,Auto" ClipToBounds="True">
             <TextBlock Classes="h2" Text="{Binding SelectedFile.Name, FallbackValue='Loading…'}" TextTrimming="CharacterEllipsis" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="10,0,8,0" VerticalAlignment="Center">
@@ -285,6 +361,12 @@
                      TextTrimming="CharacterEllipsis" IsVisible="{Binding SelectedFile.IsRenamed, FallbackValue=False}"
                      ToolTip.Tip="{Binding SelectedFile.Model.OldPath, StringFormat='Renamed from {0}', FallbackValue=''}"><Run Text="{Binding SelectedFile.PathChange.Head, FallbackValue=''}" Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding SelectedFile.PathChange.OldMiddle, FallbackValue=''}" Foreground="{DynamicResource Diff.Removed.Sign}" Background="{DynamicResource Diff.Removed.Bg}" TextDecorations="Strikethrough" /><Run Text=" → " Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding SelectedFile.PathChange.NewMiddle, FallbackValue=''}" Foreground="{DynamicResource Diff.Added.Sign}" Background="{DynamicResource Diff.Added.Bg}" FontWeight="Medium" /><Run Text="{Binding SelectedFile.PathChange.Tail, FallbackValue=''}" Foreground="{DynamicResource Text.Tertiary}" /></TextBlock>
 
+          <TextBlock Name="WhyHere" Grid.Row="2" Classes="caption" Margin="0,4,0,0" TextWrapping="Wrap"
+                     IsVisible="{Binding CurrentSliceFile, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <Run Text="{Binding CurrentSliceFile.PositionLabel, FallbackValue='', StringFormat='{}{0} · '}" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" />
+            <Run Text="{Binding CurrentSliceFile.Why, FallbackValue=''}" />
+            <Run Text="{Binding CurrentSliceFile.Section, FallbackValue='', StringFormat=' · section {0}'}" Foreground="{DynamicResource Text.Tertiary}" />
+          </TextBlock>
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="16,0,0,0">
             <!-- Only the hunks, or the whole file with the changes in place (X toggles) -->
             <Border Classes="segmented" VerticalAlignment="Center" Margin="0,0,6,0">
@@ -336,6 +418,7 @@
             </ToggleButton>
           </StackPanel>
         </Grid>
+        </StackPanel>
 
         <!-- Review settings changed since this analysis: offer to re-run it, never run it unasked. -->
         <Border Name="ReanalyseBanner" Grid.Row="1" Background="{DynamicResource Accent.Soft}" CornerRadius="{StaticResource Radius.Card}"

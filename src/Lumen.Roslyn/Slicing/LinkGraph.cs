@@ -173,6 +173,12 @@ public sealed class RepositoryIndex
         {
             var path = rawPath.Replace('\\', '/');
             all.Add(path);
+            if (!IsIndexed(path))
+            {
+                // Known to exist (a script tag can point at it), but not read for links.
+                continue;
+            }
+
             try
             {
                 var parsed = cache is null ? Parse(path, text) : cache.GetOrParse(path, text, Parse);

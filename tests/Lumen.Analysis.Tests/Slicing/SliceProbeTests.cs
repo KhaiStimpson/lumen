@@ -32,10 +32,7 @@ internal static class FixtureSources
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
-            if (RepositoryIndex.IsIndexed(relative))
-            {
-                yield return new(relative, File.ReadAllText(file));
-            }
+            yield return new(relative, RepositoryIndex.IsIndexed(relative) ? File.ReadAllText(file) : "");
         }
     }
 

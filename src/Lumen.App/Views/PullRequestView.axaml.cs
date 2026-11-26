@@ -37,6 +37,13 @@ public sealed partial class PullRequestView : UserControl, IDisposable
             return;
         }
 
+        // The right pane is off by default below about 1400px wide; the flags stay reachable from the slice header.
+        if (_viewModel is { } vm && !_paneDefaulted)
+        {
+            _paneDefaulted = true;
+            vm.IsRightPaneOpen = (this.FindAncestorOfType<Window>()?.Bounds.Width ?? 1600) >= RightPaneMinimumWidth;
+        }
+
         if (shell.PaneWidths.Left is { } left)
         {
             Layout.ColumnDefinitions[0].Width = new GridLength(Math.Max(0, left));
@@ -51,6 +58,11 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         LeftSplitter.DragCompleted += Commit;
         RightSplitter.DragCompleted += Commit;
     }
+
+    /// <summary>Below this window width the right pane starts closed.</summary>
+    public const double RightPaneMinimumWidth = 1400;
+
+    private bool _paneDefaulted;
 
     /// <summary>The right pane's width while it is collapsed, so opening it again restores it.</summary>
     private GridLength? _rightWidth;

@@ -125,6 +125,28 @@
     <Setter Property="HorizontalAlignment" Value="Center" />
   </Style>
 
+  <!-- A file in the slice's reading order: a quiet text button; the current one carries the selected treatment -->
+  <Style Selector="Button.crumb">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Control}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+  </Style>
+  <Style Selector="Button.crumb:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Gauge.Bg3}" />
+  </Style>
+  <Style Selector="Button.crumb.current /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Gauge.Sel}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Gauge.SelEdge}" />
+    <Setter Property="BorderThickness" Value="0,0,0,2" />
+  </Style>
+  <Style Selector="Button.crumb.current TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Gauge.SelFg}" />
+  </Style>
+  <Style Selector="Run.hidden">
+    <Setter Property="Foreground" Value="Transparent" />
+  </Style>
+
   <!-- A key name in a list of keys (the inspector's Keys section): Gauge g-kbd type without the box -->
   <Style Selector="TextBlock.kbdtext">
     <Setter Property="FontSize" Value="11" />

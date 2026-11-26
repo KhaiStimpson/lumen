@@ -121,6 +121,66 @@ public interface IPullRequestCheckout
     /// <summary>True when <paramref name="ancestor"/> is reachable from <paramref name="descendant"/>.</summary>
     Task<bool> IsAncestorAsync(string ancestor, string descendant, CancellationToken cancellationToken) => Task.FromResult(true);
 
+    /// <summary>Every file at head, repository-relative with '/' separators (the slicer's index reads the whole repository).</summary>
+    Task<IReadOnlyList<string>> ListHeadFilesAsync(CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(RootPath))
+        {
+            return Task.FromResult<IReadOnlyList<string>>([]);
+        }
+
+        var root = Path.GetFullPath(RootPath);
+        IReadOnlyList<string> files =
+        [
+            .. Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+                .Select(f => Path.GetRelativePath(root, f).Replace('\\', '/'))
+                .Where(f => !f.StartsWith(".git/", StringComparison.Ordinal) && f != ".git"),
+        ];
+        return Task.FromResult(files);
+    }
+
+    /// <summary>Several head files at once; a file that can't be read is left out.</summary>
+    async Task<IReadOnlyDictionary<string, string>> ReadHeadFilesAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        var texts = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var path in paths)
+        {
+            try
+            {
+                if (await ReadHeadFileAsync(path, cancellationToken).ConfigureAwait(false) is { } text)
+                {
+                    texts[path] = text;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+            }
+        }
+
+        return texts;
+    }
+
+    /// <summary>Several merge-base files at once; a file that can't be read (or didn't exist) is left out.</summary>
+    async Task<IReadOnlyDictionary<string, string>> ReadBaseFilesAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        var texts = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var path in paths)
+        {
+            try
+            {
+                if (await ReadBaseFileAsync(path, cancellationToken).ConfigureAwait(false) is { } text)
+                {
+                    texts[path] = text;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+            {
+            }
+        }
+
+        return texts;
+    }
+
     /// <summary>The best common ancestor of two commits; null when they share no history.</summary>
     Task<string?> MergeBaseOfAsync(string first, string second, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
 

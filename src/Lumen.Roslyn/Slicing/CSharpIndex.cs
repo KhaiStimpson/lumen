@@ -250,8 +250,29 @@ public static class CSharpReader
         };
     }
 
-    private static HashSet<string> Constructed(SyntaxNode node) =>
-        node.DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Select(o => Ref(o.Type).Name).ToHashSet(StringComparer.Ordinal);
+    /// <summary>Types constructed with <c>new T(...)</c>, and target-typed <c>new(...)</c> where the target type is written.</summary>
+    private static HashSet<string> Constructed(SyntaxNode node)
+    {
+        var names = node.DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Select(o => Ref(o.Type).Name).ToHashSet(StringComparer.Ordinal);
+        foreach (var implicitNew in node.DescendantNodes().OfType<ImplicitObjectCreationExpressionSyntax>())
+        {
+            var target = implicitNew.Parent switch
+            {
+                ArrowExpressionClauseSyntax { Parent: MethodDeclarationSyntax m } => m.ReturnType,
+                ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax p } => p.Type,
+                EqualsValueClauseSyntax { Parent: VariableDeclaratorSyntax { Parent: VariableDeclarationSyntax v } } => v.Type,
+                EqualsValueClauseSyntax { Parent: PropertyDeclarationSyntax p } => p.Type,
+                ReturnStatementSyntax r => r.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault()?.ReturnType,
+                _ => null,
+            };
+            if (target is not null && target is not IdentifierNameSyntax { IsVar: true })
+            {
+                names.Add(Ref(target).Name);
+            }
+        }
+
+        return names;
+    }
 
     private static HashSet<string> Accessed(SyntaxNode node) =>
         node.DescendantNodes().OfType<MemberAccessExpressionSyntax>().Select(m => m.Name.Identifier.ValueText).ToHashSet(StringComparer.Ordinal);

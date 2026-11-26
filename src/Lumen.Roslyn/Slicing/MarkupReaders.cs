@@ -111,7 +111,7 @@ public static partial class MarkupReaders
             Partials = Find(lines, PartialTag(), "name").Concat(Find(lines, PartialCall(), "name")).ToList(),
             ViewComponents = Find(lines, VcTag(), "name").Select(r => r with { Value = Pascal(r.Value) }).Concat(Find(lines, VcCall(), "name")).ToList(),
             Elements = [.. Find(lines, ElementTag(), "name").Where(r => r.Value.Contains('-', StringComparison.Ordinal) && !r.Value.StartsWith("vc:", StringComparison.Ordinal) && !HtmlElements.Contains(r.Value))],
-            Scripts = Find(lines, ScriptSrc(), "src").Concat(Find(lines, SrcInclude(), "src")).ToList(),
+            Scripts = Find(lines, ScriptSrc(), "src").Concat(Find(lines, SrcInclude(), "src")).Concat(Find(lines, StylesheetHref(), "href")).ToList(),
             PageLinks = Find(lines, AspPage(), "page").Concat(Find(lines, UrlPageLiteral(), "page")).Concat(Find(lines, RedirectToPageLiteral(), "page")).ToList(),
             DynamicPageLinks = Find(lines, UrlPageDynamic(), "expr"),
             Handlers = Find(lines, AspPageHandler(), "handler").Concat(Find(lines, UrlPageHandler(), "handler")).ToList(),
@@ -202,6 +202,9 @@ public static partial class MarkupReaders
 
     [GeneratedRegex(@"<script\b[^>]*\bsrc\s*=\s*\\?[""'](?<src>[^""'\\]+)\\?[""']", RegexOptions.IgnoreCase)]
     private static partial Regex ScriptSrc();
+
+    [GeneratedRegex(@"<link\b[^>]*\bhref\s*=\s*""(?<href>[^""]+\.css)""", RegexOptions.IgnoreCase)]
+    private static partial Regex StylesheetHref();
 
     [GeneratedRegex(@"asp-src-include\s*=\s*""(?<src>[^""]+)""")]
     private static partial Regex SrcInclude();

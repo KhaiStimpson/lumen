@@ -87,6 +87,7 @@ public static class EngineHost
 
         services.AddSingleton<ILocalRepositories>(_ => new GitLocalRepositories(options.DataDirectory));
         services.AddSingleton<TriageRunner>();
+        services.AddSingleton(new Overhaul.OverhaulOptions());
         services.AddSingleton<Overhaul.OverhaulAnalysis>();
         services.AddSingleton<Overhaul.Tracking>();
         services.AddSingleton<Overhaul.ReviewProgressReader>();

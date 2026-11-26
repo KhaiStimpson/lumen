@@ -393,6 +393,7 @@ public static partial class LinkResolver
     private static List<string> ResolveScripts(RepositoryIndex index, string from, string src)
     {
         var clean = src.Split('?')[0].TrimStart('~').TrimStart('/');
+        var extension = clean.EndsWith(".css", StringComparison.OrdinalIgnoreCase) ? ".css" : ".js";
         if (clean.Length == 0 || clean.StartsWith("http", StringComparison.OrdinalIgnoreCase) || clean.StartsWith("//", StringComparison.Ordinal))
         {
             return [];
@@ -401,7 +402,7 @@ public static partial class LinkResolver
         if (clean.Contains('*', StringComparison.Ordinal))
         {
             var pattern = "wwwroot/" + clean;
-            return [.. index.AllPaths.Where(p => p.EndsWith(".js", StringComparison.OrdinalIgnoreCase) && Analysis.PathPattern.Matches("**/" + pattern, p))];
+            return [.. index.AllPaths.Where(p => p.EndsWith(extension, StringComparison.OrdinalIgnoreCase) && Analysis.PathPattern.Matches("**/" + pattern, p))];
         }
 
         var candidates = index.AllPaths.Where(p => p.EndsWith("wwwroot/" + clean, StringComparison.OrdinalIgnoreCase)).ToList();

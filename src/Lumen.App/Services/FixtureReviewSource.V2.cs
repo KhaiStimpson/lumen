@@ -553,6 +553,16 @@ public sealed partial class FixtureReviewSource
         return reply;
     }
 
+    /// <summary>Adds an event as if the engine had sent it (tests and capture scripts): replayed to later watchers too.</summary>
+    public void Publish(PullRequestEvent evt)
+    {
+        _events.Add(evt);
+        Broadcast(evt);
+    }
+
+    /// <summary>Since-my-last-look for this fixture (tests and capture scripts).</summary>
+    public void SetSinceLastLook(SinceLastLook since) => _sinceLastLook = since;
+
     public Task<SinceLastLook> GetSinceLastLookAsync(PullRequestRef pullRequest, CancellationToken cancellationToken) =>
         Task.FromResult(_sinceLastLook?.Clone() ?? new SinceLastLook { NewHeadSha = _details.HeadSha });
 }

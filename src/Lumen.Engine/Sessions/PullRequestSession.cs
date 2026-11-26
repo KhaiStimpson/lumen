@@ -50,6 +50,9 @@ public sealed class PullRequestSession : IDisposable
     /// <summary>Fingerprints of each unit's normalised changed lines, by unit.</summary>
     public IReadOnlyDictionary<string, Domain.UnitFingerprint> Units { get; internal set; } = new Dictionary<string, Domain.UnitFingerprint>(StringComparer.Ordinal);
 
+    /// <summary>The head's repository index (for unit fingerprints and flags); null when it couldn't be built.</summary>
+    internal Lumen.Roslyn.Slicing.RepositoryIndex? Index { get; set; }
+
     /// <summary>Red flags at this head.</summary>
     public IReadOnlyList<Domain.RedFlag> Flags { get; internal set; } = [];
 

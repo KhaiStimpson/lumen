@@ -204,6 +204,110 @@ internal sealed class GitLocalCheckout(GitRunner git, string root, string baseSh
 
     public Task<string?> ReadBaseFileAsync(string path, CancellationToken cancellationToken) => ReadAtAsync(MergeBaseSha, path, cancellationToken);
 
+    public async Task<IReadOnlyList<string>> ListHeadFilesAsync(CancellationToken cancellationToken)
+    {
+        var listing = await git.RunAsync(RootPath, ["ls-tree", "-r", "-z", "--name-only", HeadSha], cancellationToken).ConfigureAwait(false);
+        return [.. listing.StandardOutput.Split('\0', StringSplitOptions.RemoveEmptyEntries)];
+    }
+
+    public Task<IReadOnlyDictionary<string, string>> ReadHeadFilesAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken) =>
+        ReadFilesAtAsync(HeadSha, paths, cancellationToken);
+
+    public Task<IReadOnlyDictionary<string, string>> ReadBaseFilesAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken) =>
+        ReadFilesAtAsync(MergeBaseSha, paths, cancellationToken);
+
+    /// <summary>All the files in one <c>git cat-file --batch</c>, instead of a process per file.</summary>
+    private async Task<IReadOnlyDictionary<string, string>> ReadFilesAtAsync(string commit, IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        var texts = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (paths.Count == 0)
+        {
+            return texts;
+        }
+
+        var start = new System.Diagnostics.ProcessStartInfo("git")
+        {
+            WorkingDirectory = RootPath,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var arg in new[] { "-c", "core.quotepath=false", "cat-file", "--batch" })
+        {
+            start.ArgumentList.Add(arg);
+        }
+
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var writer = Task.Run(async () =>
+        {
+            foreach (var path in paths)
+            {
+                await process.StandardInput.WriteAsync($"{commit}:{Relative(path)}\n".AsMemory(), cancellationToken).ConfigureAwait(false);
+            }
+
+            process.StandardInput.Close();
+        }, cancellationToken);
+
+        var output = process.StandardOutput.BaseStream;
+        foreach (var path in paths)
+        {
+            var header = await ReadLineAsync(output, cancellationToken).ConfigureAwait(false);
+            if (header is null)
+            {
+                break;
+            }
+
+            var parts = header.Split(' ');
+            if (parts.Length < 3 || parts[1] != "blob" || !long.TryParse(parts[2], out var size))
+            {
+                continue;
+            }
+
+            var buffer = new byte[size];
+            var read = 0;
+            while (read < size)
+            {
+                var n = await output.ReadAsync(buffer.AsMemory(read, (int)(size - read)), cancellationToken).ConfigureAwait(false);
+                if (n == 0)
+                {
+                    break;
+                }
+
+                read += n;
+            }
+
+            output.ReadByte();
+            texts[path] = System.Text.Encoding.UTF8.GetString(buffer);
+        }
+
+        await writer.ConfigureAwait(false);
+        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        return texts;
+    }
+
+    private static async Task<string?> ReadLineAsync(Stream stream, CancellationToken ct)
+    {
+        var bytes = new List<byte>();
+        var one = new byte[1];
+        while (true)
+        {
+            var n = await stream.ReadAsync(one, ct).ConfigureAwait(false);
+            if (n == 0)
+            {
+                return bytes.Count == 0 ? null : System.Text.Encoding.UTF8.GetString([.. bytes]);
+            }
+
+            if (one[0] == (byte)'\n')
+            {
+                return System.Text.Encoding.UTF8.GetString([.. bytes]);
+            }
+
+            bytes.Add(one[0]);
+        }
+    }
+
     /// <summary>Head content comes from the head commit (or snapshot), never from the working tree on disk.</summary>
     public Task<string?> ReadHeadFileAsync(string path, CancellationToken cancellationToken) => ReadAtAsync(HeadSha, path, cancellationToken);
 

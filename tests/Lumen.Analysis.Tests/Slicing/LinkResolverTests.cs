@@ -283,7 +283,7 @@ public sealed class LinkResolverTests
 
         // Unchanged files are reused as-is; only files the change touched are parsed again.
         var before = FixtureSources.Read("base").ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
-        var touched = FixtureSources.Read("head").Count(kv => !before.TryGetValue(kv.Key, out var old) || old != kv.Value);
+        var touched = FixtureSources.Read("head").Count(kv => RepositoryIndex.IsIndexed(kv.Key) && (!before.TryGetValue(kv.Key, out var old) || old != kv.Value));
         Assert.Equal(touched, cache.Misses - parsedForBase);
         Assert.True(cache.Hits > 0);
         Assert.Same(baseIndex.CSharp["src/Shop.Web/Data/Entities/Product.cs"], headIndex.CSharp["src/Shop.Web/Data/Entities/Product.cs"]);
@@ -301,5 +301,15 @@ public sealed class LinkResolverTests
         Assert.True(editModels.Count >= 3);
         var orders = index.Named("EditModel").Single(t => t.QualifiedName == "Shop.Web.Pages.Orders.EditModel");
         Assert.Contains(orders.Members, m => m.Name == "OnPostSaveAsync" && m.Kind == "method" && m.StartLine > 0);
+    }
+
+    [Fact]
+    public void ALayoutsStylesheetIsSiteWide()
+    {
+        var view = MarkupReaders.ReadRazor("Pages/Shared/_Layout.cshtml", "<head>\n    <link rel=\"stylesheet\" href=\"~/css/site.css\" asp-append-version=\"true\" />\n</head>");
+        Assert.Contains(view.Scripts, s => s.Value == "~/css/site.css");
+
+        var graph = Graph(("Pages/Shared/_Layout.cshtml", "<link rel=\"stylesheet\" href=\"~/css/site.css\" />"), ("wwwroot/css/site.css", ""));
+        Assert.Equal(EdgeKind.SiteWide, Single(graph, "Pages/Shared/_Layout.cshtml", "wwwroot/css/site.css").Kind);
     }
 }
