@@ -2,18 +2,18 @@
   "items": [
     {
       "ref": {
-        "clonePath": "C:/Dev/work/contoso-shop",
+        "clonePath": "C:/work/contoso-shop",
         "baseRef": "main",
-        "workingTree": true
+        "headRef": "feature/ai-change"
       },
-      "displayName": "contoso-shop \u00b7 working tree vs main",
+      "displayName": "contoso-shop · feature/ai-change vs main",
       "lastOpenedAt": "2026-11-27T08:40:00Z",
       "progress": {
         "analysed": true,
-        "changedLines": 3097,
-        "toReadLines": 0,
-        "slicesTotal": 0,
-        "slicesReviewed": 0
+        "changedLines": 3101,
+        "toReadLines": 2342,
+        "slicesTotal": 12,
+        "analysedHead": "343c18bba6678710cabc76618557accb27494b3e"
       }
     },
     {
@@ -22,7 +22,7 @@
         "baseRef": "develop",
         "headRef": "claude/refactor-pricing-rules"
       },
-      "displayName": "billing \u00b7 claude/refactor-pricing-rules vs develop",
+      "displayName": "billing · claude/refactor-pricing-rules vs develop",
       "lastOpenedAt": "2026-11-25T14:10:00Z",
       "progress": {}
     }

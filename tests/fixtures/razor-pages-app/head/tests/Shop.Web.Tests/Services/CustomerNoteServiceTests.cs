@@ -29,18 +29,18 @@ public class CustomerNoteServiceTests
             .Returns((CustomerNote n) => new CustomerNoteDto { Id = n.Id, Body = n.Body, Author = n.Author });
         var sut = new CustomerNoteService(db, _mapper.Object, TimeProvider.System);
 
-        var dto = await sut.AddAsync(customerId: 3, body: "  Prefers delivery before 10am  ", author: "khail");
+        var dto = await sut.AddAsync(customerId: 3, body: "  Prefers delivery before 10am  ", author: "dana");
 
         var saved = Assert.Single(db.CustomerNotes);
         Assert.Equal("Prefers delivery before 10am", saved.Body);
-        Assert.Equal("khail", dto.Author);
+        Assert.Equal("dana", dto.Author);
     }
 
     [Fact]
     public async Task DeleteAsync_soft_deletes_so_the_query_filter_hides_the_note()
     {
         await using var db = CreateDb();
-        var note = new CustomerNote { CustomerId = 3, Body = "Old note", Author = "khail" };
+        var note = new CustomerNote { CustomerId = 3, Body = "Old note", Author = "dana" };
         db.CustomerNotes.Add(note);
         await db.SaveChangesAsync();
         var sut = new CustomerNoteService(db, _mapper.Object, TimeProvider.System);

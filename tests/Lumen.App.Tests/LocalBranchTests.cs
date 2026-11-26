@@ -47,8 +47,9 @@ public sealed class LocalBranchTests
             await Fixture.WaitUntilAsync(() => !vm.Home.IsLoading && vm.Home.HasLocalBranches);
             var local = vm.Home.LocalBranches;
             Assert.Equal(2, local.Count);
-            Assert.Equal("Working tree", local[0].Title);
-            Assert.Equal("C:/Dev/work/contoso-shop · against main", local[0].Detail);
+            Assert.Equal("feature/ai-change", local[0].Title);
+            Assert.Equal("C:/work/contoso-shop · against main", local[0].Detail);
+            Assert.Equal("3,101 changed → 2,342 to read", local[0].ShrinkLabel);
             Assert.Equal("claude/refactor-pricing-rules", local[1].Title);
             Assert.Equal("Not analysed yet", local[1].ShrinkLabel);
             Assert.True(window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "LocalBranches").IsEffectivelyVisible);
@@ -64,6 +65,34 @@ public sealed class LocalBranchTests
         finally
         {
             window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task TheRecordedLocalReviewShowsSlicesFlagsAndWhatChangedSinceTheLastLook()
+    {
+        var source = new FixtureReviewSource(Path.Combine(AppContext.BaseDirectory, "fixtures", "razor-pages-app-local"));
+        var local = new LocalBranchRef { ClonePath = "C:/work/contoso-shop", BaseRef = "main", HeadRef = "feature/ai-change" };
+        var pr = new PullRequestViewModel(source, new WatchPullRequestRequest { Local = local });
+        pr.Start();
+        try
+        {
+            await Fixture.WaitUntilAsync(() => !pr.IsAnalysing && pr.HasSlices);
+            Assert.True(pr.IsLocal);
+            Assert.False(pr.CanPost);
+            Assert.Equal(9, pr.SliceGroups.SelectMany(g => g.Slices).Count(s => s.Kind == SliceKind.Feature));
+            Assert.Equal(17, pr.Flags.Count);
+
+            // The follow-up commit: three files, two flags fixed and one new.
+            pr.ShowSinceLastLook = true;
+            await Fixture.WaitUntilAsync(() => pr.FixedFlags.Count > 0);
+            Assert.Equal(2, pr.FixedFlags.Count);
+            Assert.Single(pr.Flags, f => f.ChangeLabel == "New");
+            Assert.False(pr.IsHistoryRewritten);
+        }
+        finally
+        {
+            await pr.DisposeAsync();
         }
     }
 
