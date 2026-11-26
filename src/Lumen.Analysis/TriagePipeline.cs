@@ -39,7 +39,7 @@ public sealed class TriageWorkspace
 public sealed record GroupClaim(string Key, string Title);
 
 /// <summary>A classifier's proof that a hunk is of a given class. <see cref="Reasons"/> are words, never a score.</summary>
-public sealed record HunkVerdict(ChangeClass Class, TriageTier Tier, IReadOnlyList<string> Reasons, GroupClaim? Group = null)
+public sealed record HunkVerdict(ChangeClass Class, FoldKind Fold, IReadOnlyList<string> Reasons, GroupClaim? Group = null)
 {
     /// <summary>
     /// When set, the hunk is reported as these parts instead (for example the moved lines and the lines edited
@@ -49,7 +49,7 @@ public sealed record HunkVerdict(ChangeClass Class, TriageTier Tier, IReadOnlyLi
 }
 
 /// <summary>Some of a hunk's changed lines, with their own verdict.</summary>
-public sealed record HunkPart(ChangeClass Class, TriageTier Tier, IReadOnlyList<string> Reasons, GroupClaim? Group, IReadOnlyList<DiffLine> Lines);
+public sealed record HunkPart(ChangeClass Class, FoldKind Fold, IReadOnlyList<string> Reasons, GroupClaim? Group, IReadOnlyList<DiffLine> Lines);
 
 /// <summary>
 /// One proof about a hunk. Return null when the hunk is not provably of this class: any doubt, parse error or
@@ -65,7 +65,7 @@ public sealed class MechanicalFileClassifier : IHunkClassifier
 {
     public HunkVerdict? Classify(HunkContext context) =>
         context.File.Mechanical.IsMechanical
-            ? new(ChangeClass.Generated, TriageTier.Skip, [context.File.Mechanical.Reason ?? "Mechanical file"])
+            ? new(ChangeClass.Generated, FoldKind.Mechanical, [context.File.Mechanical.Reason ?? "Mechanical file"])
             : null;
 }
 
@@ -104,7 +104,7 @@ public sealed class TriagePipeline(IReadOnlyList<IHunkClassifier> classifiers)
 
                 var parts = verdict.Parts.Count > 0
                     ? verdict.Parts
-                    : [new HunkPart(verdict.Class, verdict.Tier, verdict.Reasons, verdict.Group, hunk.Lines)];
+                    : [new HunkPart(verdict.Class, verdict.Fold, verdict.Reasons, verdict.Group, hunk.Lines)];
                 foreach (var part in parts)
                 {
                     if (SpanOf(part.Lines) is not { } partSpan)
@@ -121,7 +121,7 @@ public sealed class TriagePipeline(IReadOnlyList<IHunkClassifier> classifiers)
                         NewStart = partSpan.NewStart,
                         NewEnd = partSpan.NewEnd,
                         Class = part.Class,
-                        Tier = part.Tier,
+                        Fold = part.Fold,
                         Reasons = part.Reasons,
                         ChangedLines = part.Lines.Count(l => l.Kind != DiffLineKind.Context),
                         GroupId = groupId,
@@ -172,8 +172,8 @@ public sealed class TriagePipeline(IReadOnlyList<IHunkClassifier> classifiers)
 
     private static HunkVerdict Fallback(ChangedFile file) =>
         file.Kind == FileChangeKind.Added
-            ? new(ChangeClass.NewCode, TriageTier.Skim, ["new file"])
-            : new(ChangeClass.BehaviourChange, TriageTier.WorthALook, ["changes existing code"]);
+            ? new(ChangeClass.NewCode, FoldKind.Open, ["new file"])
+            : new(ChangeClass.BehaviourChange, FoldKind.Open, ["changes existing code"]);
 
     /// <summary>
     /// A group's id is derived from what the group is (its claim key), not its position, so an acknowledgement stored

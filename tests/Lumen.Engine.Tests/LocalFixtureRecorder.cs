@@ -51,8 +51,8 @@ public sealed class LocalFixtureRecorder
                 services.AddSingleton<IGitHubClient>(new LocalGitHub(key, title, parent, head));
                 services.RemoveAll<IRepositoryWorkspace>();
                 services.AddSingleton<IRepositoryWorkspace>(new FakeWorkspace(new ArchiveCheckout(repo, tree, parent, head)));
-                services.RemoveAll<ISecretStore>();
-                services.AddSingleton<ISecretStore>(new Lumen.Storage.UnavailableSecretStore());
+                services.RemoveAll<Lumen.Storage.ISecretStore>();
+                services.AddSingleton<Lumen.Storage.ISecretStore>(new Lumen.Storage.UnavailableSecretStore());
             });
         await engine.StartAsync();
 
@@ -65,10 +65,7 @@ public sealed class LocalFixtureRecorder
         {
             await foreach (var evt in call.ResponseStream.ReadAllAsync(cts.Token))
             {
-                if (evt.EventCase is not PullRequestEvent.EventOneofCase.InvestigationStatus)
-                {
-                    events.Add(evt);
-                }
+                events.Add(evt);
 
                 if (evt.Complete is not null || evt.Failed is not null)
                 {

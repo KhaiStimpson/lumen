@@ -1,54 +1,35 @@
 using Grpc.Core;
-using Lumen.Agents;
-using Lumen.Analysis;
 using Lumen.Contracts;
 using Lumen.Domain;
-using Lumen.Jev;
+using Lumen.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Lumen.Engine.Tests;
 
-/// <summary>The Settings overlay's review and Cloud AI limit calls over a real named pipe.</summary>
+/// <summary>Settings → Files over a real named pipe, and what the engine drops on start (removed AI settings and keys).</summary>
 public sealed class EngineReviewSettingsTests : IAsyncDisposable
 {
     private readonly string _pipe = $"lumen-test-{Guid.NewGuid():N}";
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), $"lumen-test-{Guid.NewGuid():N}");
+    private readonly MemorySecretStore _secrets = new();
     private Microsoft.AspNetCore.Builder.WebApplication? _engine;
     private Grpc.Net.Client.GrpcChannel? _channel;
 
-    private static Contracts.ReviewSensitivity Quiet => new()
-    {
-        MinimumPeers = 5,
-        MinimumSupport = 0.85,
-        MinimumLift = 2.0,
-        MaxPointsPerType = 1,
-        MaxExamples = 3,
-    };
-
-    private static Contracts.ReviewSensitivity Balanced => new()
-    {
-        MinimumPeers = 3,
-        MinimumSupport = 0.75,
-        MinimumLift = 1.5,
-        MaxPointsPerType = 2,
-        MaxExamples = 4,
-    };
-
-    private async Task<ReviewEngine.ReviewEngineClient> StartAsync()
+    private async Task<ReviewEngine.ReviewEngineClient> StartAsync(bool keepSettings = false)
     {
         _engine = EngineHost.Build(
             new EngineOptions { PipeName = _pipe, DataDirectory = _dataDir },
             services =>
             {
-                services.RemoveAll<EngineSettings>();
-                services.AddSingleton(new EngineSettings());
-                services.RemoveAll<ISecretStore>();
-                services.AddSingleton<ISecretStore>(new EngineConnectionsTests.MemorySecretStore());
-                services.RemoveAll<IOpenRouterKeyCheck>();
-                services.AddSingleton<IOpenRouterKeyCheck>(new EngineConnectionsTests.FakeKeyCheck());
-                services.RemoveAll<IAgentProvider>();
-                services.AddSingleton<IAgentProvider>(new EngineConnectionsTests.SignedInAgent());
+                if (!keepSettings)
+                {
+                    services.RemoveAll<EngineSettings>();
+                    services.AddSingleton(new EngineSettings());
+                }
+
+                services.RemoveAll<Lumen.Storage.ISecretStore>();
+                services.AddSingleton<ISecretStore>(_secrets);
             });
         await _engine.StartAsync();
         _channel = EngineEndpoint.CreateChannel(_pipe);
@@ -75,81 +56,82 @@ public sealed class EngineReviewSettingsTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task GlobalDefaultsAreBalancedWithTheBuiltInsListed()
+    public async Task GlobalDefaultsListTheBuiltInMechanicalRules()
     {
         var client = await StartAsync();
 
         var reply = await client.GetReviewSettingsAsync(new ReviewSettingsRequest());
 
-        Assert.Equal(3, reply.Global.Sensitivity.MinimumPeers);
-        Assert.Equal(0.75, reply.Global.Sensitivity.MinimumSupport);
+        Assert.Empty(reply.Global.MechanicalPaths);
         Assert.Null(reply.Repository);
-        Assert.Contains("CancellationToken", reply.BuiltInIgnoredNames);
         Assert.Contains("*.g.cs", reply.BuiltInMechanicalPaths);
         Assert.EndsWith("settings.json", reply.SettingsPath, StringComparison.Ordinal);
-        Assert.Equal(5, reply.Quiet.MinimumPeers);
-        Assert.Equal(reply.Global.Sensitivity, reply.Balanced);
-        Assert.Equal(0.65, reply.Thorough.MinimumSupport);
     }
 
     [Fact]
     public async Task GlobalChangesAreSavedToSettingsJson()
     {
         var client = await StartAsync();
-        var rules = new ReviewRules { Sensitivity = Quiet };
-        rules.IgnoredNames.Add(" IClock ");
-        rules.IgnoredNames.Add("IClock");
+        var rules = new ReviewRules();
+        rules.MechanicalPaths.Add(" src/Generated/** ");
         rules.MechanicalPaths.Add("src/Generated/**");
+        rules.SkippedPaths.Add("src/Legacy/");
 
         var reply = await client.UpdateReviewSettingsAsync(new UpdateReviewSettingsRequest { Rules = rules });
 
-        Assert.Equal(5, reply.Global.Sensitivity.MinimumPeers);
-        Assert.Equal(["IClock"], reply.Global.IgnoredNames);
+        Assert.Equal(["src/Generated/**"], reply.Global.MechanicalPaths);
         var saved = EngineSettings.Load(_dataDir);
-        Assert.Equal(SensitivityPreset.Quiet, saved.Review.Sensitivity.Preset);
         Assert.Equal(["src/Generated/**"], saved.Review.MechanicalPaths);
+        Assert.Equal(["src/Legacy/"], saved.Review.SkippedPaths);
     }
 
     [Fact]
-    public async Task ARepositoryOverridesSensitivityAndAddsToTheLists()
+    public async Task ARepositoryAddsToTheGlobalLists()
     {
         var client = await StartAsync();
-        var global = new ReviewRules { Sensitivity = Balanced };
-        global.IgnoredNames.Add("IClock");
+        var global = new ReviewRules();
+        global.MechanicalPaths.Add("src/Generated/**");
         await client.UpdateReviewSettingsAsync(new UpdateReviewSettingsRequest { Rules = global });
 
-        var own = new ReviewRules { Sensitivity = Quiet };
-        own.IgnoredNames.Add("OrdersDbContext");
+        var own = new ReviewRules();
         own.SkippedPaths.Add("src/Legacy/");
         var reply = await client.UpdateReviewSettingsAsync(new UpdateReviewSettingsRequest { Owner = "northwind", Name = "orders-api", Rules = own });
 
-        Assert.Equal(5, reply.Repository.Sensitivity.MinimumPeers);
-        Assert.Equal(3, reply.Global.Sensitivity.MinimumPeers);
         var path = Path.Combine(_dataDir, "review", "northwind", "orders-api.json");
         Assert.Equal(path, reply.RepositorySettingsPath);
         Assert.True(File.Exists(path));
 
         var store = _engine!.Services.GetRequiredService<ReviewSettingsStore>();
         var resolved = store.Resolve(new RepositoryRef("northwind", "orders-api"));
-        Assert.Equal(SensitivityPreset.Quiet, resolved.Sensitivity.Preset);
-        Assert.Equal(["IClock", "OrdersDbContext"], resolved.IgnoredNames);
+        Assert.Equal(["src/Generated/**"], resolved.MechanicalPaths);
         Assert.True(resolved.IsSkipped("src/Legacy/Old.cs"));
+        Assert.False(store.Resolve(new RepositoryRef("northwind", "billing")).IsSkipped("src/Legacy/Old.cs"));
+    }
 
-        // Another repository still gets only the global settings.
-        var other = store.Resolve(new RepositoryRef("northwind", "billing"));
-        Assert.Equal(SensitivityPreset.Balanced, other.Sensitivity.Preset);
-        Assert.Equal(["IClock"], other.IgnoredNames);
+    [Fact]
+    public async Task LocalClonesRunWithTheGlobalSettings()
+    {
+        var client = await StartAsync();
+        var global = new ReviewRules();
+        global.MechanicalPaths.Add("src/Generated/**");
+        await client.UpdateReviewSettingsAsync(new UpdateReviewSettingsRequest { Rules = global });
+
+        var store = _engine!.Services.GetRequiredService<ReviewSettingsStore>();
+        var local = new LocalBranchTarget(@"C:\src\my app", "main", LocalHeadKind.WorkingTree);
+
+        Assert.Equal(["src/Generated/**"], store.Resolve(local.SyntheticKey.Repository).MechanicalPaths);
     }
 
     [Fact]
     public async Task ResettingEverythingRemovesTheRepositoryFile()
     {
         var client = await StartAsync();
-        await client.UpdateReviewSettingsAsync(new UpdateReviewSettingsRequest { Owner = "northwind", Name = "orders-api", Rules = new ReviewRules { Sensitivity = Quiet } });
+        var own = new ReviewRules();
+        own.SkippedPaths.Add("src/Legacy/");
+        await client.UpdateReviewSettingsAsync(new UpdateReviewSettingsRequest { Owner = "northwind", Name = "orders-api", Rules = own });
 
         var reply = await client.UpdateReviewSettingsAsync(new UpdateReviewSettingsRequest { Owner = "northwind", Name = "orders-api", Rules = new ReviewRules() });
 
-        Assert.Null(reply.Repository.Sensitivity);
         Assert.False(File.Exists(reply.RepositorySettingsPath));
     }
 
@@ -160,48 +142,74 @@ public sealed class EngineReviewSettingsTests : IAsyncDisposable
     public async Task RepositoryNamesThatCouldEscapeTheDataFolderAreRejected(string owner, string name)
     {
         var client = await StartAsync();
+        var rules = new ReviewRules();
+        rules.SkippedPaths.Add("x/");
 
         var ex = await Assert.ThrowsAsync<RpcException>(async () =>
-            await client.UpdateReviewSettingsAsync(new UpdateReviewSettingsRequest { Owner = owner, Name = name, Rules = new ReviewRules { Sensitivity = Quiet } }));
+            await client.UpdateReviewSettingsAsync(new UpdateReviewSettingsRequest { Owner = owner, Name = name, Rules = rules }));
 
         Assert.Equal(StatusCode.InvalidArgument, ex.StatusCode);
     }
 
     [Fact]
-    public async Task CloudAiLimitsChangeOnlyWhenSet()
+    public async Task RemovedAiSettingsAreDroppedFromSettingsJsonOnStart()
     {
-        var client = await StartAsync();
+        Directory.CreateDirectory(_dataDir);
+        File.WriteAllText(EngineSettings.PathIn(_dataDir), """
+            {
+              "privacy": { "allowCodeToAgents": true, "allowCodeToFastModel": true },
+              "jev": { "enabled": true, "model": "typesafe/jev-1.13" },
+              "agents": { "enabled": true },
+              "fastModel": { "model": "@cf/zai-org/glm-5.3-flash" },
+              "inbox": { "watchedRepositories": ["acme/shop"] },
+              "review": { "sensitivity": { "minimumPeers": 5 }, "ignoredNames": ["IClock"], "mechanicalPaths": ["src/Generated/**"] }
+            }
+            """);
 
-        var status = await client.UpdateConnectionSettingsAsync(new ConnectionSettings
-        {
-            AllowCloudReasoning = true,
-            JevEnabled = true,
-            JevModel = " ~typesafe/jev-latest ",
-            MaxInvestigationsPerPullRequest = 99,
-            AllowMeteredUsage = true,
-        });
+        await StartAsync(keepSettings: true);
+        _ = _engine!.Services.GetRequiredService<EngineSettings>();
 
-        Assert.Equal("~typesafe/jev-latest", status.Settings.JevModel);
-        Assert.Equal(20, status.Settings.MaxInvestigationsPerPullRequest);
-        Assert.True(status.Settings.AllowMeteredUsage);
-        Assert.Equal(12, status.Settings.JevTimeoutSeconds);
-        Assert.True(status.Settings.JevRequireZeroDataRetention);
-        Assert.Equal(1, status.Settings.MaxConcurrentInvestigations);
-        Assert.Equal("~typesafe/jev-latest", status.Jev.Model);
-
+        var json = File.ReadAllText(EngineSettings.PathIn(_dataDir));
+        Assert.False(EngineSettings.HasUnknownKeys(json));
+        Assert.DoesNotContain("jev", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("sensitivity", json, StringComparison.OrdinalIgnoreCase);
         var saved = EngineSettings.Load(_dataDir);
-        Assert.Equal("~typesafe/jev-latest", saved.Jev.Model);
-        Assert.True(saved.Agents.AllowMeteredUsage);
+        Assert.Equal(["acme/shop"], saved.Inbox.WatchedRepositories);
+        Assert.Equal(["src/Generated/**"], saved.Review.MechanicalPaths);
     }
 
     [Fact]
-    public async Task ABlankJevModelIsRejected()
+    public void KnownSettingsAreLeftAlone()
     {
-        var client = await StartAsync();
+        Assert.False(EngineSettings.HasUnknownKeys("""{ "inbox": { "pollSeconds": 60 }, "review": { "skippedPaths": [] } }"""));
+        Assert.True(EngineSettings.HasUnknownKeys("""{ "privacy": {} }"""));
+        Assert.True(EngineSettings.HasUnknownKeys("""{ "review": { "ignoredNames": [] } }"""));
+    }
 
-        var ex = await Assert.ThrowsAsync<RpcException>(async () =>
-            await client.UpdateConnectionSettingsAsync(new ConnectionSettings { AllowCloudReasoning = true, JevModel = "  " }));
+    [Fact]
+    public async Task CredentialsForRemovedServicesAreDeletedOnStart()
+    {
+        _secrets.Write("Lumen/OpenRouter", "sk-or-test");
+        _secrets.Write("Lumen/Cloudflare/ApiToken", "cf-test");
+        _secrets.Write("SomethingElse", "keep");
 
-        Assert.Equal(StatusCode.InvalidArgument, ex.StatusCode);
+        await StartAsync();
+
+        Assert.Null(_secrets.Read("Lumen/OpenRouter"));
+        Assert.Null(_secrets.Read("Lumen/Cloudflare/ApiToken"));
+        Assert.Equal("keep", _secrets.Read("SomethingElse"));
+    }
+
+    private sealed class MemorySecretStore : ISecretStore
+    {
+        private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
+
+        public bool IsAvailable => true;
+
+        public string? Read(string name) => _values.GetValueOrDefault(name);
+
+        public void Write(string name, string secret) => _values[name] = secret;
+
+        public bool Delete(string name) => _values.Remove(name);
     }
 }

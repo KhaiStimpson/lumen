@@ -17,52 +17,38 @@ public sealed class EngineSettingsTests : IDisposable
     [Fact]
     public void NullSettingsSectionsUseSafeDefaults()
     {
-        var settings = Load("""{"privacy":null,"jev":null,"agents":null,"review":null}""");
+        var settings = Load("""{"inbox":null,"review":null}""");
 
-        Assert.NotNull(settings.Privacy);
-        Assert.NotNull(settings.Jev);
-        Assert.NotNull(settings.Agents);
+        Assert.NotNull(settings.Inbox);
         Assert.NotNull(settings.Review);
-        Assert.False(settings.AgentsAllowed);
-    }
-
-    [Fact]
-    public void HandEditedLimitsAndModelAreMadeUsable()
-    {
-        var settings = Load("""
-            {"privacy":{"allowCloudReasoning":false},
-             "jev":{"timeoutSeconds":-10,"model":" "},
-             "agents":{"maxConcurrent":100,"maxInvestigationsPerPullRequest":-4}}
-            """);
-
-        Assert.False(settings.Privacy.AllowCloudReasoning);
-        Assert.Equal(2, settings.Jev.TimeoutSeconds);
-        Assert.Equal(new JevSettings().Model, settings.Jev.Model);
-        Assert.Equal(4, settings.Agents.MaxConcurrent);
-        Assert.Equal(0, settings.Agents.MaxInvestigationsPerPullRequest);
     }
 
     [Fact]
     public void NullReviewValuesCannotBreakTheSettingsPanelOrAnalysis()
     {
         var settings = Load("""
-            {"review":{"sensitivity":null,"ignoredNames":[null," Foo ","Foo"],
-             "mechanicalPaths":null,"skippedPaths":null}}
+            {"review":{"mechanicalPaths":[null," src/Gen/** ","src/Gen/**"],"skippedPaths":null}}
             """);
 
-        Assert.Equal(ReviewSensitivity.Balanced, settings.Review.Sensitivity);
-        Assert.Equal(["Foo"], settings.Review.IgnoredNames);
-        Assert.Empty(settings.Review.MechanicalPaths);
+        Assert.Equal(["src/Gen/**"], settings.Review.MechanicalPaths);
         Assert.Empty(settings.Review.SkippedPaths);
     }
 
     [Fact]
-    public void InvalidJsonKeepsTheExistingSafeFallback()
+    public void InvalidJsonKeepsTheSafeFallback()
     {
         var settings = Load("{");
 
-        Assert.False(settings.AgentsAllowed);
-        Assert.Equal(new JevSettings().TimeoutSeconds, settings.Jev.TimeoutSeconds);
+        Assert.Empty(settings.Review.MechanicalPaths);
+        Assert.Empty(settings.Inbox.WatchedRepositories);
+    }
+
+    [Fact]
+    public void RemovedSectionsAreIgnoredOnLoad()
+    {
+        var settings = Load("""{"privacy":{"allowCodeToAgents":true},"jev":{"enabled":true},"review":{"skippedPaths":["x/"]}}""");
+
+        Assert.Equal(["x/"], settings.Review.SkippedPaths);
     }
 
     [Fact]
@@ -73,12 +59,11 @@ public sealed class EngineSettingsTests : IDisposable
         var repository = new RepositoryRef("acme", "billing");
         var path = store.PathFor(repository);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, """{"ignoredNames":[null," IClock "],"mechanicalPaths":null,"skippedPaths":null}""");
+        File.WriteAllText(path, """{"mechanicalPaths":[null," src/Gen/** "],"skippedPaths":null}""");
 
         var resolved = store.Resolve(repository);
 
-        Assert.Equal(["IClock"], resolved.IgnoredNames);
-        Assert.Empty(resolved.MechanicalPaths);
+        Assert.Equal(["src/Gen/**"], resolved.MechanicalPaths);
         Assert.Empty(resolved.SkippedPaths);
     }
 

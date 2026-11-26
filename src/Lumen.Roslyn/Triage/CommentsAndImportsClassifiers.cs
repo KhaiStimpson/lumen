@@ -17,7 +17,7 @@ public sealed class CommentsOnlyClassifier : IHunkClassifier
         }
 
         var docs = proof.After.Root.DescendantTrivia().Any(IsDoc) || proof.Before.Root.DescendantTrivia().Any(IsDoc);
-        return new(ChangeClass.CommentsOnly, TriageTier.Skip, [docs ? "comments and doc comments only" : "comments only"]);
+        return new(ChangeClass.CommentsOnly, FoldKind.Mechanical, [docs ? "comments and doc comments only" : "comments only"]);
     }
 
     private static bool IsDoc(SyntaxTrivia t) =>
@@ -55,8 +55,8 @@ public sealed class ImportsOnlyClassifier : IHunkClassifier
             _ => $"usings changed: +{string.Join(", ", added)} −{string.Join(", ", removed)}",
         };
         return added.Count == 0 && removed.Count == 0
-            ? new(ChangeClass.ImportsOnly, TriageTier.Skip, [reason])
-            : new(ChangeClass.ImportsOnly, TriageTier.Skim, [reason, "name binding may change"]);
+            ? new(ChangeClass.ImportsOnly, FoldKind.Mechanical, [reason])
+            : new(ChangeClass.ImportsOnly, FoldKind.Open, [reason, "name binding may change"]);
     }
 
     private static (List<SyntaxToken> Code, List<string> Imports) Split(SyntaxNode root)

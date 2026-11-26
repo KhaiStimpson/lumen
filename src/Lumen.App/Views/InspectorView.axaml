@@ -1,0 +1,144 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             x:Class="Lumen.App.Views.InspectorView"
+             x:DataType="vm:PullRequestViewModel">
+  <!-- The right pane: mark reviewed, the slice's lines, its flags, why its files belong together, and the keys.
+       Collapsible (I); the flags stay reachable from the slice header in the centre when it is closed. -->
+  <ScrollViewer>
+    <StackPanel Margin="16,14,16,16" Spacing="18">
+      <!-- The current slice -->
+      <StackPanel Spacing="8" IsVisible="{Binding HasCurrentSlice}">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <TextBlock Classes="h3" FontSize="14" Text="{Binding CurrentSlice.Title, FallbackValue=''}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          <Button Name="MarkReviewed" Grid.Column="1" Classes="subtle" Classes.primary="{Binding MarkReviewed.IsArmed}"
+                  Command="{Binding MarkSliceReviewedCommand}" ToolTip.Tip="Mark every file in this slice reviewed (M)">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <TextBlock Text="{Binding MarkReviewed.Label}" />
+              <Border Classes="kbd"><TextBlock Text="M" /></Border>
+            </StackPanel>
+          </Button>
+        </Grid>
+        <TextBlock Name="MarkHint" Classes="caption" Foreground="{DynamicResource Gauge.Warn}" TextWrapping="Wrap"
+                   IsVisible="{Binding MarkReviewed.HasHint}">
+          <Run Text="Still open: " /><Run Text="{Binding MarkReviewed.Hint}" FontWeight="SemiBold" />
+        </TextBlock>
+
+        <!-- To read / boilerplate / mechanical, written as numbers and drawn as a bar whose segments are 3:1 apart -->
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="3">
+          <TextBlock Classes="caption" Text="Changed" />
+          <TextBlock Grid.Column="1" Classes="caption" HorizontalAlignment="Right" Text="{Binding CurrentSlice.ChangedLines, StringFormat='{}{0:N0}', FallbackValue=''}" />
+          <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="6">
+            <Border Width="9" Height="9" CornerRadius="2" Background="{DynamicResource Bar.Boilerplate}" VerticalAlignment="Center" />
+            <TextBlock Classes="caption" Text="Boilerplate, not verified" />
+          </StackPanel>
+          <TextBlock Grid.Row="1" Grid.Column="1" Classes="caption" HorizontalAlignment="Right" Text="{Binding CurrentSlice.BoilerplateLines, StringFormat='{}{0:N0}', FallbackValue=''}" />
+          <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="6">
+            <Border Width="9" Height="9" CornerRadius="2" Background="{DynamicResource Bar.Mechanical}" BorderBrush="{DynamicResource Gauge.LineCtl}" BorderThickness="1" VerticalAlignment="Center" />
+            <TextBlock Classes="caption" Text="Mechanical, proven" />
+          </StackPanel>
+          <TextBlock Grid.Row="2" Grid.Column="1" Classes="caption" HorizontalAlignment="Right" Text="{Binding CurrentSlice.MechanicalLines, StringFormat='{}{0:N0}', FallbackValue=''}" />
+          <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="6">
+            <Border Width="9" Height="9" CornerRadius="2" Background="{DynamicResource Bar.ToRead}" VerticalAlignment="Center" />
+            <TextBlock Classes="caption" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" Text="To read" />
+          </StackPanel>
+          <TextBlock Grid.Row="3" Grid.Column="1" Classes="caption" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" HorizontalAlignment="Right"
+                     Text="{Binding CurrentSlice.OpenLines, StringFormat='{}{0:N0}', FallbackValue=''}" />
+        </Grid>
+      </StackPanel>
+
+      <!-- Flags in this slice (or in the whole change when there are no slices) -->
+      <StackPanel Name="FlagsSection" Spacing="6" IsVisible="{Binding HasFlags}">
+        <TextBlock Classes="section">
+          <Run Text="Flags" /><Run Text=" · " /><Run Text="{Binding CurrentSliceFlagCount}" />
+        </TextBlock>
+        <TextBlock Classes="caption tertiary" Text="None in this slice." IsVisible="{Binding !CurrentSliceFlagCount}" />
+        <ItemsControl Name="FlagList" ItemsSource="{Binding CurrentSliceFlags}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:FlagViewModel">
+              <Button Classes="row" Margin="-8,0" Padding="8,5" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                      Command="{Binding $parent[views:InspectorView].((vm:PullRequestViewModel)DataContext).SelectFlagCommand}" CommandParameter="{Binding}"
+                      ToolTip.Tip="{Binding Message}">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                  <TextBlock Classes="caption" FontWeight="SemiBold" Foreground="{DynamicResource Gauge.Crit}" Text="Flag" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="1" Spacing="1">
+                    <TextBlock FontSize="12.5" Text="{Binding KindLabel}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="caption tertiary" FontFamily="{StaticResource CodeFont}" FontSize="11.5" Text="{Binding LocationLabel}" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="2" Classes="caption" FontWeight="SemiBold" Foreground="{DynamicResource Gauge.Warn}" Text="{Binding ChangeLabel}"
+                             IsVisible="{Binding HasChangeLabel}" VerticalAlignment="Center" />
+                </Grid>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <ItemsControl Name="FixedFlagList" ItemsSource="{Binding FixedFlags}" IsVisible="{Binding FixedFlags.Count, Converter={x:Static views:Converters.IsPositive}}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:FlagViewModel">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,4">
+                <TextBlock Classes="caption" FontWeight="SemiBold" Foreground="{DynamicResource Gauge.Ok}" Text="Fixed" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Spacing="1">
+                  <TextBlock FontSize="12.5" Text="{Binding KindLabel}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Text.Secondary}" />
+                  <TextBlock Classes="caption tertiary" FontFamily="{StaticResource CodeFont}" FontSize="11.5" Text="{Binding LocationLabel}" />
+                </StackPanel>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <!-- Why these files are together -->
+      <StackPanel Name="WhySection" Spacing="6" IsVisible="{Binding HasCurrentSlice}">
+        <TextBlock Classes="section" Text="Why these files are together" />
+        <ItemsControl ItemsSource="{Binding CurrentSlice.Edges, FallbackValue={x:Null}}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SliceEdgeViewModel">
+              <TextBlock Classes="caption" TextWrapping="Wrap" Margin="0,2" Text="{Binding Reason}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <StackPanel Spacing="4" IsVisible="{Binding CurrentSlice.HasPossibleLinks, FallbackValue=False}" Margin="0,4,0,0">
+          <TextBlock Classes="caption" FontWeight="SemiBold" Text="Possible links (not merged in)" />
+          <ItemsControl ItemsSource="{Binding CurrentSlice.PossibleLinks, FallbackValue={x:Null}}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:SliceEdgeViewModel">
+                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="0,2" Text="{Binding Reason}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        <StackPanel Spacing="4" IsVisible="{Binding CurrentSlice.HasPageLinks, FallbackValue=False}" Margin="0,4,0,0">
+          <TextBlock Classes="caption" FontWeight="SemiBold" Text="Links to other pages" />
+          <ItemsControl ItemsSource="{Binding CurrentSlice.PageLinks, FallbackValue={x:Null}}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:SliceEdgeViewModel">
+                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="0,2" Text="{Binding Reason}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </StackPanel>
+
+      <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="{Binding SliceFallbackReason}"
+                 IsVisible="{Binding SliceFallbackReason, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+      <!-- Keys: rechecked against the existing bindings (F, L, K and Space were taken) -->
+      <StackPanel Name="KeysSection" Spacing="6">
+        <TextBlock Classes="section" Text="Keys" />
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="4">
+          <TextBlock Classes="kbdtext" Text="J  K" /><TextBlock Grid.Column="1" Classes="caption" Text="Next / previous slice" />
+          <TextBlock Grid.Row="1" Classes="kbdtext" Text=".  ," /><TextBlock Grid.Row="1" Grid.Column="1" Classes="caption" Text="Next / previous file in reading order" />
+          <TextBlock Grid.Row="2" Classes="kbdtext" Text="G  ⇧G" /><TextBlock Grid.Row="2" Grid.Column="1" Classes="caption" Text="Next / previous flag" />
+          <TextBlock Grid.Row="3" Classes="kbdtext" Text="O" /><TextBlock Grid.Row="3" Grid.Column="1" Classes="caption" Text="Open or close this file's folds" />
+          <TextBlock Grid.Row="4" Classes="kbdtext" Text="⇧O" /><TextBlock Grid.Row="4" Grid.Column="1" Classes="caption" Text="Open all folds in the slice" />
+          <TextBlock Grid.Row="5" Classes="kbdtext" Text="M" /><TextBlock Grid.Row="5" Grid.Column="1" Classes="caption" Text="Mark the slice reviewed" />
+          <TextBlock Grid.Row="6" Classes="kbdtext" Text="U" /><TextBlock Grid.Row="6" Grid.Column="1" Classes="caption" Text="Since my last look" />
+          <TextBlock Grid.Row="7" Classes="kbdtext" Text="C" /><TextBlock Grid.Row="7" Grid.Column="1" Classes="caption" Text="Comment on the current change" />
+          <TextBlock Grid.Row="8" Classes="kbdtext" Text="T  I" /><TextBlock Grid.Row="8" Grid.Column="1" Classes="caption" Text="Slices or files · this pane" />
+          <TextBlock Grid.Row="9" Classes="kbdtext" Text="]  [" /><TextBlock Grid.Row="9" Grid.Column="1" Classes="caption" Text="Next / previous change" />
+        </Grid>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

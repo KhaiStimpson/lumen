@@ -14,8 +14,6 @@ public sealed partial class PullRequestSessionManager(
     IGitHubClient gitHub,
     IRepositoryWorkspace workspace,
     IReviewStore store,
-    ReviewPointPipeline pipeline,
-    InvestigationCoordinator investigations,
     ReviewSettingsStore reviewSettings,
     TriageRunner triage,
     IPullRequestVisitStore visits,
@@ -81,45 +79,18 @@ public sealed partial class PullRequestSessionManager(
             _ = Task.Run(() => FollowAsync(session), CancellationToken.None);
             SessionReady?.Invoke(session);
 
-            // Triage runs before detectors (it needs only the snapshot) and never blocks the review: null means unavailable.
+            // Triage needs only the snapshot and never blocks the review: null means unavailable.
             Progress(session, "triage", "Separating mechanical changes from real ones…");
             var triageResult = await triage.RunAsync(snapshot, checkout, settings, ct).ConfigureAwait(false);
             session.SetTriage(triageResult);
-            var states = await store.GetLatestActionsAsync(key, ct).ConfigureAwait(false);
             if (triageResult is not null)
             {
-                var acknowledged = TriageAcknowledgement.AcknowledgedGroups(states);
-                session.Publish(new PullRequestEvent { TriageReady = ProtoMapper.ToProto(triageResult, snapshot, viewed, acknowledged) });
+                session.Publish(new PullRequestEvent { TriageReady = ProtoMapper.ToProto(triageResult, snapshot, viewed) });
             }
 
-            Progress(session, "analysis", "Comparing with repository precedent…");
-
-            var result = await pipeline.RunAsync(
-                new AnalysisContext(snapshot, checkout) { Settings = settings },
-                point =>
-                {
-                    var withState = states.TryGetValue(point.Id, out var action) ? point with { State = StateFor(action, point.State) } : point;
-                    session.AddReviewPoint(withState);
-                    session.Publish(new PullRequestEvent { ReviewPointAdded = ProtoMapper.ToProto(withState) });
-                    return Task.CompletedTask;
-                },
-                ct).ConfigureAwait(false);
-
-            session.Publish(new PullRequestEvent { Conventions = ProtoMapper.ToProto(result.Conventions) });
-            session.Publish(new PullRequestEvent
-            {
-                Complete = new AnalysisComplete
-                {
-                    ReviewPointCount = result.ReviewPoints.Count,
-                    SuppressedCount = result.Suppressed.Count,
-                    DurationMs = stopwatch.ElapsedMilliseconds,
-                },
-            });
-            LogAnalysisComplete(logger, key, result.ReviewPoints.Count, result.Suppressed.Count, stopwatch.ElapsedMilliseconds);
+            session.Publish(new PullRequestEvent { Complete = new AnalysisComplete { DurationMs = stopwatch.ElapsedMilliseconds } });
+            LogAnalysisComplete(logger, key, stopwatch.ElapsedMilliseconds);
             session.MarkFinished(failed: false);
-
-            // The review is complete and usable; investigations only add evidence to it from here on.
-            await investigations.RunAsync(session, result).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -151,8 +122,8 @@ public sealed partial class PullRequestSessionManager(
     {
         try
         {
-            session.PreviousVisit = await visits.GetVisitAsync(session.Key, ct).ConfigureAwait(false);
-            await visits.RecordOpenedAsync(session.Key, headSha, time.GetUtcNow(), ct).ConfigureAwait(false);
+            session.PreviousVisit = await visits.GetVisitAsync(session.Target, ct).ConfigureAwait(false);
+            await visits.RecordOpenedAsync(session.Target, headSha, time.GetUtcNow(), ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -285,16 +256,6 @@ public sealed partial class PullRequestSessionManager(
         }
     }
 
-    private static Domain.ReviewPointState StateFor(ReviewAction action, Domain.ReviewPointState fallback) => action switch
-    {
-        ReviewAction.Dismissed => Domain.ReviewPointState.Dismissed,
-        ReviewAction.Commented => Domain.ReviewPointState.Commented,
-        ReviewAction.Examined => Domain.ReviewPointState.Examined,
-        ReviewAction.Resolved => Domain.ReviewPointState.Resolved,
-        ReviewAction.Restored => Domain.ReviewPointState.Visible,
-        _ => fallback,
-    };
-
     private static void Progress(PullRequestSession session, string stage, string message) =>
         session.Publish(new PullRequestEvent { Progress = new AnalysisProgress { Stage = stage, Message = message } });
 
@@ -317,8 +278,8 @@ public sealed partial class PullRequestSessionManager(
     [LoggerMessage(Level = LogLevel.Information, Message = "{PullRequest}: snapshot ready ({Files} files) in {Elapsed} ms")]
     private static partial void LogSnapshotReady(ILogger logger, PullRequestKey pullRequest, int files, long elapsed);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "{PullRequest}: {Points} review points, {Suppressed} suppressed, {Elapsed} ms")]
-    private static partial void LogAnalysisComplete(ILogger logger, PullRequestKey pullRequest, int points, int suppressed, long elapsed);
+    [LoggerMessage(Level = LogLevel.Information, Message = "{PullRequest}: analysis complete in {Elapsed} ms")]
+    private static partial void LogAnalysisComplete(ILogger logger, PullRequestKey pullRequest, long elapsed);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "{PullRequest}: couldn't read the Viewed checkboxes from GitHub")]
     private static partial void LogViewedFilesUnavailable(ILogger logger, Exception exception, PullRequestKey pullRequest);

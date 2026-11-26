@@ -18,25 +18,10 @@ public interface IReviewSource : IAsyncDisposable
 
     Task<SourceFile> GetSourceFileAsync(PullRequestRef pullRequest, string path, CancellationToken cancellationToken, bool fromBase = false);
 
-    Task SetReviewPointStateAsync(PullRequestRef pullRequest, string reviewPointId, ReviewPointState state, CancellationToken cancellationToken);
-
     Task<PostReviewCommentReply> PostCommentAsync(PostReviewCommentRequest request, CancellationToken cancellationToken);
 
     /// <summary>Ticks or clears the file's "Viewed" checkbox on GitHub.</summary>
     Task SetFileViewedAsync(PullRequestRef pullRequest, string path, bool viewed, CancellationToken cancellationToken);
-
-    /// <summary>Clears (or restores) a triage group for this pull request; the engine stores it like a dismissal.</summary>
-    Task SetTriageGroupAcknowledgedAsync(PullRequestRef pullRequest, string groupId, bool acknowledged, CancellationToken cancellationToken);
-
-    Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken);
-
-    /// <summary>Hands the key to the engine, which puts it in the platform credential store; returns fresh status.</summary>
-    Task<Connections> SetOpenRouterKeyAsync(string key, CancellationToken cancellationToken);
-
-    Task<Connections> RemoveOpenRouterKeyAsync(CancellationToken cancellationToken);
-
-    /// <summary>Saves the panel's switches to the engine's settings.json; they apply without a restart.</summary>
-    Task<Connections> UpdateConnectionSettingsAsync(ConnectionSettings settings, CancellationToken cancellationToken);
 
     /// <summary>The global review settings, and the repository's own when the request names one.</summary>
     Task<ReviewSettingsReply> GetReviewSettingsAsync(ReviewSettingsRequest request, CancellationToken cancellationToken);
@@ -75,10 +60,16 @@ public interface IReviewSource : IAsyncDisposable
 
     Task<SubmitReviewReply> SubmitReviewAsync(SubmitReviewRequest request, CancellationToken cancellationToken);
 
-    Task<Connections> SetCloudflareCredentialsAsync(string accountId, string apiToken, CancellationToken cancellationToken);
+    // ---- overhaul ----
 
-    Task<Connections> RemoveCloudflareCredentialsAsync(CancellationToken cancellationToken);
+    /// <summary>Opens (or re-attaches to) a pull request or a local branch, as the request says.</summary>
+    IAsyncEnumerable<PullRequestEvent> WatchAsync(WatchPullRequestRequest request, CancellationToken cancellationToken);
 
-    /// <summary>Results arrive on the pull request's stream as WalkthroughUpdated.</summary>
-    Task StartWalkthroughAsync(StartWalkthroughRequest request, CancellationToken cancellationToken);
+    /// <summary>Local targets opened before, newest first.</summary>
+    Task<LocalBranches> ListLocalBranchesAsync(CancellationToken cancellationToken);
+
+    /// <summary>Marks or clears units as reviewed; the reply carries every mark and any Viewed boxes ticked.</summary>
+    Task<MarksUpdated> SetMarkedAsync(SetMarkedRequest request, CancellationToken cancellationToken);
+
+    Task<SinceLastLook> GetSinceLastLookAsync(PullRequestRef pullRequest, CancellationToken cancellationToken);
 }

@@ -24,35 +24,6 @@ public sealed class ReviewSettingsTests
         Assert.Equal(expected, PathPattern.Matches(pattern, path));
 
     [Fact]
-    public void PresetsAreRecognisedByTheirNumbers()
-    {
-        Assert.Equal(SensitivityPreset.Balanced, new ReviewSensitivity().Preset);
-        Assert.Equal(SensitivityPreset.Quiet, (ReviewSensitivity.Balanced with { MinimumPeers = 5, MinimumSupport = 0.85, MinimumLift = 2.0, MaxPointsPerType = 1, MaxExamples = 3 }).Preset);
-        Assert.Equal(SensitivityPreset.Custom, (ReviewSensitivity.Balanced with { MaxExamples = 5 }).Preset);
-        Assert.Same(ReviewSensitivity.Thorough, ReviewSensitivity.For(SensitivityPreset.Thorough));
-    }
-
-    [Fact]
-    public void BalancedKeepsTheDetectorsOriginalPreFilter()
-    {
-        Assert.Equal(0.6, ReviewSensitivity.Balanced.CandidateSupport, 3);
-        Assert.Equal(0.5, ReviewSensitivity.Thorough.CandidateSupport, 3);
-        Assert.Equal(0.5, (ReviewSensitivity.Balanced with { MinimumSupport = 0.55 }).CandidateSupport, 3);
-    }
-
-    [Fact]
-    public void ClampingPullsHandEditedValuesIntoRange()
-    {
-        var clamped = new ReviewSensitivity { MinimumPeers = 0, MinimumSupport = 1.4, MinimumLift = 0.2, MaxPointsPerType = 99, MaxExamples = -1 }.Clamped();
-
-        Assert.Equal(2, clamped.MinimumPeers);
-        Assert.Equal(1.0, clamped.MinimumSupport);
-        Assert.Equal(1.0, clamped.MinimumLift);
-        Assert.Equal(10, clamped.MaxPointsPerType);
-        Assert.Equal(1, clamped.MaxExamples);
-    }
-
-    [Fact]
     public void RepositoryPatternsMarkFilesMechanical()
     {
         var result = MechanicalClassifier.Classify("src/Contracts/Generated/Order.cs", [], ["src/Contracts/Generated/**"]);

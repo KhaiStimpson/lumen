@@ -56,7 +56,7 @@ public sealed class TriageSweepTests(ITestOutputHelper output)
                 totals[hunk.Class] = totals.GetValueOrDefault(hunk.Class) + hunk.ChangedLines;
             }
 
-            foreach (var hunk in triage.Hunks.Where(h => h.Tier == TriageTier.Skip && h.Class != ChangeClass.Generated))
+            foreach (var hunk in triage.Hunks.Where(h => h.Fold == FoldKind.Mechanical && h.Class != ChangeClass.Generated))
             {
                 var sb = new StringBuilder();
                 sb.Append("=== ").Append(sha[..8]).Append(' ').Append(hunk.Class).Append(' ').Append(hunk.Path)

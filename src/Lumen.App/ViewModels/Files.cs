@@ -79,26 +79,31 @@ public sealed partial class FileEntryViewModel(ChangedFileSummary file) : Observ
         _ => "Modified",
     };
 
+    /// <summary>Changed lines by fold; null until the triage arrives.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasReviewPoints))]
-    public partial int ReviewPointCount { get; set; }
+    [NotifyPropertyChangedFor(nameof(IsMechanicalOnly), nameof(MechanicalLabel), nameof(OpenLines), nameof(OpenLinesLabel))]
+    public partial FoldLines? FoldLines { get; set; }
 
-    public bool HasReviewPoints => ReviewPointCount > 0;
+    /// <summary>Every changed line was proven mechanical: greyed in the tree, still one click away.</summary>
+    public bool IsMechanicalOnly => FoldLines is { } f && f.Mechanical > 0 && f.Open + f.Boilerplate == 0;
 
-    /// <summary>Changed lines per triage tier; null until the triage arrives.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsMechanicalOnly), nameof(MechanicalLabel), nameof(HasCritical))]
-    public partial TierLines? TierLines { get; set; }
-
-    /// <summary>Every changed line was proven mechanical (all Skip): greyed in the tree, still one click away.</summary>
-    public bool IsMechanicalOnly => TierLines is { } t && t.Skip > 0 && t.Critical + t.WorthALook + t.Skim == 0;
-
-    public string MechanicalLabel => TierLines is { Skip: > 0 } t
-        ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{t.Skip:N0} {(t.Skip == 1 ? "line" : "lines")} mechanical")
+    public string MechanicalLabel => FoldLines is { Mechanical: > 0 } f
+        ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{f.Mechanical:N0} {(f.Mechanical == 1 ? "line" : "lines")} mechanical")
         : "";
 
-    /// <summary>The file holds at least one Critical hunk.</summary>
-    public bool HasCritical => TierLines is { Critical: > 0 };
+    /// <summary>Lines left open by default in this file.</summary>
+    public int OpenLines => FoldLines?.Open ?? Model.Additions + Model.Deletions;
+
+    public string OpenLinesLabel => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{OpenLines:N0} to read");
+
+    /// <summary>Red flags on this file.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFlags), nameof(FlagCountLabel))]
+    public partial int FlagCount { get; set; }
+
+    public bool HasFlags => FlagCount > 0;
+
+    public string FlagCountLabel => FlagCount == 1 ? "1 flag" : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{FlagCount} flags");
 
     /// <summary>Unresolved review threads on this file (plan v2 M4).</summary>
     [ObservableProperty]
@@ -243,15 +248,4 @@ public sealed partial class FileTreeNode : ObservableObject
             Sort(child);
         }
     }
-}
-
-public sealed class ConventionViewModel(Convention convention)
-{
-    public string Statement => convention.Statement;
-
-    public string Support => $"{convention.Supporting} of {convention.PeerCount}";
-
-    public string ExamplesLabel => string.Join(", ", convention.Examples.Select(e => e.Symbol).Where(s => s.Length > 0).Take(3));
-
-    public double Strength => convention.PeerCount == 0 ? 0 : (double)convention.Supporting / convention.PeerCount;
 }

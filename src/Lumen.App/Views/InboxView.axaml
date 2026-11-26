@@ -128,7 +128,7 @@
         </StackPanel>
 
         <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="4,0"
-                   Text="Uses your GitHub CLI sign-in (gh auth login). Code is analysed locally. Nothing is posted to GitHub without a click or Ctrl+Enter, and nothing goes to an AI service unless you turn it on in Connections." />
+                   Text="Uses your GitHub CLI sign-in (gh auth login). Code is analysed locally. Nothing is posted to GitHub without a click or Ctrl+Enter, and nothing is sent anywhere else." />
       </StackPanel>
     </Grid>
   </ScrollViewer>

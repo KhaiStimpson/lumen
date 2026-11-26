@@ -29,8 +29,6 @@ public sealed partial class PendingCommentViewModel(PendingComment comment) : Ob
 
     public string Body => Model.Body;
 
-    public bool IsForReviewPoint => Model.ReviewPointId.Length > 0;
-
     [ObservableProperty]
     public partial bool IsEditing { get; set; }
 
@@ -239,9 +237,6 @@ public sealed partial class PullRequestViewModel
         CurrentThread = null;
         PendingComments.Clear();
         PendingReviewId = "";
-        Walkthrough = null;
-        DeltaWalkthrough = null;
-        CurrentGroup = null;
         OnPropertyChanged(nameof(TrayLabel));
     }
 }

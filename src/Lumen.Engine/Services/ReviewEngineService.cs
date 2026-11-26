@@ -11,13 +11,9 @@ namespace Lumen.Engine.Services;
 public sealed partial class ReviewEngineService(
     PullRequestSessionManager sessions,
     IGitHubClient gitHub,
-    IReviewStore store,
-    ConnectionsProbe connections,
     ReviewSettingsStore reviewSettings,
     Inbox.InboxService inbox,
-    ReviewActions actions,
-    Walkthroughs.WalkthroughCoordinator walkthroughs,
-    TimeProvider time) : ReviewEngine.ReviewEngineBase
+    ReviewActions actions) : ReviewEngine.ReviewEngineBase
 {
     private static readonly string Version =
         typeof(ReviewEngineService).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
@@ -81,13 +77,6 @@ public sealed partial class ReviewEngineService(
         }
     }
 
-    public override async Task<SetReviewPointStateReply> SetReviewPointState(SetReviewPointStateRequest request, ServerCallContext context)
-    {
-        var session = RequireSession(request.PullRequest);
-        await RecordAsync(session, request.ReviewPointId, request.State, null, context.CancellationToken).ConfigureAwait(false);
-        return new SetReviewPointStateReply();
-    }
-
     public override async Task<PostReviewCommentReply> PostReviewComment(PostReviewCommentRequest request, ServerCallContext context)
     {
         var session = RequireSession(request.PullRequest);
@@ -99,47 +88,12 @@ public sealed partial class ReviewEngineService(
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Comment body is empty."));
         }
 
-        if (!string.IsNullOrEmpty(request.ReviewPointId) && session.FindReviewPoint(request.ReviewPointId) is null)
-        {
-            throw new RpcException(new Status(StatusCode.NotFound, $"Unknown review point '{request.ReviewPointId}'."));
-        }
-
         var comment = NewComment(session.Key, snapshot.HeadSha, request.Path, request.Line, request.Body, request.Side, request.StartLine, request.StartSide);
-        var (posted, pending) = await Run(() => actions.PostNowAsync(session, comment, NullIfEmpty(request.ReviewPointId), context.CancellationToken)).ConfigureAwait(false);
-
-        if (!string.IsNullOrEmpty(request.ReviewPointId))
-        {
-            await RecordAsync(session, request.ReviewPointId, Contracts.ReviewPointState.Commented, posted?.Url, context.CancellationToken).ConfigureAwait(false);
-        }
+        var (posted, pending) = await Run(() => actions.PostNowAsync(session, comment, context.CancellationToken)).ConfigureAwait(false);
 
         return posted is not null
             ? new PostReviewCommentReply { CommentId = posted.Id, Url = posted.Url }
-            : new PostReviewCommentReply { AddedToPendingReview = true, PendingReview = ProtoMapper.ToProto(pending, session.PendingPoints) };
-    }
-
-    public override async Task<SetTriageGroupAcknowledgedReply> SetTriageGroupAcknowledged(SetTriageGroupAcknowledgedRequest request, ServerCallContext context)
-    {
-        var session = RequireSession(request.PullRequest);
-        if (session.Triage?.Groups.Any(g => g.Id == request.GroupId) != true)
-        {
-            throw new RpcException(new Status(StatusCode.NotFound, $"Unknown triage group '{request.GroupId}'."));
-        }
-
-        await store.RecordInteractionAsync(
-            new ReviewInteraction(
-                session.Key,
-                session.Snapshot?.HeadSha ?? "",
-                TriageAcknowledgement.InteractionId(request.GroupId),
-                request.Acknowledged ? ReviewAction.Acknowledged : ReviewAction.Unacknowledged,
-                time.GetUtcNow(),
-                null),
-            context.CancellationToken).ConfigureAwait(false);
-
-        session.Publish(new PullRequestEvent
-        {
-            TriageGroupAcknowledged = new TriageGroupAcknowledged { GroupId = request.GroupId, Acknowledged = request.Acknowledged },
-        });
-        return new SetTriageGroupAcknowledgedReply();
+            : new PostReviewCommentReply { AddedToPendingReview = true, PendingReview = ProtoMapper.ToProto(pending) };
     }
 
     public override async Task<SetFileViewedReply> SetFileViewed(SetFileViewedRequest request, ServerCallContext context)
@@ -166,51 +120,6 @@ public sealed partial class ReviewEngineService(
         return new SetFileViewedReply();
     }
 
-    public override Task<Connections> GetConnections(GetConnectionsRequest request, ServerCallContext context) =>
-        connections.GetAsync(context.CancellationToken);
-
-    public override async Task<Connections> SetOpenRouterKey(SetOpenRouterKeyRequest request, ServerCallContext context)
-    {
-        try
-        {
-            connections.SetOpenRouterKey(request.Key);
-        }
-        catch (ArgumentException ex)
-        {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
-        }
-        catch (PlatformNotSupportedException ex)
-        {
-            throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message));
-        }
-
-        return await connections.GetAsync(context.CancellationToken).ConfigureAwait(false);
-    }
-
-    public override async Task<Connections> RemoveOpenRouterKey(RemoveOpenRouterKeyRequest request, ServerCallContext context)
-    {
-        connections.RemoveOpenRouterKey();
-        return await connections.GetAsync(context.CancellationToken).ConfigureAwait(false);
-    }
-
-    public override async Task<Connections> UpdateConnectionSettings(ConnectionSettings request, ServerCallContext context)
-    {
-        try
-        {
-            connections.UpdateSettings(request);
-        }
-        catch (ArgumentException ex)
-        {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            throw new RpcException(new Status(StatusCode.Unavailable, $"Could not save settings: {ex.Message}"));
-        }
-
-        return await connections.GetAsync(context.CancellationToken).ConfigureAwait(false);
-    }
-
     public override Task<ReviewSettingsReply> GetReviewSettings(ReviewSettingsRequest request, ServerCallContext context)
     {
         try
@@ -233,8 +142,6 @@ public sealed partial class ReviewEngineService(
             {
                 reviewSettings.UpdateGlobal(new Analysis.ReviewSettings
                 {
-                    Sensitivity = FromProto(rules.Sensitivity) ?? Analysis.ReviewSensitivity.Balanced,
-                    IgnoredNames = [.. rules.IgnoredNames],
                     MechanicalPaths = [.. rules.MechanicalPaths],
                     SkippedPaths = [.. rules.SkippedPaths],
                 });
@@ -243,8 +150,6 @@ public sealed partial class ReviewEngineService(
             {
                 reviewSettings.Update(repository, new RepositoryReviewSettings
                 {
-                    Sensitivity = FromProto(rules.Sensitivity),
-                    IgnoredNames = [.. rules.IgnoredNames],
                     MechanicalPaths = [.. rules.MechanicalPaths],
                     SkippedPaths = [.. rules.SkippedPaths],
                 });
@@ -267,19 +172,15 @@ public sealed partial class ReviewEngineService(
         var global = reviewSettings.Global;
         var reply = new ReviewSettingsReply
         {
-            Global = ToProto(global.Sensitivity, global.IgnoredNames, global.MechanicalPaths, global.SkippedPaths),
+            Global = ToProto(global.MechanicalPaths, global.SkippedPaths),
             SettingsPath = reviewSettings.SettingsPath,
-            Quiet = ToProto(Analysis.ReviewSensitivity.Quiet),
-            Balanced = ToProto(Analysis.ReviewSensitivity.Balanced),
-            Thorough = ToProto(Analysis.ReviewSensitivity.Thorough),
         };
-        reply.BuiltInIgnoredNames.AddRange(Roslyn.PeerPatternDetector.BuiltInIgnoredNames.Order(StringComparer.OrdinalIgnoreCase));
         reply.BuiltInMechanicalPaths.AddRange(Analysis.MechanicalClassifier.BuiltInDescriptions);
 
         if (repository is not null)
         {
             var own = reviewSettings.Get(repository);
-            reply.Repository = ToProto(own.Sensitivity, own.IgnoredNames, own.MechanicalPaths, own.SkippedPaths);
+            reply.Repository = ToProto(own.MechanicalPaths, own.SkippedPaths);
             reply.RepositorySettingsPath = reviewSettings.PathFor(repository);
         }
 
@@ -301,36 +202,13 @@ public sealed partial class ReviewEngineService(
         return new RepositoryRef(owner, name);
     }
 
-    private static ReviewRules ToProto(
-        Analysis.ReviewSensitivity? sensitivity,
-        IEnumerable<string> ignoredNames,
-        IEnumerable<string> mechanicalPaths,
-        IEnumerable<string> skippedPaths)
+    private static ReviewRules ToProto(IEnumerable<string> mechanicalPaths, IEnumerable<string> skippedPaths)
     {
-        var rules = new ReviewRules { Sensitivity = sensitivity is null ? null : ToProto(sensitivity) };
-        rules.IgnoredNames.AddRange(ignoredNames);
+        var rules = new ReviewRules();
         rules.MechanicalPaths.AddRange(mechanicalPaths);
         rules.SkippedPaths.AddRange(skippedPaths);
         return rules;
     }
-
-    private static Contracts.ReviewSensitivity ToProto(Analysis.ReviewSensitivity sensitivity) => new()
-    {
-        MinimumPeers = sensitivity.MinimumPeers,
-        MinimumSupport = sensitivity.MinimumSupport,
-        MinimumLift = sensitivity.MinimumLift,
-        MaxPointsPerType = sensitivity.MaxPointsPerType,
-        MaxExamples = sensitivity.MaxExamples,
-    };
-
-    private static Analysis.ReviewSensitivity? FromProto(Contracts.ReviewSensitivity? sensitivity) => sensitivity is null ? null : new()
-    {
-        MinimumPeers = sensitivity.MinimumPeers,
-        MinimumSupport = sensitivity.MinimumSupport,
-        MinimumLift = sensitivity.MinimumLift,
-        MaxPointsPerType = sensitivity.MaxPointsPerType,
-        MaxExamples = sensitivity.MaxExamples,
-    };
 
     // ---------------------------------------------------------------- v2: inbox (M1)
 
@@ -423,7 +301,7 @@ public sealed partial class ReviewEngineService(
     {
         var session = RequireSession(request.PullRequest);
         await sessions.RefreshReviewStateAsync(session, context.CancellationToken).ConfigureAwait(false);
-        return ProtoMapper.ToProto(session.PendingReview, session.PendingPoints);
+        return ProtoMapper.ToProto(session.PendingReview);
     }
 
     public override async Task<Contracts.PendingReview> AddPendingComment(AddPendingCommentRequest request, ServerCallContext context)
@@ -431,34 +309,24 @@ public sealed partial class ReviewEngineService(
         var session = RequireSession(request.PullRequest);
         var snapshot = session.Snapshot
             ?? throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pull request is still loading."));
-        if (!string.IsNullOrEmpty(request.ReviewPointId) && session.FindReviewPoint(request.ReviewPointId) is null)
-        {
-            throw new RpcException(new Status(StatusCode.NotFound, $"Unknown review point '{request.ReviewPointId}'."));
-        }
-
         var comment = NewComment(session.Key, snapshot.HeadSha, request.Path, request.Line, request.Body, request.Side, request.StartLine, request.StartSide);
         var pending = await Run(() => actions.AddPendingAsync(
-            session, comment, NullIfEmpty(request.ReviewPointId), NullIfEmpty(request.ReplyToThreadId), context.CancellationToken)).ConfigureAwait(false);
-        if (!string.IsNullOrEmpty(request.ReviewPointId))
-        {
-            await RecordAsync(session, request.ReviewPointId, Contracts.ReviewPointState.Commented, "pending review", context.CancellationToken).ConfigureAwait(false);
-        }
-
-        return ProtoMapper.ToProto(pending, session.PendingPoints);
+            session, comment, NullIfEmpty(request.ReplyToThreadId), context.CancellationToken)).ConfigureAwait(false);
+        return ProtoMapper.ToProto(pending);
     }
 
     public override async Task<Contracts.PendingReview> UpdatePendingComment(UpdatePendingCommentRequest request, ServerCallContext context)
     {
         var session = RequireSession(request.PullRequest);
         var pending = await Run(() => actions.UpdatePendingAsync(session, request.CommentId, request.Body, context.CancellationToken)).ConfigureAwait(false);
-        return ProtoMapper.ToProto(pending, session.PendingPoints);
+        return ProtoMapper.ToProto(pending);
     }
 
     public override async Task<Contracts.PendingReview> DeletePendingComment(DeletePendingCommentRequest request, ServerCallContext context)
     {
         var session = RequireSession(request.PullRequest);
         var pending = await Run(() => actions.DeletePendingAsync(session, request.CommentId, context.CancellationToken)).ConfigureAwait(false);
-        return ProtoMapper.ToProto(pending, session.PendingPoints);
+        return ProtoMapper.ToProto(pending);
     }
 
     public override async Task<SubmitReviewReply> SubmitReview(SubmitReviewRequest request, ServerCallContext context)
@@ -472,45 +340,6 @@ public sealed partial class ReviewEngineService(
         };
         var (review, head) = await Run(() => actions.SubmitAsync(session, reviewEvent, request.Body, context.CancellationToken)).ConfigureAwait(false);
         return new SubmitReviewReply { Url = review.Url, HeadSha = head };
-    }
-
-    // ---------------------------------------------------------------- v2: fast model and walkthrough (M7, M8)
-
-    public override async Task<Connections> SetCloudflareCredentials(SetCloudflareCredentialsRequest request, ServerCallContext context)
-    {
-        try
-        {
-            connections.SetCloudflareCredentials(request.AccountId, request.ApiToken);
-        }
-        catch (ArgumentException ex)
-        {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
-        }
-        catch (PlatformNotSupportedException ex)
-        {
-            throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message));
-        }
-
-        return await connections.GetAsync(context.CancellationToken).ConfigureAwait(false);
-    }
-
-    public override async Task<Connections> RemoveCloudflareCredentials(RemoveCloudflareCredentialsRequest request, ServerCallContext context)
-    {
-        connections.RemoveCloudflareCredentials();
-        return await connections.GetAsync(context.CancellationToken).ConfigureAwait(false);
-    }
-
-    public override Task<StartWalkthroughReply> StartWalkthrough(StartWalkthroughRequest request, ServerCallContext context)
-    {
-        var session = RequireSession(request.PullRequest);
-        if (session.Snapshot is null)
-        {
-            throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pull request is still loading."));
-        }
-
-        var since = request.Since is { FromSha.Length: > 0 } range ? range.FromSha : null;
-        walkthroughs.Start(session, since, request.Refresh);
-        return Task.FromResult(new StartWalkthroughReply());
     }
 
     private static NewReviewComment NewComment(
@@ -553,38 +382,6 @@ public sealed partial class ReviewEngineService(
                 },
                 ex.Message));
         }
-    }
-
-    private async Task RecordAsync(
-        PullRequestSession session,
-        string reviewPointId,
-        Contracts.ReviewPointState state,
-        string? detail,
-        CancellationToken cancellationToken)
-    {
-        if (session.FindReviewPoint(reviewPointId) is null)
-        {
-            throw new RpcException(new Status(StatusCode.NotFound, $"Unknown review point '{reviewPointId}'."));
-        }
-
-        await store.RecordInteractionAsync(
-            new ReviewInteraction(session.Key, session.Snapshot?.HeadSha ?? "", reviewPointId, ProtoMapper.ToAction(state), time.GetUtcNow(), detail),
-            cancellationToken).ConfigureAwait(false);
-
-        session.UpdateReviewPoint(
-            reviewPointId,
-            point => point with { State = state switch
-            {
-                Contracts.ReviewPointState.Dismissed => Domain.ReviewPointState.Dismissed,
-                Contracts.ReviewPointState.Commented => Domain.ReviewPointState.Commented,
-                Contracts.ReviewPointState.Examined => Domain.ReviewPointState.Examined,
-                Contracts.ReviewPointState.Resolved => Domain.ReviewPointState.Resolved,
-                _ => Domain.ReviewPointState.Visible,
-            } },
-            _ => new PullRequestEvent
-            {
-                ReviewPointStateChanged = new ReviewPointStateChanged { ReviewPointId = reviewPointId, State = state },
-            });
     }
 
     private PullRequestSession RequireSession(PullRequestRef pullRequest) =>

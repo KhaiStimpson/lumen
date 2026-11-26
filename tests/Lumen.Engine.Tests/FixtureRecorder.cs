@@ -43,8 +43,7 @@ public sealed class FixtureRecorder
                 switch (evt.EventCase)
                 {
                     case PullRequestEvent.EventOneofCase.ThreadsUpdated or PullRequestEvent.EventOneofCase.TimelineUpdated
-                        or PullRequestEvent.EventOneofCase.ChecksUpdated or PullRequestEvent.EventOneofCase.PendingReviewUpdated
-                        or PullRequestEvent.EventOneofCase.WalkthroughUpdated:
+                        or PullRequestEvent.EventOneofCase.ChecksUpdated or PullRequestEvent.EventOneofCase.PendingReviewUpdated:
                         // The fixture replays the latest state of each after the recording.
                         v2[evt.EventCase] = evt;
                         break;
@@ -54,9 +53,7 @@ public sealed class FixtureRecorder
                 }
 
                 complete |= evt.Complete is not null || evt.Failed is not null;
-                var walkthroughSettled = v2.TryGetValue(PullRequestEvent.EventOneofCase.WalkthroughUpdated, out var w)
-                    && w.WalkthroughUpdated.Walkthrough.Status != Contracts.WalkthroughStatus.Running;
-                if (complete && walkthroughSettled && v2.ContainsKey(PullRequestEvent.EventOneofCase.ChecksUpdated))
+                if (complete && v2.ContainsKey(PullRequestEvent.EventOneofCase.ChecksUpdated))
                 {
                     break;
                 }

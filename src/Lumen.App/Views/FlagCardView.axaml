@@ -1,0 +1,17 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             x:Class="Lumen.App.Views.FlagCardView"
+             x:DataType="vm:FlagCardContext"
+             FontFamily="{StaticResource UiFont}">
+  <!-- A red flag under its line: the word "Flag", what kind, and only what its detector found. No score, no tier. -->
+  <Border Name="Card" Background="{DynamicResource Gauge.CritDim}" BorderBrush="{DynamicResource Gauge.Crit}" BorderThickness="2,0,0,0"
+          CornerRadius="{StaticResource Radius.Card}" Padding="10,6,10,7">
+    <StackPanel Spacing="2">
+      <TextBlock FontSize="12" TextWrapping="Wrap">
+        <Run Text="Flag" FontWeight="SemiBold" Foreground="{DynamicResource Gauge.Crit}" /><Run Text="  " /><Run Text="{Binding Flag.KindLabel}" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" /><Run Text="{Binding Flag.ChangeLabel, StringFormat='  · {0}'}" Foreground="{DynamicResource Gauge.Warn}" />
+      </TextBlock>
+      <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource Text.Body}" Text="{Binding Flag.Message}" />
+    </StackPanel>
+  </Border>
+</UserControl>

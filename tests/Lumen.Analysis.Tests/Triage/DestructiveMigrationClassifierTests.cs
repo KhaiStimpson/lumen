@@ -42,11 +42,11 @@ public class DestructiveMigrationClassifierTests
                         table: "Invoices");
             """);
 
-        var critical = Assert.Single(hunks, h => h.Tier == TriageTier.Critical);
+        var critical = Assert.Single(hunks, h => h.Fold == FoldKind.Open);
         Assert.Equal(["drops column `Invoices.Total`"], critical.Reasons);
         var line = TestDiffs.LineOf(Migration("migrationBuilder.DropColumn("), "migrationBuilder.DropColumn(");
         Assert.Equal((line, line + 2), (critical.NewStart, critical.NewEnd));
-        Assert.All(hunks.Where(h => h != critical), h => Assert.Equal((ChangeClass.Generated, TriageTier.Skip), (h.Class, h.Tier)));
+        Assert.All(hunks.Where(h => h != critical), h => Assert.Equal((ChangeClass.Generated, FoldKind.Mechanical), (h.Class, h.Fold)));
     }
 
     [Theory]
@@ -60,7 +60,7 @@ public class DestructiveMigrationClassifierTests
     [InlineData("migrationBuilder.AlterColumn<string>(name: \"Email\", table: \"Users\", nullable: false, oldNullable: true);", "makes column `Users.Email` required")]
     public void DestructiveOperationsAreCriticalInWords(string statement, string reason)
     {
-        var critical = Assert.Single(Added("        " + statement), h => h.Tier == TriageTier.Critical);
+        var critical = Assert.Single(Added("        " + statement), h => h.Fold == FoldKind.Open);
 
         Assert.Equal([reason], critical.Reasons);
     }
@@ -70,7 +70,7 @@ public class DestructiveMigrationClassifierTests
     {
         var hunks = Added("        migrationBuilder.AlterColumn<string>(name: \"Code\", table: \"Invoices\", maxLength: 200, oldMaxLength: 100);");
 
-        Assert.DoesNotContain(hunks, h => h.Tier == TriageTier.Critical);
+        Assert.DoesNotContain(hunks, h => h.Fold == FoldKind.Open);
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public class DestructiveMigrationClassifierTests
     {
         var hunks = Added(string.Empty);
 
-        Assert.All(hunks, h => Assert.Equal((ChangeClass.Generated, TriageTier.Skip), (h.Class, h.Tier)));
+        Assert.All(hunks, h => Assert.Equal((ChangeClass.Generated, FoldKind.Mechanical), (h.Class, h.Fold)));
     }
 
     [Fact]
@@ -88,6 +88,6 @@ public class DestructiveMigrationClassifierTests
 
         var hunks = Roslyn.Triage.RoslynTriage.CreatePipeline().Run(TestDiffs.Snapshot(diff)).Hunks;
 
-        Assert.Contains(hunks, h => h.Tier == TriageTier.Critical && h.Reasons.SequenceEqual(["drops table `Payments`"]));
+        Assert.Contains(hunks, h => h.Fold == FoldKind.Open && h.Reasons.SequenceEqual(["drops table `Payments`"]));
     }
 }

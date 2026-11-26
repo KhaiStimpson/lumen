@@ -11,11 +11,8 @@ namespace Lumen.App.ViewModels;
 
 public enum SettingsSection
 {
-    Connections,
     Inbox,
-    Review,
     Files,
-    CloudLimits,
     Appearance,
 }
 
@@ -33,7 +30,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Home = new InboxViewModel(source, settings.RecentPullRequests, OpenAsync);
         InboxSettings = new InboxSettingsViewModel(source);
         InboxSettings.Saved += async (_, _) => await Home.RefreshAsync().ConfigureAwait(true);
-        Connections = new ConnectionsViewModel(source);
         Palette = new CommandPaletteViewModel(PaletteSources);
         Review = new ReviewSettingsViewModel(source);
         Appearance = new AppearanceViewModel(settings, settingsPath);
@@ -56,8 +52,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     /// <summary>The window came back to the foreground: refresh what's on screen (plan v2 M1: polled, and on focus).</summary>
     public Task OnActivatedAsync() => IsHome ? Home.RefreshAsync() : Task.CompletedTask;
-
-    public ConnectionsViewModel Connections { get; }
 
     public ReviewSettingsViewModel Review { get; }
 
@@ -131,9 +125,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 }));
             }
 
-            items.Add(Action("Next review point", "J", pr.NextPointAsync));
-            items.Add(Action("Previous review point", "K", pr.PreviousPointAsync));
-            items.Add(Action("Examine the current point", "Enter", () => pr.ExamineAsync(null)));
             items.Add(Action("Next open thread", "N", pr.NextThreadAsync));
             items.Add(Action("Previous open thread", "Shift+N", pr.PreviousThreadAsync));
             items.Add(Action("Next change", "]", () => Do(pr.NextChange)));
@@ -156,16 +147,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             items.Add(Action(pr.ShowFullFile ? "Show only the changes" : "Show the full file", "X", () => Do(() => pr.ShowFullFile = !pr.ShowFullFile)));
             items.Add(Action("Find in file", "Ctrl+F", () => Do(pr.OpenFind)));
             items.Add(Action("Files", "", () => Do(() => pr.ShowTab(PullRequestTab.Files))));
-            items.Add(Action("Map", "M", () => Do(() => pr.ShowTab(PullRequestTab.Map))));
             items.Add(Action("Conversation", "", () => Do(() => pr.ShowTab(PullRequestTab.Conversation))));
             items.Add(Action("Commits", "", () => Do(() => pr.ShowTab(PullRequestTab.Commits))));
             items.Add(Action("Checks", "", () => Do(() => pr.ShowTab(PullRequestTab.Checks))));
-            if (pr.WalksGroups || pr.Walkthrough is { Groups.Count: > 0 })
-            {
-                items.Add(Action("Next change group", "", pr.NextGroupAsync));
-            }
-
-            items.Add(Action("Run the walkthrough again", "", pr.RefreshWalkthroughAsync));
             if (pr.Url.Length > 0)
             {
                 items.Add(Action("Open on GitHub", "", () => Do(() => OpenUrlRequested?.Invoke(this, pr.Url))));
@@ -189,9 +173,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             items.Add(new PaletteItemViewModel(PaletteItemKind.PullRequest, recent, "Recent", "", () => OpenAsync(recent)));
         }
 
-        items.Add(Action("Connections", "", OpenConnectionsAsync));
         items.Add(Action("Settings: Inbox", "", () => OpenSettingsAsync(SettingsSection.Inbox)));
-        items.Add(Action("Settings: Review", "", OpenReviewSettingsAsync));
+        items.Add(Action("Settings: Files", "", OpenReviewSettingsAsync));
         items.Add(Action("Toggle light / dark", "", () => Do(ToggleTheme)));
         return items;
     }
@@ -246,10 +229,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private Task OpenConnectionsAsync() => OpenSettingsAsync(SettingsSection.Connections);
-
-    [RelayCommand]
-    private Task OpenReviewSettingsAsync() => OpenSettingsAsync(SettingsSection.Review);
+    private Task OpenReviewSettingsAsync() => OpenSettingsAsync(SettingsSection.Files);
 
     [RelayCommand]
     private void OpenPalette() => Palette.Open();
@@ -259,7 +239,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         Section = section;
         IsSettingsOpen = true;
-        return Task.WhenAll(Connections.LoadAsync(), Review.LoadAsync(PullRequest?.Ref), InboxSettings.LoadAsync());
+        return Task.WhenAll(Review.LoadAsync(PullRequest?.Ref), InboxSettings.LoadAsync());
     }
 
     [RelayCommand]
@@ -269,7 +249,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void CloseSettings()
     {
         IsSettingsOpen = false;
-        Connections.KeyInput = "";
     }
 
     /// <summary>Closes Settings so the fresh analysis is what the reviewer sees next.</summary>

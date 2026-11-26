@@ -28,8 +28,8 @@ public sealed class EngineTriageTests : IAsyncLifetime
                 services.AddSingleton<IGitHubClient>(new FakeGitHub());
                 services.RemoveAll<IRepositoryWorkspace>();
                 services.AddSingleton<IRepositoryWorkspace>(new FakeWorkspace(checkout));
-                services.RemoveAll<ISecretStore>();
-                services.AddSingleton<ISecretStore>(new Lumen.Storage.UnavailableSecretStore());
+                services.RemoveAll<Lumen.Storage.ISecretStore>();
+                services.AddSingleton<Lumen.Storage.ISecretStore>(new Lumen.Storage.UnavailableSecretStore());
                 services.RemoveAll<ITriageStore>();
                 services.AddSingleton<ITriageStore>(new CannedTriage());
             });
@@ -55,48 +55,19 @@ public sealed class EngineTriageTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task AcknowledgingAGroupIsStreamedAndSurvivesReanalysis()
+    public async Task CachedTriageIsServedWithItsFoldsAndGroups()
     {
         using var channel = EngineEndpoint.CreateChannel(_pipe);
         var client = new ReviewEngine.ReviewEngineClient(channel);
 
-        var first = await TriageAsync(client, refresh: false);
-        Assert.False(Assert.Single(first.Groups).Acknowledged);
+        var ready = await TriageAsync(client, refresh: false);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        using var live = client.WatchPullRequest(new WatchPullRequestRequest { PullRequest = Pr }, cancellationToken: cts.Token);
-        await client.SetTriageGroupAcknowledgedAsync(new SetTriageGroupAcknowledgedRequest { PullRequest = Pr, GroupId = GroupId, Acknowledged = true });
-        TriageGroupAcknowledged? echoed = null;
-        await foreach (var evt in live.ResponseStream.ReadAllAsync(cts.Token))
-        {
-            if (evt.TriageGroupAcknowledged is { } ack)
-            {
-                echoed = ack;
-                break;
-            }
-        }
-
-        Assert.Equal((GroupId, true), (echoed!.GroupId, echoed.Acknowledged));
-
-        var reopened = await TriageAsync(client, refresh: true);
-        Assert.True(Assert.Single(reopened.Groups).Acknowledged);
-
-        await client.SetTriageGroupAcknowledgedAsync(new SetTriageGroupAcknowledgedRequest { PullRequest = Pr, GroupId = GroupId, Acknowledged = false });
-        var restored = await TriageAsync(client, refresh: true);
-        Assert.False(Assert.Single(restored.Groups).Acknowledged);
-    }
-
-    [Fact]
-    public async Task UnknownGroupIsNotFound()
-    {
-        using var channel = EngineEndpoint.CreateChannel(_pipe);
-        var client = new ReviewEngine.ReviewEngineClient(channel);
-        await TriageAsync(client, refresh: false);
-
-        var error = await Assert.ThrowsAsync<RpcException>(async () =>
-            await client.SetTriageGroupAcknowledgedAsync(new SetTriageGroupAcknowledgedRequest { PullRequest = Pr, GroupId = "gnope", Acknowledged = true }));
-
-        Assert.Equal(StatusCode.NotFound, error.StatusCode);
+        var group = Assert.Single(ready.Groups);
+        Assert.Equal((GroupId, 1, 2), (group.Id, group.MemberCount, group.ChangedLines));
+        var hunk = Assert.Single(ready.Hunks);
+        Assert.Equal(Contracts.FoldKind.Mechanical, hunk.Fold);
+        Assert.Equal(2, ready.Summary.MechanicalLines);
+        Assert.Equal(0, ready.Summary.OpenLines);
     }
 
     private static async Task<TriageReady> TriageAsync(ReviewEngine.ReviewEngineClient client, bool refresh)
@@ -119,7 +90,7 @@ public sealed class EngineTriageTests : IAsyncLifetime
     /// <summary>Serves one rename group for the scenario's head, as if it had been computed and cached earlier.</summary>
     private sealed class CannedTriage : ITriageStore
     {
-        public Task<TriageResult?> FindTriageAsync(PullRequestKey key, string headSha, string version, CancellationToken cancellationToken)
+        public Task<TriageResult?> FindTriageAsync(ReviewTarget key, string headSha, string version, CancellationToken cancellationToken)
         {
             var hunk = new Domain.HunkTriage
             {
@@ -127,7 +98,7 @@ public sealed class EngineTriageTests : IAsyncLifetime
                 NewStart = 1,
                 NewEnd = 2,
                 Class = Domain.ChangeClass.Rename,
-                Tier = Domain.TriageTier.Skip,
+                Fold = Domain.FoldKind.Mechanical,
                 Reasons = ["pure rename `Foo`→`Bar`"],
                 ChangedLines = 2,
                 GroupId = GroupId,
@@ -137,7 +108,7 @@ public sealed class EngineTriageTests : IAsyncLifetime
                 [new Domain.TriageGroup { Id = GroupId, Class = Domain.ChangeClass.Rename, Title = "Renamed `Foo`→`Bar`", Members = [hunk] }]));
         }
 
-        public Task SaveTriageAsync(PullRequestKey key, string headSha, string version, TriageResult result, CancellationToken cancellationToken) =>
+        public Task SaveTriageAsync(ReviewTarget key, string headSha, string version, TriageResult result, CancellationToken cancellationToken) =>
             Task.CompletedTask;
     }
 }

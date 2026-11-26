@@ -47,9 +47,9 @@ public sealed class TriageGoldenEvaluationTests(ITestOutputHelper output)
             output.WriteLine($"  group {group.Id}: {group.Title} ({group.Members.Count} hunks)");
         }
 
-        foreach (var hunk in triage.Hunks.Where(h => h.Tier is TriageTier.Skip or TriageTier.Critical && h.Class != ChangeClass.Generated))
+        foreach (var hunk in triage.Hunks.Where(h => h.Fold != FoldKind.Open && h.Class != ChangeClass.Generated))
         {
-            output.WriteLine($"  {hunk.Tier} {hunk.Class} {hunk.Path}:{hunk.NewStart ?? hunk.OldStart} — {string.Join("; ", hunk.Reasons)}");
+            output.WriteLine($"  {hunk.Fold} {hunk.Class} {hunk.Path}:{hunk.NewStart ?? hunk.OldStart} — {string.Join("; ", hunk.Reasons)}");
         }
     }
 
@@ -77,7 +77,7 @@ public sealed class TriageGoldenEvaluationTests(ITestOutputHelper output)
             Assert.True(l.StartLine <= l.EndLine);
             Assert.Contains(files, f => f.Path == l.Path);
         });
-        Assert.Contains(labels.Labels, l => l.Tier == TriageTier.Critical);
+        Assert.Contains(labels.Labels, l => l.Tier == LabelTier.Critical);
     }
 
     [Fact]

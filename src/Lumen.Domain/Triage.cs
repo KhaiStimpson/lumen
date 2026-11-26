@@ -25,14 +25,22 @@ public static class ChangeClasses
         ChangeClass.Move or ChangeClass.Ripple or ChangeClass.Generated;
 }
 
-/// <summary>Where a reviewer should spend attention. The names read as instructions to a reviewer.</summary>
-[JsonConverter(typeof(JsonStringEnumConverter<TriageTier>))]
-public enum TriageTier
+/// <summary>
+/// Whether a hunk is folded behind a one-line reason. Folding is never inferred from a class: only a proof
+/// (<see cref="Mechanical"/>) or one of a short list of boilerplate shapes (<see cref="Boilerplate"/>) folds, and an
+/// opened fold always shows every line. The zero value is the safe one: unset means open.
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<FoldKind>))]
+public enum FoldKind
 {
-    Critical,
-    WorthALook,
-    Skim,
-    Skip,
+    /// <summary>Stays visible. Everything that might change behaviour or security, and proven changes worth seeing.</summary>
+    Open,
+
+    /// <summary>"Mechanical · Proven": a classifier proved the change is mechanical.</summary>
+    Mechanical,
+
+    /// <summary>"Boilerplate · Not verified": new code matching one of the listed shapes.</summary>
+    Boilerplate,
 }
 
 /// <summary>
@@ -54,7 +62,8 @@ public sealed record HunkTriage
 
     public required ChangeClass Class { get; init; }
 
-    public required TriageTier Tier { get; init; }
+    /// <summary>Whether the hunk is folded, and as what. Proven-but-worth-seeing hunks (ripple call sites) are Open.</summary>
+    public required FoldKind Fold { get; init; }
 
     public required IReadOnlyList<string> Reasons { get; init; }
 
@@ -87,22 +96,7 @@ public sealed record TriageResult(IReadOnlyList<HunkTriage> Hunks, IReadOnlyList
 /// <summary>Triage is computed once per head commit and triage version, then served from here (like investigations).</summary>
 public interface ITriageStore
 {
-    Task<TriageResult?> FindTriageAsync(PullRequestKey key, string headSha, string version, CancellationToken cancellationToken);
+    Task<TriageResult?> FindTriageAsync(ReviewTarget target, string headSha, string version, CancellationToken cancellationToken);
 
-    Task SaveTriageAsync(PullRequestKey key, string headSha, string version, TriageResult result, CancellationToken cancellationToken);
-}
-
-/// <summary>Acknowledging a group is stored like a dismissal: an interaction on a per-PR id, latest action wins.</summary>
-public static class TriageAcknowledgement
-{
-    private const string Prefix = "triage-group:";
-
-    public static string InteractionId(string groupId) => Prefix + groupId;
-
-    /// <summary>Group ids whose latest recorded action is Acknowledged.</summary>
-    public static IReadOnlySet<string> AcknowledgedGroups(IReadOnlyDictionary<string, ReviewAction> latestActions) =>
-        latestActions
-            .Where(kv => kv.Key.StartsWith(Prefix, StringComparison.Ordinal) && kv.Value == ReviewAction.Acknowledged)
-            .Select(kv => kv.Key[Prefix.Length..])
-            .ToHashSet(StringComparer.Ordinal);
+    Task SaveTriageAsync(ReviewTarget target, string headSha, string version, TriageResult result, CancellationToken cancellationToken);
 }

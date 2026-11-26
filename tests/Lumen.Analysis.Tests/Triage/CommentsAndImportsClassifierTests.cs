@@ -27,7 +27,7 @@ public class CommentsAndImportsClassifierTests
         var hunk = TriageHarness.Single(Base, Base.Replace("// Sums the lines.", "// Sums every order line.", StringComparison.Ordinal));
 
         Assert.Equal(ChangeClass.CommentsOnly, hunk.Class);
-        Assert.Equal(TriageTier.Skip, hunk.Tier);
+        Assert.Equal(FoldKind.Mechanical, hunk.Fold);
         Assert.Equal(["comments only"], hunk.Reasons);
     }
 
@@ -66,7 +66,7 @@ public class CommentsAndImportsClassifierTests
         var hunk = TriageHarness.Single(Base, Base.Replace("using System.Linq;", "using System.Linq;\nusing System.Text;", StringComparison.Ordinal));
 
         Assert.Equal(ChangeClass.ImportsOnly, hunk.Class);
-        Assert.Equal(TriageTier.Skim, hunk.Tier);
+        Assert.Equal(FoldKind.Open, hunk.Fold);
         Assert.Equal(["usings added: System.Text", "name binding may change"], hunk.Reasons);
     }
 
@@ -76,7 +76,7 @@ public class CommentsAndImportsClassifierTests
         var hunk = TriageHarness.Single(Base, Base.Replace("using System;\n", "", StringComparison.Ordinal));
 
         Assert.Equal(ChangeClass.ImportsOnly, hunk.Class);
-        Assert.Equal(TriageTier.Skim, hunk.Tier);
+        Assert.Equal(FoldKind.Open, hunk.Fold);
         Assert.Equal(["usings removed: System", "name binding may change"], hunk.Reasons);
     }
 
@@ -88,7 +88,7 @@ public class CommentsAndImportsClassifierTests
         var hunk = TriageHarness.Single(Base, head);
 
         Assert.Equal(ChangeClass.ImportsOnly, hunk.Class);
-        Assert.Equal(TriageTier.Skip, hunk.Tier);
+        Assert.Equal(FoldKind.Mechanical, hunk.Fold);
         Assert.Equal(["usings reordered"], hunk.Reasons);
     }
 
@@ -116,7 +116,7 @@ public class CommentsAndImportsClassifierTests
         Assert.Equal("B", BoundNamespace(after));
         var hunk = TriageHarness.Single(before, after);
         Assert.Equal(ChangeClass.ImportsOnly, hunk.Class);
-        Assert.Equal(TriageTier.Skim, hunk.Tier);
+        Assert.Equal(FoldKind.Open, hunk.Fold);
         Assert.Contains("name binding may change", hunk.Reasons);
     }
 

@@ -5,9 +5,7 @@ namespace Lumen.Storage.Tests;
 
 public sealed class SqliteReviewStoreTests : IDisposable
 {
-    private static readonly PullRequestKey Pr1 = new(new RepositoryRef("octo", "lumen"), 1);
-    private static readonly PullRequestKey Pr2 = new(new RepositoryRef("octo", "lumen"), 2);
-    private static readonly PullRequestKey OtherRepoPr1 = new(new RepositoryRef("octo", "other"), 1);
+    private static readonly PullRequestTarget Pr1 = new(new PullRequestKey(new RepositoryRef("octo", "lumen"), 1));
 
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "lumen-storage-tests", Guid.NewGuid().ToString("N"));
 
@@ -29,8 +27,7 @@ public sealed class SqliteReviewStoreTests : IDisposable
     {
         await using var store = new SqliteReviewStore(DatabasePath);
 
-        Assert.True(Directory.Exists(Path.GetDirectoryName(DatabasePath)));
-        Assert.Empty(await store.GetLatestActionsAsync(Pr1, Ct));
+        Assert.Null(await store.GetCacheAsync("missing", Ct));
         Assert.True(File.Exists(DatabasePath));
     }
 
@@ -39,93 +36,12 @@ public sealed class SqliteReviewStoreTests : IDisposable
     {
         await using (var first = new SqliteReviewStore(DatabasePath))
         {
-            await first.RecordInteractionAsync(Interaction(Pr1, "p1", ReviewAction.Dismissed), Ct);
+            await first.SetCacheAsync("k", "v", Ct);
         }
 
-        await using (var second = new SqliteReviewStore(DatabasePath))
-        {
-            var actions = await second.GetLatestActionsAsync(Pr1, Ct);
-            Assert.Equal(ReviewAction.Dismissed, actions["p1"]);
-        }
-
-        using var connection = new SqliteConnection($"Data Source={DatabasePath}");
-        await connection.OpenAsync(Ct);
-        using var versions = connection.CreateCommand();
-        versions.CommandText = "SELECT COUNT(*), MAX(Version) FROM SchemaVersion;";
-        using var reader = await versions.ExecuteReaderAsync(Ct);
-        Assert.True(await reader.ReadAsync(Ct));
-        Assert.Equal(4L, reader.GetInt64(0));
-        Assert.Equal(4L, reader.GetInt64(1));
-
-        using var journal = connection.CreateCommand();
-        journal.CommandText = "PRAGMA journal_mode;";
-        Assert.Equal("wal", (string?)await journal.ExecuteScalarAsync(Ct));
-    }
-
-    [Fact]
-    public async Task LatestActionWinsPerReviewPoint()
-    {
-        await using var store = new SqliteReviewStore(DatabasePath);
-
-        await store.RecordInteractionAsync(Interaction(Pr1, "p1", ReviewAction.Dismissed), Ct);
-        await store.RecordInteractionAsync(Interaction(Pr1, "p1", ReviewAction.Restored, headSha: "def"), Ct);
-        await store.RecordInteractionAsync(Interaction(Pr1, "p2", ReviewAction.Examined), Ct);
-        await store.RecordInteractionAsync(Interaction(Pr1, "p2", ReviewAction.Commented, detail: "https://example/c/1"), Ct);
-
-        var actions = await store.GetLatestActionsAsync(Pr1, Ct);
-
-        Assert.Equal(2, actions.Count);
-        Assert.Equal(ReviewAction.Restored, actions["p1"]);
-        Assert.Equal(ReviewAction.Commented, actions["p2"]);
-    }
-
-    [Fact]
-    public async Task LatestIsByInsertionOrderNotTimestamp()
-    {
-        await using var store = new SqliteReviewStore(DatabasePath);
-        var now = DateTimeOffset.UtcNow;
-
-        await store.RecordInteractionAsync(Interaction(Pr1, "p1", ReviewAction.Dismissed, at: now), Ct);
-        await store.RecordInteractionAsync(Interaction(Pr1, "p1", ReviewAction.Restored, at: now.AddHours(-1)), Ct);
-
-        Assert.Equal(ReviewAction.Restored, (await store.GetLatestActionsAsync(Pr1, Ct))["p1"]);
-    }
-
-    [Fact]
-    public async Task InteractionsAreIsolatedBetweenPullRequests()
-    {
-        await using var store = new SqliteReviewStore(DatabasePath);
-
-        await store.RecordInteractionAsync(Interaction(Pr1, "p1", ReviewAction.Dismissed), Ct);
-        await store.RecordInteractionAsync(Interaction(Pr2, "p1", ReviewAction.Commented), Ct);
-        await store.RecordInteractionAsync(Interaction(OtherRepoPr1, "p9", ReviewAction.Examined), Ct);
-
-        var pr1 = await store.GetLatestActionsAsync(Pr1, Ct);
-        var pr2 = await store.GetLatestActionsAsync(Pr2, Ct);
-        var other = await store.GetLatestActionsAsync(OtherRepoPr1, Ct);
-
-        Assert.Equal(ReviewAction.Dismissed, Assert.Single(pr1).Value);
-        Assert.Equal(ReviewAction.Commented, Assert.Single(pr2).Value);
-        Assert.Equal("p9", Assert.Single(other).Key);
-    }
-
-    [Fact]
-    public async Task StoresRepositoryAsFullNameAndRoundTripTimestamp()
-    {
-        await using var store = new SqliteReviewStore(DatabasePath);
-        var at = new DateTimeOffset(2026, 9, 27, 10, 30, 15, 123, TimeSpan.FromHours(10));
-
-        await store.RecordInteractionAsync(Interaction(Pr1, "p1", ReviewAction.Dismissed, at: at), Ct);
-
-        using var connection = new SqliteConnection($"Data Source={DatabasePath}");
-        await connection.OpenAsync(Ct);
-        using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Repository, Action, At FROM ReviewInteractions;";
-        using var reader = await command.ExecuteReaderAsync(Ct);
-        Assert.True(await reader.ReadAsync(Ct));
-        Assert.Equal("octo/lumen", reader.GetString(0));
-        Assert.Equal("Dismissed", reader.GetString(1));
-        Assert.Equal(at, DateTimeOffset.Parse(reader.GetString(2), System.Globalization.CultureInfo.InvariantCulture));
+        await using var second = new SqliteReviewStore(DatabasePath);
+        Assert.Equal("v", await second.GetCacheAsync("k", Ct));
+        Assert.Equal(SchemaVersions(), [1L, 2L, 3L, 4L, 5L]);
     }
 
     [Fact]
@@ -133,14 +49,11 @@ public sealed class SqliteReviewStoreTests : IDisposable
     {
         await using var store = new SqliteReviewStore(DatabasePath);
 
-        Assert.Null(await store.GetCacheAsync("missing", Ct));
+        await store.SetCacheAsync("a", "1", Ct);
+        await store.SetCacheAsync("a", "2", Ct);
 
-        await store.SetCacheAsync("k", "v1", Ct);
-        Assert.Equal("v1", await store.GetCacheAsync("k", Ct));
-
-        await store.SetCacheAsync("k", "v2", Ct);
-        Assert.Equal("v2", await store.GetCacheAsync("k", Ct));
-        Assert.Null(await store.GetCacheAsync("K", Ct));
+        Assert.Equal("2", await store.GetCacheAsync("a", Ct));
+        Assert.Null(await store.GetCacheAsync("b", Ct));
     }
 
     [Fact]
@@ -150,25 +63,21 @@ public sealed class SqliteReviewStoreTests : IDisposable
         const int writers = 8;
         const int perWriter = 25;
 
-        var tasks = Enumerable.Range(0, writers).Select(w => Task.Run(
-            async () =>
+        await Task.WhenAll(Enumerable.Range(0, writers).Select(w => Task.Run(async () =>
+        {
+            for (var i = 0; i < perWriter; i++)
             {
-                for (var i = 0; i < perWriter; i++)
-                {
-                    await store.RecordInteractionAsync(Interaction(Pr1, $"w{w}-p{i}", ReviewAction.Examined), Ct);
-                    await store.SetCacheAsync($"w{w}", i.ToString(System.Globalization.CultureInfo.InvariantCulture), Ct);
-                }
-            },
-            Ct));
+                await store.SetCacheAsync($"w{w}", i.ToString(System.Globalization.CultureInfo.InvariantCulture), Ct);
+                await store.SetMarkAsync(Pr1, new ReviewMark($"w{w}-{i}", "fp", DateTimeOffset.UnixEpoch), Ct);
+            }
+        }, Ct)));
 
-        await Task.WhenAll(tasks);
-
-        var actions = await store.GetLatestActionsAsync(Pr1, Ct);
-        Assert.Equal(writers * perWriter, actions.Count);
         for (var w = 0; w < writers; w++)
         {
             Assert.Equal((perWriter - 1).ToString(System.Globalization.CultureInfo.InvariantCulture), await store.GetCacheAsync($"w{w}", Ct));
         }
+
+        Assert.Equal(writers * perWriter, (await store.GetMarksAsync(Pr1, Ct)).Count);
     }
 
     [Fact]
@@ -187,46 +96,83 @@ public sealed class SqliteReviewStoreTests : IDisposable
             }
         }
 
-        using var connection = new SqliteConnection($"Data Source={DatabasePath}");
-        await connection.OpenAsync(Ct);
-        using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM SchemaVersion;";
-        Assert.Equal(4L, (long?)await command.ExecuteScalarAsync(Ct));
+        Assert.Equal([1L, 2L, 3L, 4L, 5L], SchemaVersions());
     }
 
+    /// <summary>
+    /// The overhaul's migration drops the AI tables (JEV evaluations, investigations, walkthroughs, review-point
+    /// interactions) and re-keys visits on review target, keeping what the reviewer had.
+    /// </summary>
     [Fact]
-    public async Task ADatabaseFromTheTriageBranchsMigrationThreeGainsTheVisitAndWalkthroughTables()
+    public async Task ADatabaseFromBeforeTheOverhaulKeepsItsVisitsAndLosesTheAiTables()
     {
-        // The review-triage branch shipped TriageResults as migration 3 before main's migration 3 (visits, walkthroughs)
-        // existed. Such a database is at version 3 without main's tables; migration 4 must create them.
-        await using (var first = new SqliteReviewStore(DatabasePath))
-        {
-            await first.SetCacheAsync("k", "v", Ct);
-        }
-
+        Directory.CreateDirectory(Path.GetDirectoryName(DatabasePath)!);
         using (var connection = new SqliteConnection($"Data Source={DatabasePath}"))
         {
             await connection.OpenAsync(Ct);
-            using var rewind = connection.CreateCommand();
-            rewind.CommandText = "DROP TABLE PullRequestVisits; DROP TABLE Walkthroughs; DELETE FROM SchemaVersion WHERE Version = 4;";
-            await rewind.ExecuteNonQueryAsync(Ct);
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE SchemaVersion (Version INTEGER NOT NULL);
+                INSERT INTO SchemaVersion VALUES (1), (2), (3), (4);
+                CREATE TABLE ReviewInteractions (Id INTEGER PRIMARY KEY, Repository TEXT, PullRequest INTEGER, HeadSha TEXT, ReviewPointId TEXT, Action TEXT, At TEXT, Detail TEXT);
+                CREATE TABLE CacheEntries (Key TEXT PRIMARY KEY, Value TEXT NOT NULL, UpdatedAt TEXT NOT NULL);
+                CREATE TABLE AttentionEvaluations (Id INTEGER PRIMARY KEY);
+                CREATE TABLE Investigations (Id INTEGER PRIMARY KEY);
+                CREATE TABLE Walkthroughs (Repository TEXT);
+                CREATE TABLE TriageResults (Repository TEXT, PullRequest INTEGER, HeadSha TEXT, Version TEXT, Result TEXT, At TEXT);
+                CREATE TABLE PullRequestVisits (Repository TEXT NOT NULL, PullRequest INTEGER NOT NULL, LastOpenedAt TEXT NULL,
+                    LastOpenedHead TEXT NULL, LastReviewedAt TEXT NULL, LastReviewedHead TEXT NULL, PRIMARY KEY (Repository, PullRequest));
+                INSERT INTO PullRequestVisits VALUES ('octo/lumen', 1, '2026-10-01T09:00:00.0000000+00:00', 'head-1', NULL, NULL);
+                INSERT INTO CacheEntries VALUES ('k', 'kept', '2026-10-01');
+                """;
+            await command.ExecuteNonQueryAsync(Ct);
         }
 
         SqliteConnection.ClearAllPools();
         await using var store = new SqliteReviewStore(DatabasePath);
-        await store.RecordOpenedAsync(Pr1, "abc", DateTimeOffset.UnixEpoch, Ct);
-        await store.SaveWalkthroughAsync(Pr1, "abc", "pr", "s", "{}", Ct);
 
-        Assert.Equal("abc", (await store.GetVisitAsync(Pr1, Ct))?.LastOpenedHead);
-        Assert.Equal("{}", await store.FindWalkthroughAsync(Pr1, "abc", "pr", "s", Ct));
+        Assert.Equal("head-1", (await store.GetVisitAsync(Pr1, Ct))?.LastOpenedHead);
+        Assert.Equal("kept", await store.GetCacheAsync("k", Ct));
+        var tables = Tables();
+        Assert.DoesNotContain("AttentionEvaluations", tables);
+        Assert.DoesNotContain("Investigations", tables);
+        Assert.DoesNotContain("Walkthroughs", tables);
+        Assert.DoesNotContain("ReviewInteractions", tables);
+        Assert.DoesNotContain("PullRequestVisits", tables);
+        Assert.Contains("Marks", tables);
+        Assert.Contains("Visits", tables);
     }
 
-    private static ReviewInteraction Interaction(
-        PullRequestKey key,
-        string reviewPointId,
-        ReviewAction action,
-        string headSha = "abc",
-        DateTimeOffset? at = null,
-        string? detail = null) =>
-        new(key, headSha, reviewPointId, action, at ?? DateTimeOffset.UtcNow, detail);
+    private List<long> SchemaVersions()
+    {
+        SqliteConnection.ClearAllPools();
+        using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Version FROM SchemaVersion ORDER BY Version;";
+        using var reader = command.ExecuteReader();
+        var versions = new List<long>();
+        while (reader.Read())
+        {
+            versions.Add(reader.GetInt64(0));
+        }
+
+        return versions;
+    }
+
+    private HashSet<string> Tables()
+    {
+        using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table';";
+        using var reader = command.ExecuteReader();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        while (reader.Read())
+        {
+            names.Add(reader.GetString(0));
+        }
+
+        return names;
+    }
 }

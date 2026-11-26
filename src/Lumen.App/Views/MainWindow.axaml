@@ -17,8 +17,8 @@
   <Grid RowDefinitions="38,*">
     <!-- Title bar (Gauge window chrome: bg-2 with a line border): the Kelpie icon, where you are, and the go-to box.
          Drag area is the empty space. -->
-    <Border Grid.ColumnSpan="8" Classes="chrome" BorderThickness="0,0,0,1" />
-    <Grid Name="TitleBar" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto,150">
+    <Border Grid.ColumnSpan="7" Classes="chrome" BorderThickness="0,0,0,1" />
+    <Grid Name="TitleBar" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,150">
       <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0,16,0" VerticalAlignment="Center">
         <Image Source="/Assets/kelpie-icon-64.png" Width="18" Height="18" RenderOptions.BitmapInterpolationMode="HighQuality" />
         <TextBlock Text="Kelpie Review" Classes="h3" FontSize="13" VerticalAlignment="Center" />
@@ -78,16 +78,11 @@
       </Panel>
 
       <Button Name="SettingsButton" Grid.Column="4" Classes="ghost" Padding="7" Margin="0,0,2,0"
-              Command="{Binding OpenReviewSettingsCommand}" ToolTip.Tip="Review settings">
+              Command="{Binding OpenReviewSettingsCommand}" ToolTip.Tip="Settings">
         <Path Data="{StaticResource Icon.Sliders}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="14" Height="14" />
       </Button>
 
-      <Button Name="ConnectionsButton" Grid.Column="5" Classes="ghost" Padding="7" Margin="0,0,2,0"
-              Command="{Binding OpenConnectionsCommand}" ToolTip.Tip="Connections">
-        <Path Data="{StaticResource Icon.Plug}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="14" Height="14" />
-      </Button>
-
-      <Button Grid.Column="6" Classes="ghost" Padding="7" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="Toggle light / dark">
+      <Button Grid.Column="5" Classes="ghost" Padding="7" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="Toggle light / dark">
         <Panel>
           <Path Data="{StaticResource Icon.Moon}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="14" Height="14" />
         </Panel>

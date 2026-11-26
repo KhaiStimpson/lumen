@@ -1,5 +1,7 @@
 # The Map
 
+> **Superseded** (2026-11-27) by [overhaul.md](overhaul.md): the Map tab was removed. Its since-last-look idea lives on in "Since my last look".
+
 The **Map** tab (`M`) shows a pull request as the system it builds, not as a list of files. It answers two questions
 before you read a line: *how does this change fit together?* and *where are the lines that need reading?*
 

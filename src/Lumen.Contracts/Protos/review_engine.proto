@@ -18,26 +18,16 @@ service ReviewEngine {
   // A file at the PR head, e.g. to open a precedent example in full.
   rpc GetSourceFile (GetSourceFileRequest) returns (SourceFile);
 
-  rpc SetReviewPointState (SetReviewPointStateRequest) returns (SetReviewPointStateReply);
 
   rpc PostReviewComment (PostReviewCommentRequest) returns (PostReviewCommentReply);
 
   // Ticks or clears GitHub's per-file "Viewed" checkbox for the signed-in user.
   rpc SetFileViewed (SetFileViewedRequest) returns (SetFileViewedReply);
 
-  // Clears (or restores) a triage group, e.g. "Renamed `Foo`→`Bar`", for this pull request. Stored like dismissals.
-  rpc SetTriageGroupAcknowledged (SetTriageGroupAcknowledgedRequest) returns (SetTriageGroupAcknowledgedReply);
 
-  // Connections (TDD §39). Checking status spends no usage. Keys go to the platform credential store and are never
-  // returned or logged.
-  rpc GetConnections (GetConnectionsRequest) returns (Connections);
 
-  rpc SetOpenRouterKey (SetOpenRouterKeyRequest) returns (Connections);
 
-  rpc RemoveOpenRouterKey (RemoveOpenRouterKeyRequest) returns (Connections);
 
-  // Saved to settings.json and applied to the next JEV call or investigation, without a restart.
-  rpc UpdateConnectionSettings (ConnectionSettings) returns (Connections);
 
   // Review settings: global defaults in settings.json, each repository's overrides beside it. They apply to the next
   // analysis of a pull request; nothing re-runs on its own (the app offers Re-analyse).
@@ -87,15 +77,22 @@ service ReviewEngine {
 
   rpc SubmitReview (SubmitReviewRequest) returns (SubmitReviewReply);
 
+  // ---- overhaul: local branches and tracking ----
+
+  // Local targets opened before, newest first (the inbox's Local branches section).
+  rpc ListLocalBranches (ListLocalBranchesRequest) returns (LocalBranches);
+
+  // Marks (or clears) units as reviewed at their current fingerprint. On a pull request, files whose every slice is
+  // now reviewed get GitHub's Viewed box ticked.
+  rpc SetMarked (SetMarkedRequest) returns (MarksUpdated);
+
+  // "Since my last look": each file's patch against its own merge-base, old head vs the current one.
+  rpc GetSinceLastLook (GetSinceLastLookRequest) returns (SinceLastLook);
+
   // ---- v2: fast model and walkthrough (M7, M8) ----
 
-  // Stored in the platform credential store, never returned or logged.
-  rpc SetCloudflareCredentials (SetCloudflareCredentialsRequest) returns (Connections);
 
-  rpc RemoveCloudflareCredentials (RemoveCloudflareCredentialsRequest) returns (Connections);
 
-  // Runs (or re-sends from cache) the walkthrough; results arrive as WalkthroughUpdated on the pull request's stream.
-  rpc StartWalkthrough (StartWalkthroughRequest) returns (StartWalkthroughReply);
 }
 
 message PingRequest {}
@@ -115,59 +112,49 @@ message WatchPullRequestRequest {
   PullRequestRef pull_request = 1;
   // Re-fetch from GitHub even if an analysis for this PR is already running or complete.
   bool refresh = 2;
+  // Set instead of pull_request to review a local clone. The snapshot's pull_request then carries the session's
+  // synthetic ref (owner "local"), which every other request uses.
+  LocalBranchRef local = 3;
+}
+
+// A local clone reviewed read-only: base_ref against a branch, or against the working tree (uncommitted included).
+message LocalBranchRef {
+  string clone_path = 1;
+  string base_ref = 2;
+  bool working_tree = 3;
+  // The branch when working_tree is false.
+  string head_ref = 4;
 }
 
 message PullRequestEvent {
   oneof event {
     AnalysisProgress progress = 1;
     PullRequestSnapshot snapshot = 2;
-    ReviewPoint review_point_added = 3;
-    ReviewPointStateChanged review_point_state_changed = 4;
-    ConventionsFound conventions = 5;
     AnalysisComplete complete = 6;
     AnalysisFailed failed = 7;
-    // A review point already sent, replaced in full (e.g. after an investigation added evidence).
-    ReviewPoint review_point_updated = 8;
-    InvestigationStatus investigation_status = 9;
     FileViewed file_viewed = 10;
     // v2
     TimelineUpdated timeline_updated = 11;
     ChecksUpdated checks_updated = 12;
     HeadChanged head_changed = 13;
     ThreadsUpdated threads_updated = 14;
-    WalkthroughUpdated walkthrough_updated = 15;
     PendingReview pending_review_updated = 16;
-    // Where to spend attention, per hunk. Sent once per analysis, after the snapshot and before review points.
+    // What folds, per hunk. Sent once per analysis, after the snapshot.
     TriageReady triage_ready = 17;
-    TriageGroupAcknowledged triage_group_acknowledged = 18;
+    // Feature slices: sent after triage, or never when slicing falls back to the file list.
+    SlicesReady slices_ready = 19;
+    // Red flags, each anchored to a line. Sent after slices (or after triage when slicing fell back).
+    FlagsReady flags_ready = 20;
+    // Reviewed marks changed (sent once with the stored marks, then after every SetMarked).
+    MarksUpdated marks_updated = 21;
   }
+  reserved 3, 4, 5, 8, 9, 15, 18;
 }
-
-// A triage group was acknowledged or restored after TriageReady was sent.
-message TriageGroupAcknowledged {
-  string group_id = 1;
-  bool acknowledged = 2;
-}
-
-message SetTriageGroupAcknowledgedRequest {
-  PullRequestRef pull_request = 1;
-  string group_id = 2;
-  bool acknowledged = 3;
-}
-
-message SetTriageGroupAcknowledgedReply {}
 
 // A file's "Viewed" checkbox changed after the snapshot was sent.
 message FileViewed {
   string path = 1;
   bool viewed = 2;
-}
-
-// Background investigations; may continue after AnalysisComplete (TDD §49: at most "Analysing N areas…").
-message InvestigationStatus {
-  int32 active = 1;
-  // Why investigations are not running, when they were wanted but could not start (e.g. "Not signed in").
-  string detail = 2;
 }
 
 message AnalysisProgress {
@@ -195,16 +182,26 @@ message ChangedFileSummary {
   bool is_viewed = 9;
   // Renamed files: git's similarity index, 0-100 (100 when only the path changed).
   int32 similarity = 10;
-  // Changed lines per triage tier. Empty in the snapshot; filled in the files TriageReady re-sends.
-  TierLines tier_lines = 11;
+  reserved 11;
+  // Changed lines per fold. Empty in the snapshot; filled in the files TriageReady re-sends.
+  FoldLines fold_lines = 12;
 }
 
-// Changed lines (added plus removed) per triage tier.
-message TierLines {
-  int32 critical = 1;
-  int32 worth_a_look = 2;
-  int32 skim = 3;
-  int32 skip = 4;
+// Changed lines (added plus removed) by whether they fold.
+message FoldLines {
+  // Left open: what there is to read.
+  int32 open = 1;
+  int32 mechanical = 2;
+  int32 boilerplate = 3;
+}
+
+// Whether a hunk is folded behind a one-line reason. The zero value is the safe one: unset means open.
+enum FoldKind {
+  FOLD_KIND_OPEN = 0;
+  // "Mechanical · Proven".
+  FOLD_KIND_MECHANICAL = 1;
+  // "Boilerplate · Not verified".
+  FOLD_KIND_BOILERPLATE = 2;
 }
 
 // What kind of change a hunk is. The zero value is the conservative one: an unset class is never mechanical.
@@ -220,14 +217,6 @@ enum ChangeClass {
   CHANGE_CLASS_GENERATED = 8;
 }
 
-// Where a reviewer should spend attention. The zero value is the conservative one: an unset tier is never Skip.
-enum TriageTier {
-  TRIAGE_TIER_WORTH_A_LOOK = 0;
-  TRIAGE_TIER_CRITICAL = 1;
-  TRIAGE_TIER_SKIM = 2;
-  TRIAGE_TIER_SKIP = 3;
-}
-
 // One hunk (or part of one). Lines are 1-based and inclusive; 0 when the side has no lines.
 message HunkTriage {
   string path = 1;
@@ -236,7 +225,8 @@ message HunkTriage {
   int32 new_start = 4;
   int32 new_end = 5;
   ChangeClass change_class = 6;
-  TriageTier tier = 7;
+  reserved 7;
+  FoldKind fold = 11;
   // In words, e.g. "pure rename `Foo`→`Bar`". Never a score.
   repeated string reasons = 8;
   int32 changed_lines = 9;
@@ -251,27 +241,29 @@ message TriageGroup {
   string title = 3;
   int32 member_count = 4;
   int32 changed_lines = 5;
-  bool acknowledged = 6;
+  reserved 6;
 }
 
 message TriageSummary {
-  // e.g. "19,700 lines changed: 14,100 proven mechanical, 3,200 new code, 2,400 changing existing behaviour".
-  string text = 1;
   int32 total_lines = 2;
-  // Mechanical and proven: a mechanical class in Skip.
+  // Folded as Mechanical · Proven.
   int32 mechanical_lines = 3;
   int32 new_code_lines = 4;
   int32 behaviour_change_lines = 5;
-  TierLines tier_lines = 6;
-  // A mechanical class left above Skip, e.g. ripple call sites or a move into another type.
+  // A mechanical class left open, e.g. ripple call sites or a move into another type.
   int32 likely_mechanical_lines = 7;
+  // Folded as Boilerplate · Not verified.
+  int32 boilerplate_lines = 8;
+  // Left open by default: what there is to read.
+  int32 open_lines = 9;
+  reserved 1, 6;
 }
 
 message TriageReady {
   repeated HunkTriage hunks = 1;
   repeated TriageGroup groups = 2;
   TriageSummary summary = 3;
-  // The snapshot's files again, with tier_lines filled; the client takes tier_lines from here by path.
+  // The snapshot's files again, with fold_lines filled; the client takes fold_lines from here by path.
   repeated ChangedFileSummary files = 4;
 }
 
@@ -292,6 +284,10 @@ message PullRequestSnapshot {
   repeated ChangedFileSummary files = 14;
   string viewer_login = 15;
   int32 review_thread_count = 16;
+  // The review target's storage key, e.g. "pr:owner/repo#12" or "local:c:/src/app|main|WorkingTree".
+  string target_key = 17;
+  // Set for local sessions: posting controls are hidden.
+  LocalBranchRef local = 18;
 }
 
 message GetFileDiffRequest {
@@ -357,106 +353,8 @@ message CodeLocation {
   string symbol = 4;
 }
 
-enum ReviewSeverity {
-  REVIEW_SEVERITY_LOW = 0;
-  REVIEW_SEVERITY_MEDIUM = 1;
-  REVIEW_SEVERITY_HIGH = 2;
-}
-
-enum ReviewPointState {
-  REVIEW_POINT_STATE_VISIBLE = 0;
-  REVIEW_POINT_STATE_EXAMINED = 1;
-  REVIEW_POINT_STATE_DISMISSED = 2;
-  REVIEW_POINT_STATE_COMMENTED = 3;
-  REVIEW_POINT_STATE_RESOLVED = 4;
-}
-
-enum EvidenceState {
-  EVIDENCE_STATE_UNVERIFIED = 0;
-  EVIDENCE_STATE_VERIFIED = 1;
-  EVIDENCE_STATE_STRONG = 2;
-  EVIDENCE_STATE_CONFLICTING = 3;
-  EVIDENCE_STATE_HUMAN_DECISION = 4;
-}
-
-message PrecedentExample {
-  CodeLocation location = 1;
-  string type_name = 2;
-  string snippet = 3;
-  int32 snippet_start_line = 4;
-}
-
-message Evidence {
-  string id = 1;
-  // e.g. "RepositoryPrecedent", "StaticAnalysis".
-  string source = 2;
-  // Provenance: the component that produced it, e.g. "peer-pattern/v1".
-  string producer = 3;
-  string summary = 4;
-  bool is_counter_evidence = 5;
-  google.protobuf.Timestamp created_at = 6;
-  string convention = 7;
-  int32 supporting = 8;
-  int32 peer_count = 9;
-  repeated PrecedentExample examples = 10;
-  CodeLocation location = 11;
-}
-
-message ComparisonSide {
-  string title = 1;
-  string caption = 2;
-  CodeLocation source = 3;
-  string snippet = 4;
-  int32 snippet_start_line = 5;
-  repeated int32 highlight_lines = 6;
-  repeated string points = 7;
-}
-
-message ComparisonSurface {
-  ComparisonSide current = 1;
-  ComparisonSide precedent = 2;
-}
-
-message ReviewPoint {
-  string id = 1;
-  // ReviewPointType name, e.g. "PatternDeviation".
-  string type = 2;
-  ReviewSeverity severity = 3;
-  ReviewPointState state = 4;
-  EvidenceState evidence_state = 5;
-  string title = 6;
-  string summary = 7;
-  string why_it_matters = 8;
-  string suggested_comment = 9;
-  CodeLocation anchor = 10;
-  repeated CodeLocation other_locations = 11;
-  repeated Evidence evidence = 12;
-  ComparisonSurface comparison = 13;
-  double priority = 14;
-  string routing_reason = 15;
-}
-
-message ReviewPointStateChanged {
-  string review_point_id = 1;
-  ReviewPointState state = 2;
-}
-
-message Convention {
-  string id = 1;
-  string statement = 2;
-  string peer_group = 3;
-  int32 supporting = 4;
-  int32 peer_count = 5;
-  repeated CodeLocation examples = 6;
-}
-
-message ConventionsFound {
-  repeated Convention conventions = 1;
-}
-
 message AnalysisComplete {
-  int32 review_point_count = 1;
-  int32 suppressed_count = 2;
+  reserved 1, 2;
   int64 duration_ms = 3;
 }
 
@@ -464,14 +362,6 @@ message AnalysisFailed {
   string message = 1;
   bool is_authentication = 2;
 }
-
-message SetReviewPointStateRequest {
-  PullRequestRef pull_request = 1;
-  string review_point_id = 2;
-  ReviewPointState state = 3;
-}
-
-message SetReviewPointStateReply {}
 
 enum DiffSide {
   // The head side (added and unchanged lines).
@@ -482,8 +372,7 @@ enum DiffSide {
 
 message PostReviewCommentRequest {
   PullRequestRef pull_request = 1;
-  // Optional: the review point this comment responds to; it is marked Commented.
-  string review_point_id = 2;
+  reserved 2;
   string path = 3;
   // The last line of the comment's range, on `side`.
   int32 line = 4;
@@ -510,108 +399,11 @@ message SetFileViewedRequest {
 
 message SetFileViewedReply {}
 
-message GetConnectionsRequest {}
-
-message SetOpenRouterKeyRequest {
-  string key = 1;
-}
-
-message RemoveOpenRouterKeyRequest {}
-
-enum ConnectionState {
-  // Turned off in settings; nothing is sent.
-  CONNECTION_STATE_OFF = 0;
-  // Allowed, but no credential or sign-in yet.
-  CONNECTION_STATE_NOT_CONNECTED = 1;
-  CONNECTION_STATE_CONNECTED = 2;
-  // A credential is present but the service rejected it or could not be reached.
-  CONNECTION_STATE_ERROR = 3;
-}
-
-enum ConnectionBilling {
-  CONNECTION_BILLING_UNKNOWN = 0;
-  CONNECTION_BILLING_SUBSCRIPTION = 1;
-  CONNECTION_BILLING_METERED = 2;
-}
-
-message JevConnection {
-  ConnectionState state = 1;
-  string detail = 2;
-  string model = 3;
-  bool key_stored = 4;
-  // False where there is no secure credential store yet (non-Windows).
-  bool can_store_key = 5;
-  // What JEV receives, e.g. "Counts and categories only".
-  string sends = 6;
-}
-
-message AgentConnection {
-  ConnectionState state = 1;
-  string detail = 2;
-  string version = 3;
-  ConnectionBilling billing = 4;
-  bool investigations_enabled = 5;
-  string investigations_detail = 6;
-}
-
-// The switches the Connections panel edits (TDD §40). Everything else stays in settings.json.
-message ConnectionSettings {
-  // privacy.allowCloudReasoning: the master switch for every outbound model call.
-  bool allow_cloud_reasoning = 1;
-  // jev.enabled
-  bool jev_enabled = 2;
-  // privacy.allowCodeSnippetsToJev: convention wording, not just counts and categories.
-  bool allow_code_snippets_to_jev = 3;
-  // agents.enabled and privacy.allowCodeToAgents together: investigations send repository code to the agent.
-  bool investigations_enabled = 4;
-
-  // Cloud AI limits. Unset on an update leaves the saved value alone.
-  optional string jev_model = 5;
-  optional double jev_timeout_seconds = 6;
-  optional bool jev_require_zero_data_retention = 7;
-  optional int32 max_investigations_per_pull_request = 8;
-  optional int32 max_concurrent_investigations = 9;
-  // Never switch an investigation from subscription to metered billing without this opt-in (TDD §37.5).
-  optional bool allow_metered_usage = 10;
-
-  // privacy.allowCodeToFastModel: the diff goes to the fast model (Cloudflare Workers AI). Unset leaves it alone.
-  optional bool allow_code_to_fast_model = 11;
-  optional string fast_model_id = 12;
-  optional double fast_model_timeout_seconds = 13;
-  // Largest diff sent, in KB; bigger files are truncated and the rest summarised by path and size.
-  optional int32 fast_model_max_diff_kb = 14;
-  optional int32 fast_model_daily_request_cap = 15;
-  // Optional Cloudflare AI Gateway id: requests go through the gateway (caching, logs) instead of Workers AI directly.
-  optional string fast_model_gateway = 16;
-}
-
-message Connections {
-  JevConnection jev = 1;
-  AgentConnection claude = 2;
-  // Where the non-secret preferences live (jev.enabled, privacy.*, agents.*).
-  string settings_path = 3;
-  ConnectionSettings settings = 4;
-  FastModelConnection fast_model = 5;
-}
-
-// How picky convention detection is. The detector's looser pre-filter is derived from minimum_support.
-message ReviewSensitivity {
-  int32 minimum_peers = 1;
-  // 0..1
-  double minimum_support = 2;
-  double minimum_lift = 3;
-  int32 max_points_per_type = 4;
-  int32 max_examples = 5;
-}
-
 message ReviewRules {
-  // Unset on a repository while it inherits the global sensitivity.
-  ReviewSensitivity sensitivity = 1;
-  // Type or member names never treated as a convention.
-  repeated string ignored_names = 2;
+  reserved 1, 2;
   // Gitignore-style path patterns treated as mechanical.
   repeated string mechanical_paths = 3;
-  // Path patterns whose changes are never flagged.
+  // Path patterns whose changes never raise a red flag.
   repeated string skipped_paths = 4;
 }
 
@@ -625,14 +417,10 @@ message ReviewSettingsReply {
   ReviewRules global = 1;
   // Present when a repository was asked for; its lists add to the global ones.
   ReviewRules repository = 2;
-  repeated string built_in_ignored_names = 3;
+  reserved 3, 7, 8, 9;
   repeated string built_in_mechanical_paths = 4;
   string settings_path = 5;
   string repository_settings_path = 6;
-  // The presets' numbers, so the app can show which one the current values match.
-  ReviewSensitivity quiet = 7;
-  ReviewSensitivity balanced = 8;
-  ReviewSensitivity thorough = 9;
 }
 
 // Owner and name empty: replaces the global settings. Otherwise replaces that repository's overrides.
@@ -928,8 +716,7 @@ message PendingComment {
   string body = 7;
   // A reply to an existing thread rather than a new one.
   bool is_reply = 8;
-  // The review point it was written for, when Lumen knows.
-  string review_point_id = 9;
+  reserved 9;
 }
 
 message PendingReview {
@@ -947,7 +734,7 @@ message AddPendingCommentRequest {
   int32 start_line = 5;
   DiffSide start_side = 6;
   string body = 7;
-  string review_point_id = 8;
+  reserved 8;
   // Set to reply to an existing thread inside the pending review instead of starting a new one.
   string reply_to_thread_id = 9;
 }
@@ -981,140 +768,161 @@ message SubmitReviewReply {
   string head_sha = 2;
 }
 
-// ---- Fast model (M7) ----
+// ================================== overhaul ==================================
 
-message SetCloudflareCredentialsRequest {
-  string account_id = 1;
-  string api_token = 2;
+// ---- Feature slices (Phase 4) ----
+
+enum SliceKind {
+  // The code behind one entry point.
+  SLICE_KIND_FEATURE = 0;
+  // Reached from three or more slices; reviewed once.
+  SLICE_KIND_SHARED = 1;
+  // Changed code no seed reaches that unchanged code uses.
+  SLICE_KIND_UNLINKED_USED = 2;
+  // Changed code nothing uses.
+  SLICE_KIND_UNLINKED_UNUSED = 3;
+  // Files whose every change folds as mechanical: listed as groups, not read.
+  SLICE_KIND_MECHANICAL_ONLY = 4;
 }
 
-message RemoveCloudflareCredentialsRequest {}
-
-message FastModelConnection {
-  ConnectionState state = 1;
-  string detail = 2;
-  string model = 3;
-  bool credentials_stored = 4;
-  bool can_store_credentials = 5;
-  // What is sent, e.g. "The pull request's diff, title and description".
-  string sends = 6;
-  int32 requests_today = 7;
+// A link between two nodes (a file path, or "path::Type.Member"), always with its reason in words.
+message SliceEdge {
+  string from = 1;
+  string to = 2;
+  // e.g. "page loads `orders-edit.js`", "`EditModel` injects `IOrderService` → `OrderService`".
+  string reason = 3;
+  // A possible link: shown, never moves code into a slice.
+  bool possible = 4;
 }
 
-// ---- Walkthrough (M8) ----
+message SliceFile {
+  string path = 1;
+  // Reading order inside the slice: entities and input models → data → services → page model → .cshtml → JS → tests.
+  int32 order = 2;
+  // Why the file is in the slice, e.g. "`EditModel` injects `IOrderService` → `OrderService`".
+  string why = 3;
+  // Changed members in this file that belong to the slice ("Type.Member"); empty when the whole file does.
+  repeated string members = 4;
+  // Handler sub-section ("OnGet", "OnPostSave"); empty when the slice is not split.
+  string section = 5;
+  // Unchanged code that uses this file (Unlinked: "Used outside this change").
+  int32 outside_callers = 6;
+}
 
-message StartWalkthroughRequest {
+message Slice {
+  string id = 1;
+  string title = 2;
+  SliceKind kind = 3;
+  string seed_path = 4;
+  repeated SliceFile files = 5;
+  // Handler sub-sections in order, for large slices.
+  repeated string sections = 6;
+  repeated SliceEdge possible_links = 7;
+  // Links to other pages (asp-page, RedirectToPage, Url.Page): shown, they never merge slices.
+  repeated SliceEdge page_links = 8;
+}
+
+message SlicesReady {
+  repeated Slice slices = 1;
+  // Every membership edge, for "why this file is here".
+  repeated SliceEdge edges = 2;
+  // Slicing failed, ran past its budget or the repository isn't Razor/WebForms-shaped: the file list stays.
+  bool fell_back = 3;
+  string fallback_reason = 4;
+  int64 duration_ms = 5;
+  // Fingerprint of each unit's normalised changed lines (unit = path, or "path::Type.Member" in a large file).
+  repeated UnitFingerprint units = 6;
+}
+
+message UnitFingerprint {
+  string unit = 1;
+  string path = 2;
+  string fingerprint = 3;
+  // Changed lines left open in this unit.
+  int32 open_lines = 4;
+}
+
+// ---- Red flags (Phase 7) ----
+
+enum FlagKind {
+  FLAG_KIND_WEAKENED_TESTS = 0;
+  FLAG_KIND_ANTIFORGERY_OFF = 1;
+  FLAG_KIND_AUTHORISATION_LOOSENED = 2;
+  FLAG_KIND_OVER_POSTING = 3;
+  FLAG_KIND_GUARD_REMOVED = 4;
+  FLAG_KIND_RAW_OUTPUT = 5;
+  FLAG_KIND_RAW_SQL = 6;
+  FLAG_KIND_QUERY_SAFETY = 7;
+  FLAG_KIND_SWALLOWED_ERRORS = 8;
+  FLAG_KIND_WARNINGS_SILENCED = 9;
+  FLAG_KIND_DEPENDENCIES_AND_BUILD = 10;
+  FLAG_KIND_SECURITY_CONFIG = 11;
+}
+
+message RedFlag {
+  // Identity: (kind, member, normalised line). Stable across pushes, so since-my-last-look can say Fixed / New.
+  string id = 1;
+  FlagKind kind = 2;
+  string path = 3;
+  DiffSide side = 4;
+  int32 line = 5;
+  // Only what the detector found, e.g. "`[IgnoreAntiforgeryToken]` added".
+  string message = 6;
+  string member = 7;
+}
+
+message FlagsReady {
+  repeated RedFlag flags = 1;
+}
+
+// ---- Tracking (Phase 6) ----
+
+message ReviewMark {
+  string unit = 1;
+  // The unit's fingerprint when it was marked; a different current fingerprint means it changed since.
+  string fingerprint = 2;
+}
+
+message MarksUpdated {
+  repeated ReviewMark marks = 1;
+  // Files whose GitHub Viewed box was ticked by this change.
+  repeated string viewed_paths = 2;
+}
+
+message SetMarkedRequest {
   PullRequestRef pull_request = 1;
-  // Optional: a short "what changed since you last looked" walkthrough of this range instead of the whole PR.
-  CommitRange since = 2;
-  // Ignore the cache.
-  bool refresh = 3;
+  repeated string units = 2;
+  bool marked = 3;
 }
 
-message StartWalkthroughReply {}
-
-enum WalkthroughStatus {
-  // Not offered: the fast model is off, not connected, or not allowed to see code.
-  WALKTHROUGH_STATUS_UNAVAILABLE = 0;
-  WALKTHROUGH_STATUS_RUNNING = 1;
-  WALKTHROUGH_STATUS_COMPLETE = 2;
-  WALKTHROUGH_STATUS_FAILED = 3;
+message GetSinceLastLookRequest {
+  PullRequestRef pull_request = 1;
 }
 
-message WalkthroughGroup {
-  string id = 1;
-  string title = 2;
-  string summary = 3;
-  repeated string paths = 4;
-  // 1-based reading order.
-  int32 order = 5;
-  bool is_mechanical = 6;
+message SinceLastLook {
+  // The head last looked at; empty when there has been no look yet.
+  string old_head_sha = 1;
+  string new_head_sha = 2;
+  // The old head no longer exists (a force-push): file contents were compared instead.
+  bool history_rewritten = 3;
+  string note = 4;
+  // Files whose patch changed, each reduced to the diff from the old head.
+  repeated FileDiff files = 5;
+  // Flag ids new since the last look, and ids that were there and are now gone.
+  repeated string new_flag_ids = 6;
+  repeated RedFlag fixed_flags = 7;
 }
 
-enum RiskCategory {
-  RISK_CATEGORY_OTHER = 0;
-  RISK_CATEGORY_CONCURRENCY = 1;
-  RISK_CATEGORY_ERROR_HANDLING = 2;
-  RISK_CATEGORY_SECURITY = 3;
-  RISK_CATEGORY_BEHAVIOUR_CHANGE = 4;
-  RISK_CATEGORY_MISSING_TESTS = 5;
+// ---- Local branches (Phase 2) ----
+
+message ListLocalBranchesRequest {}
+
+message LocalBranchItem {
+  LocalBranchRef ref = 1;
+  string display_name = 2;
+  google.protobuf.Timestamp last_opened_at = 3;
 }
 
-message WalkthroughRisk {
-  string id = 1;
-  CodeLocation location = 2;
-  RiskCategory category = 3;
-  string reason = 4;
-}
-
-// The Map (plan v3): what part of the system a component plays.
-enum ComponentLayer {
-  COMPONENT_LAYER_OTHER = 0;
-  COMPONENT_LAYER_ENTRY = 1;
-  COMPONENT_LAYER_UI = 2;
-  COMPONENT_LAYER_CORE = 3;
-  COMPONENT_LAYER_INTEGRATION = 4;
-  COMPONENT_LAYER_DATA = 5;
-  COMPONENT_LAYER_CONFIG = 6;
-}
-
-// How one changed file uses another, strongest last.
-enum LinkKind {
-  LINK_KIND_REFERENCES = 0;
-  LINK_KIND_DEPENDS_ON = 1;
-  LINK_KIND_IMPLEMENTS = 2;
-  LINK_KIND_TESTS = 3;
-}
-
-// A part of the system the pull request builds or changes, and its (hand-written, non-test) files.
-message WalkthroughComponent {
-  string id = 1;
-  string title = 2;
-  string role = 3;
-  ComponentLayer layer = 4;
-  repeated string paths = 5;
-}
-
-// "from" uses "to" (component ids). Found in the code unless inferred (only the model suggested it).
-message WalkthroughEdge {
-  string from = 1;
-  string to = 2;
-  LinkKind kind = 3;
-  bool inferred = 4;
-  string label = 5;
-}
-
-// A link between two changed files found in the code: "from" uses "to".
-message FileLink {
-  string from = 1;
-  string to = 2;
-  LinkKind kind = 3;
-}
-
-message Walkthrough {
-  WalkthroughStatus status = 1;
-  // Progress or why it is unavailable / failed.
-  string detail = 2;
-  string intent = 3;
-  // Where the description and the diff disagree; empty if they agree.
-  string description_mismatch = 4;
-  repeated WalkthroughGroup groups = 5;
-  repeated WalkthroughRisk risks = 6;
-  // e.g. "glm-5.3-flash · walkthrough/v2"
-  string producer = 7;
-  string head_sha = 8;
-  // Set for a "since last review" walkthrough.
-  CommitRange since = 9;
-  bool from_cache = 10;
-  // Files summarised so far / total (while running).
-  int32 files_done = 11;
-  int32 files_total = 12;
-  // The Map (plan v3): components, how they connect, and the file links found in the code.
-  repeated WalkthroughComponent components = 13;
-  repeated WalkthroughEdge edges = 14;
-  repeated FileLink file_links = 15;
-}
-
-message WalkthroughUpdated {
-  Walkthrough walkthrough = 1;
+message LocalBranches {
+  repeated LocalBranchItem items = 1;
 }

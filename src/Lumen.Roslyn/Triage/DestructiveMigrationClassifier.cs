@@ -30,7 +30,7 @@ public sealed class DestructiveMigrationClassifier : IHunkClassifier
         {
             if (group.Key is { } op)
             {
-                parts.Add(new HunkPart(ChangeClass.BehaviourChange, TriageTier.Critical, [op.Description], null, group.ToList()));
+                parts.Add(new HunkPart(ChangeClass.BehaviourChange, FoldKind.Open, [op.Description], null, group.ToList()));
             }
             else
             {
@@ -45,10 +45,10 @@ public sealed class DestructiveMigrationClassifier : IHunkClassifier
 
         if (rest.Count > 0)
         {
-            parts.Add(new HunkPart(ChangeClass.Generated, TriageTier.Skip, [MigrationReason], null, rest));
+            parts.Add(new HunkPart(ChangeClass.Generated, FoldKind.Mechanical, [MigrationReason], null, rest));
         }
 
-        return new(ChangeClass.BehaviourChange, TriageTier.Critical, parts.SelectMany(p => p.Reasons).Distinct().ToList()) { Parts = parts };
+        return new(ChangeClass.BehaviourChange, FoldKind.Open, parts.SelectMany(p => p.Reasons).Distinct().ToList()) { Parts = parts };
     }
 
     public static bool IsMigration(string path) =>

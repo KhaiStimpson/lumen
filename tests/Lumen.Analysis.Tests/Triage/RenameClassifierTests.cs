@@ -35,7 +35,7 @@ public class RenameClassifierTests
         var hunk = TriageHarness.Single(Service, Rename(Service, "subtotal", "gross"));
 
         Assert.Equal(ChangeClass.Rename, hunk.Class);
-        Assert.Equal(TriageTier.Skip, hunk.Tier);
+        Assert.Equal(FoldKind.Mechanical, hunk.Fold);
         Assert.Equal(["pure rename `subtotal`→`gross`"], hunk.Reasons);
         Assert.NotNull(hunk.GroupId);
     }

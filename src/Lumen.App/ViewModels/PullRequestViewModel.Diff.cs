@@ -174,7 +174,7 @@ public sealed partial class PullRequestViewModel
     /// </summary>
     public async Task<bool> StepFileAsync(int direction)
     {
-        var ordered = Tree.SelectMany(n => n.Descendants().Prepend(n)).Select(n => n.File).OfType<FileEntryViewModel>().ToList();
+        var ordered = NavigableFiles();
         var at = SelectedFile is null ? -1 : ordered.FindIndex(f => f.Path == SelectedFile.Path);
         for (var i = at + direction; i >= 0 && i < ordered.Count; i += direction)
         {

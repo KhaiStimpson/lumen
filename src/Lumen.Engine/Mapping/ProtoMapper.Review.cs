@@ -157,8 +157,7 @@ public static partial class ProtoMapper
         return proto;
     }
 
-    /// <param name="reviewPoints">Pending comment id → the review point it was written for.</param>
-    public static Contracts.PendingReview ToProto(D.PendingReview? review, IReadOnlyDictionary<string, string>? reviewPoints = null)
+    public static Contracts.PendingReview ToProto(D.PendingReview? review)
     {
         var proto = new Contracts.PendingReview();
         if (review is null)
@@ -178,7 +177,6 @@ public static partial class ProtoMapper
             StartLine = c.StartLine ?? 0,
             Body = c.Body,
             IsReply = c.IsReply,
-            ReviewPointId = reviewPoints?.GetValueOrDefault(c.Id) ?? "",
         }));
         return proto;
     }
@@ -196,58 +194,4 @@ public static partial class ProtoMapper
         IsViewed = viewed,
         Similarity = f.Similarity ?? 0,
     };
-}
-
-/// <summary>Walkthrough mapping (plan v2 M8, and the Map's components in v3).</summary>
-public static partial class ProtoMapper
-{
-    public static Contracts.Walkthrough ToProto(D.Walkthrough walkthrough)
-    {
-        var proto = new Contracts.Walkthrough
-        {
-            Status = (Contracts.WalkthroughStatus)walkthrough.Status,
-            Detail = walkthrough.Detail,
-            Intent = walkthrough.Intent,
-            DescriptionMismatch = walkthrough.DescriptionMismatch,
-            Producer = walkthrough.Producer,
-            HeadSha = walkthrough.HeadSha,
-            FromCache = walkthrough.FromCache,
-            FilesDone = walkthrough.FilesDone,
-            FilesTotal = walkthrough.FilesTotal,
-        };
-        if (walkthrough.SinceSha is { } since)
-        {
-            proto.Since = new CommitRange { FromSha = since, ToSha = walkthrough.HeadSha };
-        }
-
-        proto.Groups.AddRange(walkthrough.Groups.Select(g =>
-        {
-            var group = new Contracts.WalkthroughGroup { Id = g.Id, Title = g.Title, Summary = g.Summary, Order = g.Order, IsMechanical = g.IsMechanical };
-            group.Paths.AddRange(g.Paths);
-            return group;
-        }));
-        proto.Risks.AddRange(walkthrough.Risks.Select(r => new Contracts.WalkthroughRisk
-        {
-            Id = r.Id,
-            Location = ToProto(r.Location),
-            Category = (Contracts.RiskCategory)r.Category,
-            Reason = r.Reason,
-        }));
-        proto.Components.AddRange(walkthrough.Components.Select(c =>
-        {
-            var component = new Contracts.WalkthroughComponent { Id = c.Id, Title = c.Title, Role = c.Role, Layer = (Contracts.ComponentLayer)c.Layer };
-            component.Paths.AddRange(c.Paths);
-            return component;
-        }));
-        proto.Edges.AddRange(walkthrough.Edges.Select(e => new Contracts.WalkthroughEdge
-        {
-            From = e.From,
-            To = e.To,
-            Kind = (Contracts.LinkKind)e.Kind,
-            Inferred = e.Inferred,
-            Label = e.Label,
-        }));
-        proto.FileLinks.AddRange(walkthrough.FileLinks.Select(l => new Contracts.FileLink { From = l.From, To = l.To, Kind = (Contracts.LinkKind)l.Kind }));
-        return proto;
-    }
 }

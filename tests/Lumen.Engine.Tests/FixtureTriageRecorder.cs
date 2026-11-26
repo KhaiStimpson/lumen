@@ -55,10 +55,10 @@ public sealed class FixtureTriageRecorder
 
     private sealed class NoStore : ITriageStore
     {
-        public Task<TriageResult?> FindTriageAsync(PullRequestKey key, string headSha, string version, CancellationToken cancellationToken) =>
+        public Task<TriageResult?> FindTriageAsync(ReviewTarget key, string headSha, string version, CancellationToken cancellationToken) =>
             Task.FromResult<TriageResult?>(null);
 
-        public Task SaveTriageAsync(PullRequestKey key, string headSha, string version, TriageResult result, CancellationToken cancellationToken) =>
+        public Task SaveTriageAsync(ReviewTarget key, string headSha, string version, TriageResult result, CancellationToken cancellationToken) =>
             Task.CompletedTask;
     }
 

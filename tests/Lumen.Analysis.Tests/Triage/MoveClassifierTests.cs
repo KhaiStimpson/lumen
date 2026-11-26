@@ -40,7 +40,7 @@ public class MoveClassifierTests
 
         var result = TriageHarness.Run(new TestFile("src/Order.cs", before, after));
 
-        Assert.All(result.Hunks, h => Assert.Equal((ChangeClass.Move, TriageTier.Skip), (h.Class, h.Tier)));
+        Assert.All(result.Hunks, h => Assert.Equal((ChangeClass.Move, FoldKind.Mechanical), (h.Class, h.Fold)));
         var group = Assert.Single(result.Groups);
         Assert.Equal("Moved `Round` within Order.cs", group.Title);
         Assert.Equal(2, group.Members.Count);
@@ -53,7 +53,7 @@ public class MoveClassifierTests
             new TestFile("src/Order.cs", Class("Order", Round, Price), Class("Order", Price)),
             new TestFile("src/Order.Rounding.cs", Class("Order", Tax), Class("Order", Tax, Round)));
 
-        Assert.All(result.Hunks, h => Assert.Equal((ChangeClass.Move, TriageTier.Skip), (h.Class, h.Tier)));
+        Assert.All(result.Hunks, h => Assert.Equal((ChangeClass.Move, FoldKind.Mechanical), (h.Class, h.Fold)));
         var group = Assert.Single(result.Groups);
         Assert.Equal("Moved `Round` from Order.cs to Order.Rounding.cs", group.Title);
         Assert.Equal(["src/Order.Rounding.cs", "src/Order.cs"], group.Members.Select(m => m.Path).Order(StringComparer.Ordinal));
@@ -66,7 +66,7 @@ public class MoveClassifierTests
             new TestFile("src/Order.cs", Class("Order", Round, Price), Class("Order", Price)),
             new TestFile("src/Money.cs", Class("Money", Tax), Class("Money", Tax, Round)));
 
-        Assert.All(result.Hunks, h => Assert.Equal((ChangeClass.Move, TriageTier.Skim), (h.Class, h.Tier)));
+        Assert.All(result.Hunks, h => Assert.Equal((ChangeClass.Move, FoldKind.Open), (h.Class, h.Fold)));
         Assert.Contains(result.Hunks[0].Reasons, r => r.Contains("bind differently", StringComparison.Ordinal));
     }
 
@@ -83,7 +83,7 @@ public class MoveClassifierTests
 
         var group = Assert.Single(result.Groups);
         Assert.Equal("Moved `Rounding` from Order.cs to Rounding.cs", group.Title);
-        Assert.All(group.Members, h => Assert.Equal((ChangeClass.Move, TriageTier.Skip), (h.Class, h.Tier)));
+        Assert.All(group.Members, h => Assert.Equal((ChangeClass.Move, FoldKind.Mechanical), (h.Class, h.Fold)));
 
         // The new file's `using`/`namespace` header is not part of the move: it is new code.
         var rest = Assert.Single(result.Hunks, h => h.GroupId is null);
@@ -126,7 +126,7 @@ public class MoveClassifierTests
 
         var hunks = TriageHarness.Run(new TestFile("src/C.cs", before, after)).Hunks;
 
-        Assert.All(hunks, h => Assert.NotEqual(TriageTier.Skip, h.Tier));
+        Assert.All(hunks, h => Assert.NotEqual(FoldKind.Mechanical, h.Fold));
     }
 
     [Theory]
@@ -140,7 +140,7 @@ public class MoveClassifierTests
         var moved = TriageHarness.Run(new TestFile("src/Order.cs", before, after)).Hunks.Where(h => h.Class == ChangeClass.Move).ToList();
 
         Assert.NotEmpty(moved);
-        Assert.All(moved, h => Assert.Equal(TriageTier.Skim, h.Tier));
+        Assert.All(moved, h => Assert.Equal(FoldKind.Open, h.Fold));
     }
 
     [Theory]
@@ -154,7 +154,7 @@ public class MoveClassifierTests
         var moved = TriageHarness.Run(new TestFile("src/C.cs", before, after)).Hunks.Where(h => h.Class == ChangeClass.Move).ToList();
 
         Assert.NotEmpty(moved);
-        Assert.All(moved, h => Assert.Equal(TriageTier.Skim, h.Tier));
+        Assert.All(moved, h => Assert.Equal(FoldKind.Open, h.Fold));
     }
 
     [Fact]
@@ -166,7 +166,7 @@ public class MoveClassifierTests
         var hunks = TriageHarness.Run(new TestFile("src/Order.cs", before, after)).Hunks;
 
         // `Price` is the member the diff shows as moved (it is shorter than `Round`), edited on one line.
-        Assert.Contains(hunks, h => h.Class == ChangeClass.Move && h.Tier == TriageTier.Skip);
+        Assert.Contains(hunks, h => h.Class == ChangeClass.Move && h.Fold == FoldKind.Mechanical);
         var edits = hunks.Where(h => h.Class == ChangeClass.BehaviourChange).ToList();
         Assert.Equal(2, edits.Sum(h => h.ChangedLines));
         Assert.All(edits, h => Assert.Equal(["edited while moving `Price`"], h.Reasons));
@@ -184,7 +184,7 @@ public class MoveClassifierTests
             new TestFile("src/Order.cs", before, after),
             new TestFile("src/Order.Debug.cs", null, target));
 
-        Assert.DoesNotContain(result.Hunks, h => h.Tier == TriageTier.Skip);
+        Assert.DoesNotContain(result.Hunks, h => h.Fold == FoldKind.Mechanical);
     }
 
     [Fact]

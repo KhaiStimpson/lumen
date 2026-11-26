@@ -7,7 +7,7 @@ namespace Lumen.Engine.Tests;
 
 public class TriageMappingTests
 {
-    private static D.HunkTriage Hunk(string path, D.ChangeClass cls, D.TriageTier tier, int lines, string? group = null, int? oldStart = 3, int? newStart = 4) => new()
+    private static D.HunkTriage Hunk(string path, D.ChangeClass cls, D.FoldKind fold, int lines, string? group = null, int? oldStart = 3, int? newStart = 4) => new()
     {
         Path = path,
         OldStart = oldStart,
@@ -15,7 +15,7 @@ public class TriageMappingTests
         NewStart = newStart,
         NewEnd = newStart + 2,
         Class = cls,
-        Tier = tier,
+        Fold = fold,
         Reasons = [$"{cls} reason"],
         ChangedLines = lines,
         GroupId = group,
@@ -23,10 +23,10 @@ public class TriageMappingTests
 
     private static D.TriageResult Triage()
     {
-        var a = Hunk("src/A.cs", D.ChangeClass.Rename, D.TriageTier.Skip, 4, "g0");
-        var b = Hunk("src/B.cs", D.ChangeClass.Rename, D.TriageTier.Skip, 2, "g0");
-        var c = Hunk("src/B.cs", D.ChangeClass.BehaviourChange, D.TriageTier.Critical, 5);
-        var d = Hunk("src/New.cs", D.ChangeClass.NewCode, D.TriageTier.Skim, 30, oldStart: null);
+        var a = Hunk("src/A.cs", D.ChangeClass.Rename, D.FoldKind.Mechanical, 4, "g0");
+        var b = Hunk("src/B.cs", D.ChangeClass.Rename, D.FoldKind.Mechanical, 2, "g0");
+        var c = Hunk("src/B.cs", D.ChangeClass.BehaviourChange, D.FoldKind.Open, 5);
+        var d = Hunk("src/New.cs", D.ChangeClass.NewCode, D.FoldKind.Open, 30, oldStart: null);
         return new D.TriageResult([a, b, c, d], [new D.TriageGroup { Id = "g0", Class = D.ChangeClass.Rename, Title = "Renamed `Foo`→`Bar`", Members = [a, b] }]);
     }
 
@@ -65,44 +65,53 @@ public class TriageMappingTests
     }
 
     [Fact]
-    public void EveryClassAndTierMapsBothWays()
+    public void EveryClassAndFoldMapsBothWays()
     {
         foreach (var cls in Enum.GetValues<D.ChangeClass>())
         {
             Assert.Equal(cls, ProtoMapper.FromProto(ProtoMapper.ToProto(cls)));
         }
 
-        foreach (var tier in Enum.GetValues<D.TriageTier>())
+        foreach (var fold in Enum.GetValues<D.FoldKind>())
         {
-            Assert.Equal(tier, ProtoMapper.FromProto(ProtoMapper.ToProto(tier)));
+            Assert.Equal(fold, ProtoMapper.FromProto(ProtoMapper.ToProto(fold)));
         }
     }
 
     [Fact]
-    public void UnsetWireValuesAreNeverMechanical()
+    public void UnsetWireValuesNeverFold()
     {
         var hunk = ProtoMapper.FromProto(new C.HunkTriage { Path = "x.cs" });
 
         Assert.Equal(D.ChangeClass.BehaviourChange, hunk.Class);
-        Assert.Equal(D.TriageTier.WorthALook, hunk.Tier);
+        Assert.Equal(D.FoldKind.Open, hunk.Fold);
     }
 
     [Fact]
-    public void FilesCarryLinesPerTierAndGroupsTheirSize()
+    public void FilesCarryLinesPerFoldAndGroupsTheirSize()
     {
-        var ready = ProtoMapper.ToProto(Triage(), Snapshot(), new HashSet<string> { "src/A.cs" }, new HashSet<string> { "g0" });
+        var ready = ProtoMapper.ToProto(Triage(), Snapshot(), new HashSet<string> { "src/A.cs" });
 
         var b = ready.Files.Single(f => f.Path == "src/B.cs");
-        Assert.Equal((0, 0, 0, 2, 5), (b.TierLines.WorthALook, b.TierLines.Skim, 0, b.TierLines.Skip, b.TierLines.Critical));
+        Assert.Equal((5, 2, 0), (b.FoldLines.Open, b.FoldLines.Mechanical, b.FoldLines.Boilerplate));
         Assert.True(ready.Files.Single(f => f.Path == "src/A.cs").IsViewed);
-        Assert.Equal(new C.TierLines(), ready.Files.Single(f => f.Path == "src/Untouched.cs").TierLines);
+        Assert.Equal(new C.FoldLines(), ready.Files.Single(f => f.Path == "src/Untouched.cs").FoldLines);
 
         var group = Assert.Single(ready.Groups);
-        Assert.Equal((2, 6, true), (group.MemberCount, group.ChangedLines, group.Acknowledged));
+        Assert.Equal((2, 6), (group.MemberCount, group.ChangedLines));
 
         Assert.Equal((41, 6, 30, 5), (ready.Summary.TotalLines, ready.Summary.MechanicalLines, ready.Summary.NewCodeLines, ready.Summary.BehaviourChangeLines));
-        Assert.Equal("41 lines changed: 6 proven mechanical, 30 new code, 5 changing existing behaviour", ready.Summary.Text);
-        Assert.Equal((5, 0, 30, 6), (ready.Summary.TierLines.Critical, ready.Summary.TierLines.WorthALook, ready.Summary.TierLines.Skim, ready.Summary.TierLines.Skip));
+        Assert.Equal((35, 0), (ready.Summary.OpenLines, ready.Summary.BoilerplateLines));
+    }
+
+    [Fact]
+    public void BoilerplateFoldsAreCountedApartFromMechanical()
+    {
+        var a = Hunk("src/Dto.cs", D.ChangeClass.NewCode, D.FoldKind.Boilerplate, 12, oldStart: null);
+        var ready = ProtoMapper.ToProto(new D.TriageResult([a], []), Snapshot(), new HashSet<string>());
+
+        Assert.Equal((12, 0, 0), (ready.Summary.BoilerplateLines, ready.Summary.MechanicalLines, ready.Summary.OpenLines));
+        Assert.Equal(C.FoldKind.Boilerplate, Assert.Single(ready.Hunks).Fold);
     }
 
     private sealed class HunkComparer : IEqualityComparer<D.HunkTriage>
@@ -111,8 +120,8 @@ public class TriageMappingTests
 
         public bool Equals(D.HunkTriage? x, D.HunkTriage? y) =>
             x is not null && y is not null &&
-            (x.Path, x.OldStart, x.OldEnd, x.NewStart, x.NewEnd, x.Class, x.Tier, x.ChangedLines, x.GroupId) ==
-            (y.Path, y.OldStart, y.OldEnd, y.NewStart, y.NewEnd, y.Class, y.Tier, y.ChangedLines, y.GroupId) &&
+            (x.Path, x.OldStart, x.OldEnd, x.NewStart, x.NewEnd, x.Class, x.Fold, x.ChangedLines, x.GroupId) ==
+            (y.Path, y.OldStart, y.OldEnd, y.NewStart, y.NewEnd, y.Class, y.Fold, y.ChangedLines, y.GroupId) &&
             x.Reasons.SequenceEqual(y.Reasons);
 
         public int GetHashCode(D.HunkTriage obj) => obj.Path.GetHashCode(StringComparison.Ordinal);

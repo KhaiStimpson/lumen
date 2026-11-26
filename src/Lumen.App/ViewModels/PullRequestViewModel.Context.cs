@@ -14,23 +14,26 @@ public sealed partial class PullRequestViewModel
     private static DateTimeOffset Now => DateTimeOffset.UtcNow;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsFilesTab), nameof(IsConversationTab), nameof(IsCommitsTab), nameof(IsChecksTab), nameof(IsMapTab),
-        nameof(IsPlanNav), nameof(IsFilesNav))]
+    [NotifyPropertyChangedFor(nameof(IsFilesTab), nameof(IsConversationTab), nameof(IsCommitsTab), nameof(IsChecksTab),
+        nameof(IsSlicesNav), nameof(IsFilesNav))]
     public partial PullRequestTab Tab { get; set; }
 
-    /// <summary>The list beside the diff: the review plan (false) or the changed-file tree (true). Both review the Files tab.</summary>
+    /// <summary>
+    /// The list beside the diff: the slices (false, the default) or the changed-file tree (true), one toggle apart.
+    /// Without slices (slicing fell back, or hasn't finished) the file tree shows either way.
+    /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsPlanNav), nameof(IsFilesNav))]
+    [NotifyPropertyChangedFor(nameof(IsSlicesNav), nameof(IsFilesNav), nameof(ShowsFileTree))]
     public partial bool ShowFileList { get; set; }
 
-    /// <summary>Nav rail: "Review plan" is current.</summary>
-    public bool IsPlanNav => IsFilesTab && !ShowFileList;
+    /// <summary>Nav rail: "Slices" is current.</summary>
+    public bool IsSlicesNav => IsFilesTab && !ShowFileList;
 
     /// <summary>Nav rail: "Files" is current.</summary>
     public bool IsFilesNav => IsFilesTab && ShowFileList;
 
     [RelayCommand]
-    public void ShowPlan()
+    public void ShowSlices()
     {
         ShowFileList = false;
         ShowTab(PullRequestTab.Files);
@@ -45,8 +48,6 @@ public sealed partial class PullRequestViewModel
 
     public bool IsFilesTab => Tab == PullRequestTab.Files;
 
-    public bool IsMapTab => Tab == PullRequestTab.Map;
-
     public bool IsConversationTab => Tab == PullRequestTab.Conversation;
 
     public bool IsCommitsTab => Tab == PullRequestTab.Commits;
@@ -54,14 +55,7 @@ public sealed partial class PullRequestViewModel
     public bool IsChecksTab => Tab == PullRequestTab.Checks;
 
     [RelayCommand]
-    public void ShowTab(PullRequestTab tab)
-    {
-        Tab = tab;
-        if (tab != PullRequestTab.Files)
-        {
-            Mode = ReviewMode.Diff;
-        }
-    }
+    public void ShowTab(PullRequestTab tab) => Tab = tab;
 
     // Header ---------------------------------------------------------------------------------------
 
@@ -232,7 +226,6 @@ public sealed partial class PullRequestViewModel
         if (value && Details?.LastReviewedSha is { Length: > 0 } sha)
         {
             _ = ApplyScopeAsync(new DiffScope(sha, _headSha, LastReviewedLabel, IsSinceLastReview: true));
-            _ = RequestDeltaWalkthroughAsync(sha);
         }
         else if (!value && Scope?.IsSinceLastReview == true)
         {
@@ -415,8 +408,6 @@ public sealed partial class PullRequestViewModel
     internal void ApplyDetails(PullRequestDetails details)
     {
         Details = details;
-        _mapSincePaths = null;
-        RebuildMap();
         Labels.Clear();
         foreach (var label in details.Labels)
         {

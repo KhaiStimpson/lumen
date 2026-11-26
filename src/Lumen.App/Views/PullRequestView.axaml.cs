@@ -20,20 +20,6 @@ public sealed partial class PullRequestView : UserControl, IDisposable
     {
         InitializeComponent();
         Editor.CardFactory = CreateCard;
-        if (!App.Motion.ReducedMotion)
-        {
-            // Progress eases forward; with reduced motion it simply takes its new value.
-            ((Avalonia.Media.ScaleTransform)CoverageFill.RenderTransform!).Transitions =
-            [
-                new Avalonia.Animation.DoubleTransition
-                {
-                    Property = Avalonia.Media.ScaleTransform.ScaleXProperty,
-                    Duration = TimeSpan.FromMilliseconds(320),
-                    Easing = new Avalonia.Animation.Easings.CubicEaseOut(),
-                },
-            ];
-        }
-
         SplitEditor.CardFactory = CreateCard;
         Editor.MarkerClicked += async (_, id) => await OnMarkerClickedAsync(id).ConfigureAwait(true);
         SplitEditor.MarkerClicked += async (_, id) => await OnMarkerClickedAsync(id).ConfigureAwait(true);
@@ -41,15 +27,6 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         SplitEditor.LineCommentRequested += (_, request) => _viewModel?.StartLineComment(request.Side, request.Line, request.StartLine);
         Editor.CurrentChangeChanged += (_, index) => _viewModel?.SetCurrentChange(index);
         SplitEditor.Right.CurrentChangeChanged += (_, index) => _viewModel?.SetCurrentChange(index);
-
-        AddHandler(KeyDownEvent, (_, e) =>
-        {
-            if (e.Key == Key.Escape && _viewModel?.SourcePreview is not null)
-            {
-                _viewModel.CloseSource();
-                e.Handled = true;
-            }
-        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -70,43 +47,35 @@ public sealed partial class PullRequestView : UserControl, IDisposable
             Layout.ColumnDefinitions[4].Width = new GridLength(Math.Max(0, right));
         }
 
-        void Commit(object? sender, VectorEventArgs args) => shell.SavePaneWidths(Layout.ColumnDefinitions[0].ActualWidth, _rightBeforeMap?.Value ?? Layout.ColumnDefinitions[4].ActualWidth);
+        void Commit(object? sender, VectorEventArgs args) => shell.SavePaneWidths(Layout.ColumnDefinitions[0].ActualWidth, _rightWidth?.Value ?? Layout.ColumnDefinitions[4].ActualWidth);
         LeftSplitter.DragCompleted += Commit;
         RightSplitter.DragCompleted += Commit;
     }
 
-    /// <summary>The Map is an overview: it takes the walkthrough pane's width while it shows, and gives it back after.</summary>
-    private void ApplyMapPanes(bool map)
+    /// <summary>The right pane's width while it is collapsed, so opening it again restores it.</summary>
+    private GridLength? _rightWidth;
+
+    /// <summary>The right pane collapses to nothing; its width comes back when it opens.</summary>
+    private void ApplyRightPane(bool open)
     {
         var right = Layout.ColumnDefinitions[4];
-        if (map && _rightBeforeMap is null)
+        if (!open && _rightWidth is null)
         {
-            _rightBeforeMap = right.Width;
+            _rightWidth = right.Width;
             right.Width = new GridLength(0);
         }
-        else if (!map && _rightBeforeMap is { } width)
+        else if (open && _rightWidth is { } width)
         {
             right.Width = width;
-            _rightBeforeMap = null;
+            _rightWidth = null;
         }
     }
 
-    private GridLength? _rightBeforeMap;
-
     private async Task OnMarkerClickedAsync(string id)
     {
-        if (_viewModel is null)
+        if (_viewModel is not null)
         {
-            return;
-        }
-
-        if (_viewModel.ReviewPoints.FirstOrDefault(p => p.Id == id) is { } point)
-        {
-            await _viewModel.SelectPointAsync(point).ConfigureAwait(true);
-        }
-        else if (_viewModel.Walkthrough?.Risks.FirstOrDefault(r => r.MarkerId == id) is { } risk)
-        {
-            await _viewModel.SelectRiskAsync(risk).ConfigureAwait(true);
+            await _viewModel.GoToFlagAsync(id).ConfigureAwait(true);
         }
     }
 
@@ -120,8 +89,7 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         base.OnDataContextChanged(e);
         if (_viewModel is not null)
         {
-            _viewModel.NavigationRequested -= OnNavigationRequested;
-            _viewModel.PlanNavigationRequested -= OnPlanNavigationRequested;
+            _viewModel.LineFocusRequested -= OnLineFocusRequested;
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             _viewModel.DraftOpened -= OnDraftOpened;
             _viewModel.LineRevealRequested -= OnLineRevealRequested;
@@ -132,23 +100,17 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         _viewModel = DataContext as PullRequestViewModel;
         if (_viewModel is not null)
         {
-            _viewModel.NavigationRequested += OnNavigationRequested;
-            _viewModel.PlanNavigationRequested += OnPlanNavigationRequested;
+            _viewModel.LineFocusRequested += OnLineFocusRequested;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
             _viewModel.DraftOpened += OnDraftOpened;
             _viewModel.LineRevealRequested += OnLineRevealRequested;
             _viewModel.FindMatchRequested += OnFindMatchRequested;
             _viewModel.ChangeStepRequested += OnChangeStepRequested;
-
-            // The session may already have arrived at a point before this view existed; catch up.
-            if (_viewModel.CurrentPoint is { } current)
-            {
-                OnNavigationRequested(_viewModel, new NavigationRequest(current, NavigationReason.Arrived, null));
-            }
+            ApplyRightPane(_viewModel.IsRightPaneOpen);
         }
     }
 
-    /// <summary>Review points, threads and comment drafts each have their own card (plan v2 M3, M4).</summary>
+    /// <summary>Folds, red flags, threads and comment drafts each have their own card (plan v2 M3, M4).</summary>
     private Control? CreateCard(string cardId)
     {
         if (cardId.StartsWith(Diff.DiffFold.CardPrefix, StringComparison.Ordinal))
@@ -171,9 +133,7 @@ public sealed partial class PullRequestView : UserControl, IDisposable
             return new ThreadCardView { DataContext = new ThreadCardContext(_viewModel, thread) };
         }
 
-        return _viewModel.ResolveCard(cardId) is { } resolved
-            ? new ReviewCardView { DataContext = new CardContext(_viewModel, resolved.Point, resolved.IsPrimary) }
-            : null;
+        return _viewModel.ResolveFlagCard(cardId) is { } flag ? new FlagCardView { DataContext = flag } : null;
     }
 
     /// <summary>Focuses a new comment draft's composer once its card is on screen.</summary>
@@ -259,48 +219,8 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         }
     }
 
-    private async void OnNavigationRequested(object? sender, NavigationRequest request)
-    {
-        if (_viewModel is null)
-        {
-            return;
-        }
-
-        _navigation?.Cancel();
-        _navigation = new CancellationTokenSource();
-        var token = _navigation.Token;
-        var motion = App.Motion;
-
-        try
-        {
-            if (_viewModel.IsExamining)
-            {
-                await Examine.ShowPointAsync(request, token).ConfigureAwait(true);
-                return;
-            }
-
-            // Let the editor lay out a newly loaded file before measuring where to scroll.
-            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
-
-            if (request.From is { } from && from != request.Point && ExistingCard(from.Id) is { } leaving)
-            {
-                _ = motion.ContractAsync(leaving, token);
-            }
-
-            var line = request.Point.Locations.FirstOrDefault(l => l.Path == _viewModel.SelectedFile?.Path)?.Line ?? request.Point.Line;
-            await ActiveEditor.RevealLineAsync(line, request.Reason == NavigationReason.Arrived ? null : motion, token).ConfigureAwait(true);
-
-            if (ExistingCard(request.Point.Id) is ReviewCardView arriving && request.Reason != NavigationReason.Refocus)
-            {
-                await motion.RevealAsync(arriving.CardSurface, Motion.MotionPreset.NavigateReviewPoint, token).ConfigureAwait(true);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-    }
-
-    private async void OnPlanNavigationRequested(object? sender, PlanTarget target)
+    /// <summary>Scrolls the diff to a line (a fold's group member, a flag), once the file has laid out.</summary>
+    private async void OnLineFocusRequested(object? sender, (int Line, bool OldSide) target)
     {
         _navigation?.Cancel();
         _navigation?.Dispose();
@@ -309,18 +229,24 @@ public sealed partial class PullRequestView : UserControl, IDisposable
         try
         {
             await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render, token);
-            if (_viewModel?.CurrentDiff is not { } diff || diff.Path != target.Path)
+            if (_viewModel?.CurrentDiff is not { } diff)
             {
                 return;
             }
 
-            var badgeLine = target.FoldId is { } id ? diff.CardLine(DiffFold.CardPrefix + id) : null;
-            var documentLine = badgeLine ?? (target.IsOldSide
-                ? diff.Rows.Select((row, index) => (row, index)).Where(x => x.row.OldNumber >= target.StartLine).Select(x => (int?)(x.index + 1)).FirstOrDefault()
-                : diff.DocumentLineForNewLine(target.StartLine));
+            var documentLine = target.OldSide
+                ? diff.Rows.Select((row, index) => (row, index)).Where(x => x.row.OldNumber >= target.Line).Select(x => (int?)(x.index + 1)).FirstOrDefault()
+                : diff.DocumentLineForNewLine(target.Line);
             if (documentLine is { } line)
             {
-                await Editor.RevealDocumentLineAsync(line, App.Motion, token).ConfigureAwait(true);
+                if (_viewModel.IsSplitView)
+                {
+                    await SplitEditor.RevealUnifiedLineAsync(line, App.Motion).ConfigureAwait(true);
+                }
+                else
+                {
+                    await Editor.RevealDocumentLineAsync(line, App.Motion, token).ConfigureAwait(true);
+                }
             }
         }
         catch (OperationCanceledException)
@@ -337,26 +263,15 @@ public sealed partial class PullRequestView : UserControl, IDisposable
 
         switch (e.PropertyName)
         {
-            case nameof(PullRequestViewModel.Tab):
-                ApplyMapPanes(_viewModel.IsMapTab);
-                break;
-
-            case nameof(PullRequestViewModel.Mode) when _viewModel.IsExamining:
-                var source = _viewModel.CurrentPoint is { } current && ExistingCard(current.Id) is ReviewCardView card && card.IsEffectivelyVisible
-                    ? card.CardSurface
-                    : null;
-                await Examine.EnterAsync(source).ConfigureAwait(true);
-                break;
-
-            case nameof(PullRequestViewModel.Mode):
-                await App.Motion.RevealAsync(this.FindControl<Grid>("Center")!, Motion.MotionPreset.CollapseFinding, CancellationToken.None).ConfigureAwait(true);
+            case nameof(PullRequestViewModel.IsRightPaneOpen):
+                ApplyRightPane(_viewModel.IsRightPaneOpen);
                 break;
 
             case nameof(PullRequestViewModel.Toast) when _viewModel.Toast is not null:
                 _toast?.Cancel();
                 _toast = new CancellationTokenSource();
                 var token = _toast.Token;
-                await App.Motion.RevealAsync(this.FindControl<Border>("ToastHost")!, Motion.MotionPreset.RevealEvidence, token).ConfigureAwait(true);
+                await App.Motion.RevealAsync(this.FindControl<Border>("ToastHost")!, Motion.MotionPreset.Reveal, token).ConfigureAwait(true);
                 try
                 {
                     await Task.Delay(3200, token).ConfigureAwait(true);
@@ -372,21 +287,6 @@ public sealed partial class PullRequestView : UserControl, IDisposable
                 await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
                 this.FindControl<TextBox>("FindBox")?.Focus();
                 break;
-
-            case nameof(PullRequestViewModel.SourcePreview) when _viewModel.SourcePreview is { } preview:
-                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
-                var scroll = this.FindControl<ScrollViewer>("SourceScroll")!;
-                scroll.Offset = new Avalonia.Vector(0, Math.Max(0, (preview.Line - preview.StartLine - 8) * 17.5));
-                await App.Motion.RevealAsync(this.FindControl<Border>("SourceSheet")!, Motion.MotionPreset.OpenPrecedent, CancellationToken.None).ConfigureAwait(true);
-                break;
-        }
-    }
-
-    private void OnScrimPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (e.Source == sender)
-        {
-            _viewModel?.CloseSource();
         }
     }
 

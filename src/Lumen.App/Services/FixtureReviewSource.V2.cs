@@ -7,7 +7,7 @@ using Lumen.Contracts;
 namespace Lumen.App.Services;
 
 /// <summary>
-/// The review client against the fixture (plan v2): inbox, details, threads, a pending review and the walkthrough,
+/// The review client against the fixture (plan v2): inbox, details, threads, a pending review, marks and since-my-last-look,
 /// all in memory. Writes behave as GitHub would (a pending review swallows single comments; submitting publishes it)
 /// and are echoed as events; nothing leaves the machine.
 /// </summary>
@@ -18,18 +18,16 @@ public sealed partial class FixtureReviewSource
     private PendingReview _pending = new();
     private PullRequestDetails _details = new();
     private Inbox _inbox = new();
-    private Walkthrough? _walkthrough;
+    private SinceLastLook? _sinceLastLook;
+    private LocalBranches _localBranches = new();
+    private bool _localBranchMode;
     private InboxSettings _inboxSettings = new();
     private readonly List<System.Threading.Channels.Channel<Inbox>> _inboxWatchers = [];
     private int _ids;
 
     public List<SubmitReviewRequest> SubmittedReviews { get; } = [];
 
-    public List<StartWalkthroughRequest> WalkthroughRequests { get; } = [];
-
     public List<string> IssueComments { get; } = [];
-
-    public bool CloudflareStored { get; set; } = true;
 
     public PendingReview Pending => _pending;
 
@@ -49,9 +47,6 @@ public sealed partial class FixtureReviewSource
                         break;
                     case PullRequestEvent.EventOneofCase.PendingReviewUpdated:
                         _pending = evt.PendingReviewUpdated;
-                        break;
-                    case PullRequestEvent.EventOneofCase.WalkthroughUpdated:
-                        _walkthrough = evt.WalkthroughUpdated.Walkthrough;
                         break;
                 }
             }
@@ -94,6 +89,20 @@ public sealed partial class FixtureReviewSource
             }
         }
 
+        var since = Path.Combine(directory, "since.json");
+        if (File.Exists(since))
+        {
+            _sinceLastLook = parser.Parse<SinceLastLook>(File.ReadAllText(since));
+        }
+
+        var local = Path.Combine(directory, "..", "inbox", "local-branches.json");
+        if (File.Exists(local))
+        {
+            _localBranches = parser.Parse<LocalBranches>(File.ReadAllText(local));
+        }
+
+        _localBranchMode = _events.Any(e => e.Snapshot is { Local: not null });
+
         var inbox = Path.Combine(directory, "..", "inbox", "inbox.json");
         _inbox = File.Exists(inbox) ? parser.Parse<Inbox>(File.ReadAllText(inbox)) : SynthesizedInbox();
     }
@@ -107,17 +116,9 @@ public sealed partial class FixtureReviewSource
             yield return new PullRequestEvent { TimelineUpdated = new TimelineUpdated { Timeline = { _details.Timeline } } };
             yield return new PullRequestEvent { ChecksUpdated = new ChecksUpdated { Checks = { _details.Checks }, HeadSha = _details.HeadSha } };
             yield return new PullRequestEvent { PendingReviewUpdated = _pending.Clone() };
-            if (_walkthrough is not null)
+            if (_marks.Count > 0 || _events.Any(e => e.SlicesReady is not null))
             {
-                yield return new PullRequestEvent
-                {
-                    WalkthroughUpdated = new WalkthroughUpdated
-                    {
-                        Walkthrough = ConnectionSettings.AllowCodeToFastModel && CloudflareStored
-                            ? _walkthrough
-                            : new Walkthrough { Status = WalkthroughStatus.Unavailable, Detail = "Turn on the walkthrough in Connections to send the diff to the fast model." },
-                    },
-                };
+                yield return new PullRequestEvent { MarksUpdated = MarksEvent() };
             }
         }
     }
@@ -344,7 +345,7 @@ public sealed partial class FixtureReviewSource
 
     public Task<PendingReview> GetPendingReviewAsync(PullRequestRef pullRequest, CancellationToken cancellationToken) => Task.FromResult(_pending.Clone());
 
-    private PendingReview AddPending(string path, DiffSide side, int line, int startLine, string body, string? reviewPointId, string? replyTo)
+    private PendingReview AddPending(string path, DiffSide side, int line, int startLine, string body, string? replyTo)
     {
         if (_pending.Id.Length == 0)
         {
@@ -371,23 +372,11 @@ public sealed partial class FixtureReviewSource
                 Line = line,
                 StartLine = startLine,
                 Body = body.Trim(),
-                ReviewPointId = reviewPointId ?? "",
             });
         }
 
         Broadcast(new PullRequestEvent { PendingReviewUpdated = _pending.Clone() });
         return _pending.Clone();
-    }
-
-    private void MarkCommented(string? reviewPointId)
-    {
-        if (!string.IsNullOrEmpty(reviewPointId))
-        {
-            Broadcast(new PullRequestEvent
-            {
-                ReviewPointStateChanged = new ReviewPointStateChanged { ReviewPointId = reviewPointId, State = ReviewPointState.Commented },
-            });
-        }
     }
 
     public Task<PendingReview> AddPendingCommentAsync(AddPendingCommentRequest request, CancellationToken cancellationToken)
@@ -403,9 +392,7 @@ public sealed partial class FixtureReviewSource
             request.Line,
             request.StartLine,
             request.Body,
-            request.ReviewPointId,
             request.ReplyToThreadId.Length > 0 ? request.ReplyToThreadId : null);
-        MarkCommented(request.ReviewPointId);
         return Task.FromResult(pending);
     }
 
@@ -498,52 +485,74 @@ public sealed partial class FixtureReviewSource
         return Task.FromResult(new SubmitReviewReply { Url = "https://example.invalid/fixture-review", HeadSha = _details.HeadSha });
     }
 
-    // ---------------------------------------------------------------- Fast model
+    // ---------------------------------------------------------------- Overhaul: local branches and tracking
 
-    public Task<Connections> SetCloudflareCredentialsAsync(string accountId, string apiToken, CancellationToken cancellationToken)
-    {
-        CloudflareStored = !string.IsNullOrWhiteSpace(accountId) && !string.IsNullOrWhiteSpace(apiToken);
-        return Task.FromResult(FixtureConnections());
-    }
+    private readonly Dictionary<string, string> _marks = new(StringComparer.Ordinal);
 
-    public Task<Connections> RemoveCloudflareCredentialsAsync(CancellationToken cancellationToken)
-    {
-        CloudflareStored = false;
-        return Task.FromResult(FixtureConnections());
-    }
+    /// <summary>Every SetMarked request, so tests can see what was marked.</summary>
+    public List<SetMarkedRequest> MarkRequests { get; } = [];
 
-    /// <summary>A recorded walkthrough for the whole PR; a short one built from the range for "since last review".</summary>
-    public async Task StartWalkthroughAsync(StartWalkthroughRequest request, CancellationToken cancellationToken)
+    /// <summary>Paths whose Viewed box the fixture "ticked" because every slice holding them is reviewed.</summary>
+    public HashSet<string> ViewedTicks { get; } = new(StringComparer.Ordinal);
+
+    public IAsyncEnumerable<PullRequestEvent> WatchAsync(WatchPullRequestRequest request, CancellationToken cancellationToken) =>
+        WatchAsync(request.PullRequest ?? new PullRequestRef(), request.Refresh, cancellationToken);
+
+    public Task<LocalBranches> ListLocalBranchesAsync(CancellationToken cancellationToken) => Task.FromResult(_localBranches.Clone());
+
+    public Task<MarksUpdated> SetMarkedAsync(SetMarkedRequest request, CancellationToken cancellationToken)
     {
-        WalkthroughRequests.Add(request.Clone());
-        if (request.Since is not { FromSha.Length: > 0 } since)
+        MarkRequests.Add(request.Clone());
+        var fingerprints = _events.Where(e => e.SlicesReady is not null).SelectMany(e => e.SlicesReady.Units)
+            .GroupBy(u => u.Unit, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First().Fingerprint, StringComparer.Ordinal);
+        foreach (var unit in request.Units)
         {
-            if (_walkthrough is not null)
+            if (request.Marked)
             {
-                Broadcast(new PullRequestEvent { WalkthroughUpdated = new WalkthroughUpdated { Walkthrough = _walkthrough } });
+                _marks[unit] = fingerprints.GetValueOrDefault(unit, "");
             }
-
-            return;
+            else
+            {
+                _marks.Remove(unit);
+            }
         }
 
-        var range = await GetDiffRangeAsync(
-            new GetDiffRangeRequest { PullRequest = request.PullRequest, Range = new CommitRange { FromSha = since.FromSha, ToSha = _details.HeadSha } },
-            cancellationToken).ConfigureAwait(false);
-        var delta = new Walkthrough
-        {
-            Status = WalkthroughStatus.Complete,
-            Intent = string.Create(
-                CultureInfo.InvariantCulture,
-                $"Since you last looked: {range.Files.Count} files changed, mostly signals, the scheduler and the settings page."),
-            Producer = _walkthrough?.Producer ?? "fixture",
-            HeadSha = _details.HeadSha,
-            Since = new CommitRange { FromSha = since.FromSha, ToSha = _details.HeadSha },
-            FilesDone = range.Files.Count,
-            FilesTotal = range.Files.Count,
-        };
-        var group = new WalkthroughGroup { Id = "g1", Title = "Changes since your last review", Order = 1 };
-        group.Paths.AddRange(range.Files.Where(f => !f.IsMechanical).Select(f => f.Path));
-        delta.Groups.Add(group);
-        Broadcast(new PullRequestEvent { WalkthroughUpdated = new WalkthroughUpdated { Walkthrough = delta } });
+        var reply = MarksEvent();
+        reply.ViewedPaths.AddRange(ViewedNow(fingerprints));
+        Broadcast(new PullRequestEvent { MarksUpdated = reply.Clone() });
+        return Task.FromResult(reply);
     }
+
+    /// <summary>Like the engine: a file is Viewed once every slice holding it has all its units marked.</summary>
+    private List<string> ViewedNow(Dictionary<string, string> fingerprints)
+    {
+        var slices = _events.LastOrDefault(e => e.SlicesReady is not null)?.SlicesReady;
+        if (slices is null || _localBranchMode)
+        {
+            return [];
+        }
+
+        bool Reviewed(Slice slice) => slice.Files.All(f => fingerprints.Keys.Where(u => u == f.Path || u.StartsWith(f.Path + "::", StringComparison.Ordinal))
+            .All(u => _marks.TryGetValue(u, out var fp) && fp == fingerprints[u]));
+        var newly = new List<string>();
+        foreach (var path in slices.Slices.SelectMany(s => s.Files).Select(f => f.Path).Distinct(StringComparer.Ordinal))
+        {
+            if (slices.Slices.Where(s => s.Files.Any(f => f.Path == path)).All(Reviewed) && ViewedTicks.Add(path))
+            {
+                newly.Add(path);
+            }
+        }
+
+        return newly;
+    }
+
+    private MarksUpdated MarksEvent()
+    {
+        var reply = new MarksUpdated();
+        reply.Marks.AddRange(_marks.Select(kv => new ReviewMark { Unit = kv.Key, Fingerprint = kv.Value }));
+        return reply;
+    }
+
+    public Task<SinceLastLook> GetSinceLastLookAsync(PullRequestRef pullRequest, CancellationToken cancellationToken) =>
+        Task.FromResult(_sinceLastLook?.Clone() ?? new SinceLastLook { NewHeadSha = _details.HeadSha });
 }

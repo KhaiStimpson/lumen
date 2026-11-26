@@ -173,7 +173,9 @@ public sealed partial class InboxService(
             try
             {
                 var result = await gitHub.SearchInboxAsync(QueriesFor(watched), cancellationToken).ConfigureAwait(false);
-                var opened = await visits.GetVisitsAsync(cancellationToken).ConfigureAwait(false);
+                var opened = (await visits.GetVisitsAsync(cancellationToken).ConfigureAwait(false)).Values
+                    .Where(v => v.Target is PullRequestTarget)
+                    .ToDictionary(v => ((PullRequestTarget)v.Target).PullRequest);
                 inbox = Build(result, opened, watched.Count > 0);
             }
             catch (Exception ex) when (ex is GitHubApiException or GitHubAuthenticationException or HttpRequestException)

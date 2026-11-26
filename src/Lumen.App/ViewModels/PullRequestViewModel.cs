@@ -9,25 +9,10 @@ using Lumen.Contracts;
 
 namespace Lumen.App.ViewModels;
 
-public enum ReviewMode
-{
-    Diff,
-    Examine,
-}
-
-public enum NavigationReason
-{
-    Next,
-    Previous,
-    Select,
-    Arrived,
-    Refocus,
-}
-
-/// <summary>Asks the view to bring a review point into view (the view owns the motion).</summary>
-public sealed record NavigationRequest(ReviewPointViewModel Point, NavigationReason Reason, ReviewPointViewModel? From);
-
-/// <summary>One open pull request: its files, diff, review points and the guided-review state (TDD §20).</summary>
+/// <summary>
+/// One open review: a GitHub pull request or a local branch. Its files and diff, folds, threads and the pending review;
+/// slices, flags and marks live in their own partials.
+/// </summary>
 public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDisposable
 {
     private readonly IReviewSource _source;
@@ -39,29 +24,49 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
     // Head-side file text for the full-file view; null when the file has none (deleted) or couldn't be loaded.
     private readonly Dictionary<string, string?> _headCache = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FileTreeNode> _nodes = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _arrived = new(StringComparer.Ordinal);
+    private readonly WatchPullRequestRequest _watchRequest;
     private Task? _watch;
     private int _diffVersion;
 
     public PullRequestViewModel(IReviewSource source, PullRequestRef pullRequest)
+        : this(source, new WatchPullRequestRequest { PullRequest = pullRequest })
     {
-        _source = source;
-        Ref = pullRequest;
-        Title = $"{pullRequest.Owner}/{pullRequest.Name} #{pullRequest.Number}";
-        Status = "Connecting…";
-        Map.OpenRequested += (_, _) => _ = OpenMapSelectionAsync();
-        Map.PropertyChanged += OnMapPropertyChanged;
     }
 
-    public PullRequestRef Ref { get; }
+    /// <summary>Opens what <paramref name="request"/> names: a pull request, or a local branch (<c>request.Local</c>).</summary>
+    public PullRequestViewModel(IReviewSource source, WatchPullRequestRequest request)
+    {
+        _source = source;
+        _watchRequest = request.Clone();
+        _watchRequest.Refresh = false;
+        Ref = request.PullRequest ?? new PullRequestRef { Owner = "local", Name = LocalName(request.Local) };
+        Local = request.Local;
+        Title = Local is null ? $"{Ref.Owner}/{Ref.Name} #{Ref.Number}" : LocalName(Local);
+        Status = "Connecting…";
+    }
 
-    public string NumberLabel => $"#{Ref.Number}";
+    private static string LocalName(LocalBranchRef? local) =>
+        local is null ? "" : $"{(local.WorkingTree ? "working tree" : local.HeadRef)} vs {local.BaseRef}";
 
-    public string RepositoryLabel => $"{Ref.Owner} / {Ref.Name}";
+    /// <summary>The pull request, or for a local branch the synthetic ref the engine gives the session (owner "local").</summary>
+    public PullRequestRef Ref { get; private set; }
 
-    public event EventHandler<NavigationRequest>? NavigationRequested;
+    /// <summary>Set when reviewing a local branch: posting controls are hidden and nothing goes to GitHub.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLocal), nameof(CanPost), nameof(NumberLabel), nameof(RepositoryLabel), nameof(LocalLabel))]
+    public partial LocalBranchRef? Local { get; private set; }
 
-    public event EventHandler<PlanTarget>? PlanNavigationRequested;
+    public bool IsLocal => Local is not null;
+
+    /// <summary>Comments, reviews and Viewed ticks only exist for pull requests.</summary>
+    public bool CanPost => !IsLocal;
+
+    public string NumberLabel => IsLocal ? "Local" : $"#{Ref.Number}";
+
+    public string RepositoryLabel => IsLocal ? Local!.ClonePath : $"{Ref.Owner} / {Ref.Name}";
+
+    /// <summary>"C:\src\app · against main · Local branch: comments stay on this machine".</summary>
+    public string LocalLabel => Local is null ? "" : $"{Local.ClonePath} · against {Local.BaseRef} · Local branch: nothing is posted";
 
     // Header ---------------------------------------------------------------------------------------
 
@@ -108,77 +113,71 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
     public bool ViewerIsAuthor => ViewerLogin.Length > 0 && string.Equals(ViewerLogin, Author, StringComparison.OrdinalIgnoreCase);
 
-    // Triage ---------------------------------------------------------------------------------------
+    /// <summary>The head commit (or, for a working tree, the snapshot tree) the review shows.</summary>
+    public string HeadSha => _headSha;
 
-    /// <summary>Where to spend attention, per hunk; null until the engine sends it (or when it could not compute it).</summary>
+    public string HeadShort => _headSha.Length > 7 ? _headSha[..7] : _headSha;
+
+    // Folds ----------------------------------------------------------------------------------------
+
+    /// <summary>What folds, per hunk; null until the engine sends it (or when it could not compute it).</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasTriage), nameof(ChangedLines), nameof(OpenLines), nameof(BoilerplateLines), nameof(MechanicalLines),
+        nameof(ShrinkLabel))]
     public partial TriageReady? Triage { get; set; }
 
-    /// <summary>A group's acknowledged flag changed (the group in <see cref="Triage"/> is already updated).</summary>
-    public event EventHandler<string>? TriageGroupChanged;
+    public bool HasTriage => Triage is not null;
 
-    /// <summary>The right pane: summary, lines per tier, and the tiers the reviewer works through.</summary>
-    public ReviewPlanViewModel ReviewPlan { get; } = new();
+    public int ChangedLines => Triage?.Summary?.TotalLines ?? Additions + Deletions;
 
-    /// <summary>A group or a set of hunks picked from the plan; drives the diff focus while no review point is current.</summary>
-    private PlanTarget? _planFocus;
+    /// <summary>Lines left open by default: what there is to read.</summary>
+    public int OpenLines => Triage?.Summary?.OpenLines ?? 0;
 
-    private void RebuildPlan()
-    {
-        ReviewPlan.Rebuild(Triage, ReviewPoints);
-        UpdateCoverage();
-    }
+    public int BoilerplateLines => Triage?.Summary?.BoilerplateLines ?? 0;
 
-    /// <summary>Hunks the reviewer has opened from the plan or landed on with J/K.</summary>
-    private readonly HashSet<string> _visitedHunks = new(StringComparer.Ordinal);
+    public int MechanicalLines => Triage?.Summary?.MechanicalLines ?? 0;
 
-    /// <summary>0..1 share of Critical and Worth a look lines covered; drives the progress meter.</summary>
-    [ObservableProperty]
-    public partial double CoverageFraction { get; set; }
+    /// <summary>"1,180 lines to read of 4,212 changed".</summary>
+    public string ShrinkLabel => Triage is null
+        ? string.Create(CultureInfo.InvariantCulture, $"{ChangedLines:N0} changed")
+        : string.Create(CultureInfo.InvariantCulture, $"{OpenLines:N0} lines to read of {ChangedLines:N0} changed");
 
-    [ObservableProperty]
-    public partial string CoverageLabel { get; set; } = "";
-
-    /// <summary>Short form for the files header, e.g. "38% covered"; empty until triage arrives.</summary>
-    [ObservableProperty]
-    public partial string CoverageShort { get; set; } = "";
-
-    private void UpdateCoverage()
-    {
-        var viewed = Files.Where(f => f.IsViewed).Select(f => f.Path).ToHashSet(StringComparer.Ordinal);
-        var (covered, total) = ReviewPlanBuilder.Coverage(Triage, ReviewPoints, viewed, _visitedHunks);
-        var percent = total == 0 ? 0 : (int)Math.Floor(100.0 * covered / total);
-        CoverageFraction = total == 0 ? 0 : (double)covered / total;
-        CoverageLabel = Triage is null ? "" : total == 0
-            ? "Nothing in Critical or Worth a look"
-            : string.Create(CultureInfo.InvariantCulture, $"You've covered {percent}% of Critical and Worth a look");
-        CoverageShort = Triage is null || total == 0 ? "" : string.Create(CultureInfo.InvariantCulture, $"{percent}% covered");
-    }
-
-    private void MarkVisited(string path, int startLine, int endLine, bool oldSide = false)
-    {
-        foreach (var hunk in Triage?.Hunks.Where(h => h.Path == path && (oldSide
-                     ? h.OldStart > 0 && h.OldStart <= endLine && startLine <= h.OldEnd
-                     : h.NewStart > 0 && h.NewStart <= endLine && startLine <= h.NewEnd)) ?? [])
-        {
-            _visitedHunks.Add(DiffFolds.IdFor(hunk));
-        }
-
-        UpdateCoverage();
-    }
-
-    /// <summary>Mechanical hunks the reviewer opened; everything else proven mechanical stays behind its badge.</summary>
+    /// <summary>Folds the reviewer opened; everything else proven or summarised stays behind its one-line reason.</summary>
     private readonly HashSet<string> _expandedFolds = new(StringComparer.Ordinal);
+
+    /// <summary>Folds opened at least once this session, for "Mark reviewed" ("2 folds not opened").</summary>
+    private readonly HashSet<string> _openedFolds = new(StringComparer.Ordinal);
+
+    public bool IsFoldOpened(string foldId) => _openedFolds.Contains(foldId);
 
     public void ToggleFold(string foldId)
     {
         if (!_expandedFolds.Remove(foldId))
         {
             _expandedFolds.Add(foldId);
+            _openedFolds.Add(foldId);
         }
 
         RebuildCurrentDiff();
+        OnFoldsChanged();
     }
+
+    /// <summary>Opens every fold in the files given (the "open all folds in slice" key).</summary>
+    public void OpenFolds(IEnumerable<string> paths)
+    {
+        var set = paths.ToHashSet(StringComparer.Ordinal);
+        foreach (var hunk in Triage?.Hunks.Where(h => set.Contains(h.Path) && DiffFolds.Folds(h)) ?? [])
+        {
+            var id = DiffFolds.IdFor(hunk);
+            _expandedFolds.Add(id);
+            _openedFolds.Add(id);
+        }
+
+        RebuildCurrentDiff();
+        OnFoldsChanged();
+    }
+
+    partial void OnFoldsChanged();
 
     public FoldBadgeViewModel? ResolveFold(string cardId)
     {
@@ -188,111 +187,48 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
             return null;
         }
 
-        var group = hunk.GroupId.Length == 0 ? null : ReviewPlan.Groups.FirstOrDefault(g => g.Id == hunk.GroupId);
-        var index = group is null ? 0 : group.Members.ToList().FindIndex(m => DiffFolds.IdFor(m) == id);
-        return new FoldBadgeViewModel(this, id, hunk, _expandedFolds.Contains(id), group, Math.Max(0, index));
+        var group = hunk.GroupId.Length == 0 ? null : Triage.Groups.FirstOrDefault(g => g.Id == hunk.GroupId);
+        var members = group is null ? [] : Triage.Hunks.Where(h => h.GroupId == group.Id).ToList();
+        var index = members.FindIndex(m => DiffFolds.IdFor(m) == id);
+        return new FoldBadgeViewModel(this, id, hunk, _expandedFolds.Contains(id), group, members, Math.Max(0, index));
     }
 
     /// <summary>Opens another hunk of the same group, so a rename or move can be followed across files.</summary>
-    public Task GoToGroupMemberAsync(TriageGroupViewModel group, int index)
+    public async Task GoToGroupMemberAsync(IReadOnlyList<HunkTriage> members, int index)
     {
-        if (index < 0 || index >= group.Members.Count)
+        if (index < 0 || index >= members.Count)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        foreach (var other in ReviewPlan.Groups)
-        {
-            other.IsCurrent = other == group;
-        }
-
-        return FocusPlanTargetAsync(ReviewPlanBuilder.TargetOf(group.Members[index]));
-    }
-
-    partial void OnTriageChanged(TriageReady? value)
-    {
-        RebuildPlan();
-        RebuildCurrentDiff();
-        foreach (var file in Files)
-        {
-            file.TierLines = value?.Files.FirstOrDefault(f => f.Path == file.Path)?.TierLines;
-        }
-
-        OnPropertyChanged(nameof(GeneratedSummary));
-    }
-
-    /// <summary>Clears or restores a triage group; the change arrives back as an event, like the Viewed tick.</summary>
-    public async Task SetTriageGroupAcknowledgedAsync(string groupId, bool acknowledged)
-    {
-        try
-        {
-            await _source.SetTriageGroupAcknowledgedAsync(Ref, groupId, acknowledged, _lifetime.Token).ConfigureAwait(true);
-        }
-        catch (RpcException ex) when (!(ex.StatusCode == StatusCode.Cancelled && _lifetime.IsCancellationRequested))
-        {
-            Toast = $"Couldn't {(acknowledged ? "clear" : "restore")} that group: {ex.Status.Detail}";
-        }
-    }
-
-    [RelayCommand]
-    public Task ToggleGroupAcknowledgedAsync(TriageGroupViewModel? group) =>
-        group is null ? Task.CompletedTask : SetTriageGroupAcknowledgedAsync(group.Id, !group.Acknowledged);
-
-    [RelayCommand]
-    public Task SelectTriageGroupAsync(TriageGroupViewModel? group)
-    {
-        if (group?.Target is not { } target)
-        {
-            return Task.CompletedTask;
-        }
-
-        foreach (var other in ReviewPlan.Groups)
-        {
-            other.IsCurrent = other == group;
-        }
-
-        return FocusPlanTargetAsync(target);
-    }
-
-    [RelayCommand]
-    public Task SelectMoreChangesAsync(MoreChangesViewModel? more)
-    {
-        if (more?.Target is not { } target)
-        {
-            return Task.CompletedTask;
-        }
-
-        foreach (var group in ReviewPlan.Groups)
-        {
-            group.IsCurrent = false;
-        }
-
-        return FocusPlanTargetAsync(target);
-    }
-
-    private async Task FocusPlanTargetAsync(PlanTarget target)
-    {
-        Mode = ReviewMode.Diff;
-        if (CurrentPoint is { } point)
-        {
-            point.IsCurrent = false;
-            CurrentPoint = null;
-        }
-
-        _planFocus = target;
-        if (Files.FirstOrDefault(f => f.Path == target.Path) is { } file && SelectedFile?.Path != target.Path)
+        var hunk = members[index];
+        if (Files.FirstOrDefault(f => f.Path == hunk.Path) is { } file && SelectedFile?.Path != hunk.Path)
         {
             await SelectFileAsync(file).ConfigureAwait(true);
         }
 
-        UpdateMarkers();
-        OnPropertyChanged(nameof(PositionLabel));
-        if (CurrentDiff?.Path == target.Path)
-        {
-            MarkVisited(target.Path, target.StartLine, target.EndLine, target.IsOldSide);
-            PlanNavigationRequested?.Invoke(this, target);
-        }
+        var start = hunk.NewStart > 0 ? hunk.NewStart : hunk.OldStart;
+        var end = hunk.NewEnd > 0 ? hunk.NewEnd : hunk.OldEnd;
+        FocusRange = (start, end);
+        LineFocusRequested?.Invoke(this, (start, hunk.NewStart == 0));
     }
+
+    /// <summary>Asks the view to scroll to a line (head side unless the flag says old).</summary>
+    public event EventHandler<(int Line, bool OldSide)>? LineFocusRequested;
+
+    partial void OnTriageChanged(TriageReady? value)
+    {
+        RebuildCurrentDiff();
+        foreach (var file in Files)
+        {
+            file.FoldLines = value?.Files.FirstOrDefault(f => f.Path == file.Path)?.FoldLines;
+        }
+
+        OnPropertyChanged(nameof(GeneratedSummary));
+        OnTriageApplied();
+    }
+
+    partial void OnTriageApplied();
 
     // Files ----------------------------------------------------------------------------------------
 
@@ -337,90 +273,14 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
     public string GeneratedSummary => GeneratedFiles.Count == 0
         ? ""
-        : GeneratedFiles.All(f => f.TierLines is not null)
-            ? string.Create(CultureInfo.InvariantCulture, $"{GeneratedFiles.Count} generated files · {GeneratedFiles.Sum(f => f.TierLines!.Skip):N0} lines")
+        : GeneratedFiles.All(f => f.FoldLines is not null)
+            ? string.Create(CultureInfo.InvariantCulture, $"{GeneratedFiles.Count} generated files · {GeneratedFiles.Sum(f => f.FoldLines!.Mechanical):N0} lines")
             : string.Create(CultureInfo.InvariantCulture, $"{GeneratedFiles.Count} generated files · +{GeneratedFiles.Sum(f => f.Model.Additions)}");
-
-    // Review points --------------------------------------------------------------------------------
-
-    public ObservableCollection<ReviewPointViewModel> ReviewPoints { get; } = [];
-
-    public ObservableCollection<ConventionViewModel> Conventions { get; } = [];
-
-    public IEnumerable<ReviewPointViewModel> OpenPoints => ReviewPoints.Where(p => !p.IsDismissed);
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PositionLabel), nameof(HasCurrentPoint))]
-    public partial ReviewPointViewModel? CurrentPoint { get; set; }
-
-    public bool HasCurrentPoint => CurrentPoint is not null;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsExamining))]
-    public partial ReviewMode Mode { get; set; }
-
-    public bool IsExamining => Mode == ReviewMode.Examine;
-
-    /// <summary>"precedent", "evidence" or "comment".</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsPrecedentTab), nameof(IsEvidenceTab), nameof(IsCommentTab))]
-    public partial string ExamineTab { get; set; } = "precedent";
-
-    public bool IsPrecedentTab
-    {
-        get => ExamineTab == "precedent";
-        set
-        {
-            if (value)
-            {
-                ExamineTab = "precedent";
-            }
-        }
-    }
-
-    public bool IsEvidenceTab
-    {
-        get => ExamineTab == "evidence";
-        set
-        {
-            if (value)
-            {
-                ExamineTab = "evidence";
-            }
-        }
-    }
-
-    public bool IsCommentTab
-    {
-        get => ExamineTab == "comment";
-        set
-        {
-            if (value)
-            {
-                ExamineTab = "comment";
-                StartComment(null);
-            }
-        }
-    }
-
-    public string PositionLabel
-    {
-        get
-        {
-            var stops = PlanStops();
-            var index = CurrentStop is { } current ? stops.IndexOf(current) : -1;
-            return stops.Count == 0 ? (IsAnalysing ? "—" : "none open") :
-                index < 0 ? string.Create(CultureInfo.InvariantCulture, $"{stops.Count} to review") :
-                string.Create(CultureInfo.InvariantCulture, $"{index + 1} of {stops.Count}");
-        }
-    }
-
-    public string ReviewFocusLabel => string.Create(CultureInfo.InvariantCulture, $"{OpenPoints.Count()} key points");
 
     [ObservableProperty]
     public partial string? Toast { get; set; }
 
-    // Lifecycle ------------------------------------------------------------------------------------
+    // Loading --------------------------------------------------------------------------------------
 
     public void Start() => _watch ??= WatchAsync(refresh: false);
 
@@ -428,7 +288,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
     [ObservableProperty]
     public partial bool NeedsReanalysis { get; set; }
 
-    public string ReanalyseLabel => $"Re-analyse {NumberLabel}";
+    public string ReanalyseLabel => IsLocal ? "Re-analyse" : $"Re-analyse {NumberLabel}";
 
     [RelayCommand]
     private Task ReanalyseAsync()
@@ -464,15 +324,9 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         _watchCts.Dispose();
         _watchCts = new CancellationTokenSource();
         ++_diffVersion;
-        ReviewPoints.Clear();
-        Conventions.Clear();
-        _arrived.Clear();
         _diffCache.Clear();
         _headCache.Clear();
-        _visitedHunks.Clear();
         _expandedFolds.Clear();
-        _planFocus = null;
-        ReviewPlan.Reset();
         Triage = null;
         Files.Clear();
         GeneratedFiles.Clear();
@@ -483,15 +337,11 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         CurrentDiff = null;
         Markers = [];
         FocusRange = null;
-        SourcePreview = null;
         IsDiffLoading = false;
-        CurrentPoint = null;
-        Mode = ReviewMode.Diff;
         IsAnalysing = true;
         IsLoading = true;
         IsAuthenticationError = false;
         _completeStatus = "";
-        RebuildPlan();
         OnPropertyChanged(nameof(ViewedSummary));
         OnPropertyChanged(nameof(ViewedCount));
         OnPropertyChanged(nameof(GeneratedSummary));
@@ -502,15 +352,20 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         Timeline.Clear();
         Checks.Clear();
         ResetReviewClientState();
+        ResetOverhaulState();
     }
+
+    partial void ResetOverhaulState();
 
     private async Task WatchAsync(bool refresh)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, _watchCts.Token);
         var token = linked.Token;
+        var request = _watchRequest.Clone();
+        request.Refresh = refresh;
         try
         {
-            await foreach (var evt in _source.WatchAsync(Ref, refresh, token).ConfigureAwait(true))
+            await foreach (var evt in _source.WatchAsync(request, token).ConfigureAwait(true))
             {
                 await ApplyAsync(evt).ConfigureAwait(true);
             }
@@ -557,27 +412,16 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
                 Triage = evt.TriageReady;
                 break;
 
-            case PullRequestEvent.EventOneofCase.TriageGroupAcknowledged:
-                if (Triage?.Groups.FirstOrDefault(g => g.Id == evt.TriageGroupAcknowledged.GroupId) is { } group)
-                {
-                    group.Acknowledged = evt.TriageGroupAcknowledged.Acknowledged;
-                    RebuildPlan();
-                    TriageGroupChanged?.Invoke(this, group.Id);
-                }
-
+            case PullRequestEvent.EventOneofCase.SlicesReady:
+                ApplySlices(evt.SlicesReady);
                 break;
 
-            case PullRequestEvent.EventOneofCase.ReviewPointAdded:
-                AddReviewPoint(evt.ReviewPointAdded);
+            case PullRequestEvent.EventOneofCase.FlagsReady:
+                ApplyFlags(evt.FlagsReady);
                 break;
 
-            case PullRequestEvent.EventOneofCase.ReviewPointStateChanged:
-                if (ReviewPoints.FirstOrDefault(p => p.Id == evt.ReviewPointStateChanged.ReviewPointId) is { } changed)
-                {
-                    changed.State = evt.ReviewPointStateChanged.State;
-                    RefreshPointDerivedState();
-                }
-
+            case PullRequestEvent.EventOneofCase.MarksUpdated:
+                ApplyMarks(evt.MarksUpdated);
                 break;
 
             case PullRequestEvent.EventOneofCase.FileViewed:
@@ -586,49 +430,14 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
                     viewedFile.IsViewed = evt.FileViewed.Viewed;
                     OnPropertyChanged(nameof(ViewedSummary));
                     OnPropertyChanged(nameof(ViewedCount));
-                    UpdateCoverage();
                 }
 
-                break;
-
-            case PullRequestEvent.EventOneofCase.Conventions:
-                Conventions.Clear();
-                foreach (var convention in RankConventions(evt.Conventions.Conventions).Take(5))
-                {
-                    Conventions.Add(new ConventionViewModel(convention));
-                }
-
-                break;
-
-            case PullRequestEvent.EventOneofCase.ReviewPointUpdated:
-                if (ReviewPoints.FirstOrDefault(p => p.Id == evt.ReviewPointUpdated.Id) is { } existing)
-                {
-                    existing.Update(evt.ReviewPointUpdated);
-                    RefreshPointDerivedState();
-                }
-
-                break;
-
-            case PullRequestEvent.EventOneofCase.InvestigationStatus:
-                // TDD §49: one quiet line, never an agents dashboard.
-                var active = evt.InvestigationStatus.Active;
-                Status = active > 0
-                    ? string.Create(CultureInfo.InvariantCulture, $"Analysing {active} area{(active == 1 ? "" : "s")}…")
-                    : evt.InvestigationStatus.Detail.Length > 0 ? $"{_completeStatus} · {evt.InvestigationStatus.Detail}" : _completeStatus;
                 break;
 
             case PullRequestEvent.EventOneofCase.Complete:
                 IsAnalysing = false;
-                OnPropertyChanged(nameof(PositionLabel));
-                _completeStatus = OpenPoints.Any()
-                    ? string.Create(CultureInfo.InvariantCulture, $"{OpenPoints.Count()} review points · analysed in {evt.Complete.DurationMs / 1000.0:0.0}s")
-                    : "Nothing needs special attention";
+                _completeStatus = string.Create(CultureInfo.InvariantCulture, $"Analysed in {evt.Complete.DurationMs / 1000.0:0.0}s");
                 Status = _completeStatus;
-                if (CurrentPoint is null && OpenPoints.FirstOrDefault() is { } first)
-                {
-                    await GoToAsync(first, NavigationReason.Arrived).ConfigureAwait(true);
-                }
-
                 break;
 
             case PullRequestEvent.EventOneofCase.Failed:
@@ -654,38 +463,41 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
             case PullRequestEvent.EventOneofCase.PendingReviewUpdated:
                 ApplyPendingReview(evt.PendingReviewUpdated);
                 break;
-
-            case PullRequestEvent.EventOneofCase.WalkthroughUpdated:
-                ApplyWalkthrough(evt.WalkthroughUpdated.Walkthrough);
-                break;
         }
     }
 
-    /// <summary>Conventions behind the surfaced review points first, then the broadest well-supported ones.</summary>
-    private IEnumerable<Convention> RankConventions(IEnumerable<Convention> conventions)
-    {
-        var groups = ReviewPoints
-            .SelectMany(p => p.Model.Evidence)
-            .Where(e => !e.IsCounterEvidence && e.Convention.Length > 0)
-            .Select(e => e.Convention)
-            .ToList();
-        return conventions
-            .OrderByDescending(c => groups.Any(g => g.StartsWith(c.PeerGroup, StringComparison.Ordinal)))
-            .ThenByDescending(c => c.PeerCount)
-            .ThenByDescending(c => (double)c.Supporting / Math.Max(1, c.PeerCount));
-    }
+    partial void ApplySlices(SlicesReady slices);
+
+    partial void ApplyFlags(FlagsReady flags);
+
+    partial void ApplyMarks(MarksUpdated marks);
 
     private async Task ApplySnapshotAsync(Contracts.PullRequestSnapshot snapshot)
     {
+        if (snapshot.PullRequest is { } actual)
+        {
+            // A local session's synthetic ref comes from the engine; every later request uses it.
+            Ref = actual;
+        }
+
+        if (snapshot.Local is { } local)
+        {
+            Local = local;
+        }
+
         Title = snapshot.Title;
         Author = snapshot.Author;
         ViewerLogin = snapshot.ViewerLogin;
-        StateLabel = snapshot.IsDraft ? "Draft" : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(snapshot.State);
+        StateLabel = IsLocal ? "Local" : snapshot.IsDraft ? "Draft" : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(snapshot.State);
         Url = snapshot.Url;
         BranchLabel = $"{snapshot.HeadRef} → {snapshot.BaseRef}";
         Additions = snapshot.Files.Sum(f => f.Additions);
         Deletions = snapshot.Files.Sum(f => f.Deletions);
         _headSha = snapshot.HeadSha;
+        OnPropertyChanged(nameof(HeadSha));
+        OnPropertyChanged(nameof(HeadShort));
+        OnPropertyChanged(nameof(ChangedLines));
+        OnPropertyChanged(nameof(ShrinkLabel));
         _snapshotBody = snapshot.Body;
         OnPropertyChanged(nameof(Description));
         OnPropertyChanged(nameof(HasDescription));
@@ -693,8 +505,10 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         OnPropertyChanged(nameof(ViewerIsAuthor));
         OnPropertyChanged(nameof(CanApprove));
         OnPropertyChanged(nameof(ApproveHint));
-        OnPropertyChanged(nameof(WalkthroughTitle));
-        _ = LoadDetailsAsync();
+        if (!IsLocal)
+        {
+            _ = LoadDetailsAsync();
+        }
 
         Files.Clear();
         GeneratedFiles.Clear();
@@ -714,8 +528,6 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         OnPropertyChanged(nameof(GeneratedSummary));
         OnPropertyChanged(nameof(ViewedSummary));
         OnPropertyChanged(nameof(ViewedCount));
-        _mapSincePaths = null;
-        RebuildMap();
         IsLoading = false;
 
         var firstReviewable = Tree.SelectMany(n => n.Descendants().Prepend(n)).FirstOrDefault(n => n.File is not null)?.File ?? Files.FirstOrDefault();
@@ -732,7 +544,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         var filter = FileFilter.Trim();
         var source = Scope is null ? (IEnumerable<FileEntryViewModel>)Files : ScopeFiles;
         var visible = source.Where(f => !f.IsMechanical && (filter.Length == 0 || f.Path.Contains(filter, StringComparison.OrdinalIgnoreCase)));
-        foreach (var node in TreeNodes(visible))
+        foreach (var node in FileTreeNode.Build(visible))
         {
             Tree.Add(node);
         }
@@ -756,49 +568,6 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         {
             _ = SelectFileAsync(file);
         }
-    }
-
-    private void AddReviewPoint(ReviewPoint model)
-    {
-        var point = new ReviewPointViewModel(model, ReviewPoints.Count + 1);
-        ReviewPoints.Add(point);
-        _arrived.Add(point.Id);
-
-        // Keep the list ranked: severity, then priority (the engine's order), stable for equal ranks.
-        var ranked = ReviewPoints.OrderByDescending(p => p.Model.Severity).ThenByDescending(p => p.Model.Priority).ToList();
-        for (var i = 0; i < ranked.Count; i++)
-        {
-            var current = ReviewPoints.IndexOf(ranked[i]);
-            if (current != i)
-            {
-                ReviewPoints.Move(current, i);
-            }
-
-            ranked[i].Ordinal = i + 1;
-        }
-
-        foreach (var location in point.Locations)
-        {
-            if (Files.FirstOrDefault(f => f.Path == location.Path) is { } file)
-            {
-                file.ReviewPointCount++;
-            }
-        }
-
-        RefreshPointDerivedState();
-        if (SelectedFile is not null && point.Locations.Any(l => l.Path == SelectedFile.Path))
-        {
-            RebuildCurrentDiff();
-        }
-    }
-
-    private void RefreshPointDerivedState()
-    {
-        RebuildPlan();
-        OnPropertyChanged(nameof(OpenPoints));
-        OnPropertyChanged(nameof(PositionLabel));
-        OnPropertyChanged(nameof(ReviewFocusLabel));
-        UpdateMarkers();
     }
 
     // Files and diff -------------------------------------------------------------------------------
@@ -855,6 +624,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
                 {
                     Toast = $"Couldn't load {file.Name}: {ex.Status.Detail}";
                 }
+
                 return;
             }
             finally
@@ -875,7 +645,11 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         {
             RebuildCurrentDiff();
         }
+
+        OnFileSelected(file);
     }
+
+    partial void OnFileSelected(FileEntryViewModel file);
 
     partial void OnShowFullFileChanged(bool value) => _ = ApplyShowFullFileAsync();
 
@@ -941,7 +715,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
     [RelayCommand]
     public async Task ToggleViewedAsync(FileEntryViewModel? file)
     {
-        if (file is null)
+        if (file is null || !CanPost)
         {
             return;
         }
@@ -951,7 +725,6 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         twins.ForEach(f => f.IsViewed = viewed);
         OnPropertyChanged(nameof(ViewedSummary));
         OnPropertyChanged(nameof(ViewedCount));
-        UpdateCoverage();
         try
         {
             await _source.SetFileViewedAsync(Ref, file.Path, viewed, _lifetime.Token).ConfigureAwait(true);
@@ -961,7 +734,6 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
             twins.ForEach(f => f.IsViewed = !viewed);
             OnPropertyChanged(nameof(ViewedSummary));
             OnPropertyChanged(nameof(ViewedCount));
-            UpdateCoverage();
             Toast = $"Couldn't mark {file.Name} as {(viewed ? "viewed" : "not viewed")}: {ex.Status.Detail}";
         }
     }
@@ -980,357 +752,74 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
         // The full file is the head's; a range that ends earlier shows its hunks only.
         var head = ShowFullFile && ScopeEndsAtHead ? _headCache.GetValueOrDefault(path) : null;
+
         // Triage spans are lines of the whole pull request's diff, so folds apply only when no range is chosen.
         var folds = Scope is null ? DiffFolds.For(Triage, path, _expandedFolds) : null;
         CurrentDiff = DiffDocument.Build(diff, anchors, head, folds);
         UpdateMarkers();
     }
 
-    /// <summary>Everything that sits under a line of this file: review points, threads, drafts, risks.</summary>
+    /// <summary>Everything that sits under a line of this file: red flags, threads and drafts.</summary>
     private IEnumerable<CardAnchor> CardAnchors(string path) =>
-        ReviewPoints
-            .SelectMany(p => p.Locations.Where(l => l.Path == path).Select(l => new CardAnchor(CardId(p, l), LineSide.Right, l.Line)))
+        FlagAnchors(path)
             .Concat(ThreadAnchors(path))
             .Concat(DraftAnchors(path))
             .Concat(OutdatedAnchors(path));
-
-    /// <summary>The primary location gets the full card; other locations get a compact reference card.</summary>
-    public static string CardId(ReviewPointViewModel point, LocationViewModel location) =>
-        location.IsPrimary ? point.Id : string.Create(CultureInfo.InvariantCulture, $"{point.Id}@{location.Path}:{location.Line}");
-
-    public (ReviewPointViewModel Point, bool IsPrimary)? ResolveCard(string cardId)
-    {
-        var at = cardId.IndexOf('@', StringComparison.Ordinal);
-        var id = at < 0 ? cardId : cardId[..at];
-        return ReviewPoints.FirstOrDefault(p => p.Id == id) is { } point ? (point, at < 0) : null;
-    }
 
     private void UpdateMarkers()
     {
         if (SelectedFile is null)
         {
             Markers = [];
-            FocusRange = null;
             return;
         }
 
-        var path = SelectedFile.Path;
-        Markers = !ScopeEndsAtHead ? [] :
-        [
-            .. ReviewPoints
-                .Where(p => !p.IsDismissed)
-                .SelectMany(p => p.Locations.Where(l => l.Path == path).Select(l => new GutterMarker(
-                    p.Id, l.Line, p.Kind, p == CurrentPoint, p.IsCommented, _arrived.Remove(p.Id)))),
-            .. RiskMarkers(path),
-        ];
-
-        FocusRange = CurrentPoint?.Locations.FirstOrDefault(l => l.Path == path) is { } focus
-            ? (focus.Line, focus.Line)
-            : CurrentPoint is null && _planFocus is { } plan && plan.Path == path
-                ? (plan.StartLine, plan.EndLine)
-                : null;
+        Markers = !ScopeEndsAtHead ? [] : [.. FlagMarkers(SelectedFile.Path)];
     }
 
-    // Guided navigation ----------------------------------------------------------------------------
+    // Navigation -----------------------------------------------------------------------------------
+
+    /// <summary>The files J/K and N/P step through: the current slice's in reading order, else the tree's order.</summary>
+    private List<FileEntryViewModel> NavigableFiles()
+    {
+        var ordered = SliceFileOrder();
+        if (ordered.Count > 0)
+        {
+            return ordered;
+        }
+
+        return [.. Tree.SelectMany(n => n.Descendants().Prepend(n)).Where(n => n.File is not null).Select(n => n.File!)];
+    }
+
+    /// <summary>Next file in reading order; on to the next slice after its last file.</summary>
+    [RelayCommand]
+    public Task NextFileAsync() => StepFileOrSliceAsync(+1);
 
     [RelayCommand]
-    public Task NextPointAsync() => StepAsync(+1);
+    public Task PreviousFileAsync() => StepFileOrSliceAsync(-1);
 
-    [RelayCommand]
-    public Task PreviousPointAsync() => StepAsync(-1);
-
-    /// <summary>
-    /// What J and K walk, in the plan's order: tier by tier (Critical, Worth a look, Skim, Skip, then Consistency),
-    /// review points then groups within a tier. Dismissed points drop out; acknowledged groups stay reachable.
-    /// Folded "N more changes" rows are summaries, opened by clicking, not stops.
-    /// </summary>
-    public List<object> PlanStops() =>
-    [
-        .. ReviewPlan.Sections
-            .SelectMany(s => s.Items)
-            .Where(i => i is ReviewPointViewModel { IsDismissed: false } or TriageGroupViewModel),
-    ];
-
-    /// <summary>The review point or group the reviewer is on.</summary>
-    public object? CurrentStop => (object?)CurrentPoint ?? ReviewPlan.Groups.FirstOrDefault(g => g.IsCurrent);
-
-    private Task StepAsync(int direction)
+    private async Task StepFileOrSliceAsync(int direction)
     {
-        var stops = PlanStops();
-        if (stops.Count == 0)
+        if (!await StepFileAsync(direction).ConfigureAwait(true))
         {
-            // With nothing flagged, J / K walk the walkthrough's change groups instead (plan v2 M8).
-            return WalksGroups ? StepGroupAsync(direction) : Task.CompletedTask;
-        }
-
-        var index = CurrentStop is { } current ? stops.IndexOf(current) : -1;
-        var next = index < 0
-            ? (direction > 0 ? stops[0] : stops[^1])
-            : stops[(index + direction + stops.Count) % stops.Count];
-        return next switch
-        {
-            ReviewPointViewModel point => GoToAsync(point, direction > 0 ? NavigationReason.Next : NavigationReason.Previous),
-            TriageGroupViewModel group => SelectTriageGroupAsync(group),
-            _ => Task.CompletedTask,
-        };
-    }
-
-    /// <summary>A: clear (or restore) the group the reviewer is on, every hunk of it at once.</summary>
-    public Task AcknowledgeCurrentGroupAsync() =>
-        CurrentStop is TriageGroupViewModel group ? ToggleGroupAcknowledgedAsync(group) : Task.CompletedTask;
-
-    [RelayCommand]
-    public Task SelectPointAsync(ReviewPointViewModel? point) =>
-        point is null ? Task.CompletedTask : GoToAsync(point, NavigationReason.Select);
-
-    public async Task GoToAsync(ReviewPointViewModel point, NavigationReason reason, LocationViewModel? location = null)
-    {
-        var previous = CurrentPoint;
-        location ??= point.Locations[0];
-
-        if (SelectedFile?.Path != location.Path && Files.FirstOrDefault(f => f.Path == location.Path) is { } file)
-        {
-            await SelectFileAsync(file).ConfigureAwait(true);
-        }
-
-        if (previous is not null)
-        {
-            previous.IsCurrent = false;
-        }
-
-        point.IsCurrent = true;
-        CurrentPoint = point;
-        _planFocus = null;
-        MarkVisited(location.Path, location.Line, location.Line);
-        foreach (var group in ReviewPlan.Groups)
-        {
-            group.IsCurrent = false;
-        }
-
-        UpdateMarkers();
-        OnPropertyChanged(nameof(PositionLabel));
-        NavigationRequested?.Invoke(this, new NavigationRequest(point, reason, previous));
-    }
-
-    [RelayCommand]
-    public async Task GoToLocationAsync(LocationViewModel? location)
-    {
-        if (location is null || CurrentPoint is null)
-        {
-            return;
-        }
-
-        await GoToAsync(CurrentPoint, NavigationReason.Refocus, location).ConfigureAwait(true);
-    }
-
-    // Examine --------------------------------------------------------------------------------------
-
-    [RelayCommand]
-    public async Task ExamineAsync(ReviewPointViewModel? point)
-    {
-        point ??= CurrentPoint;
-        if (point is null)
-        {
-            return;
-        }
-
-        if (point != CurrentPoint)
-        {
-            await GoToAsync(point, NavigationReason.Select).ConfigureAwait(true);
-        }
-
-        Mode = ReviewMode.Examine;
-        if (point.State == ReviewPointState.Visible)
-        {
-            _ = SetStateQuietlyAsync(point, ReviewPointState.Examined);
+            await StepPastSliceAsync(direction).ConfigureAwait(true);
         }
     }
 
-    [RelayCommand]
-    public async Task ShowPrecedentAsync(ReviewPointViewModel? point)
+    public string FilePositionLabel
     {
-        ExamineTab = "precedent";
-        await ExamineAsync(point).ConfigureAwait(true);
-    }
-
-    [RelayCommand]
-    public async Task ShowEvidenceAsync(ReviewPointViewModel? point)
-    {
-        ExamineTab = "evidence";
-        await ExamineAsync(point).ConfigureAwait(true);
-    }
-
-    [RelayCommand]
-    public void CloseExamine()
-    {
-        Mode = ReviewMode.Diff;
-        if (CurrentPoint is { } point)
+        get
         {
-            NavigationRequested?.Invoke(this, new NavigationRequest(point, NavigationReason.Refocus, point));
+            var files = NavigableFiles();
+            var index = SelectedFile is null ? -1 : files.FindIndex(f => f.Path == SelectedFile.Path);
+            return files.Count == 0 ? "" : string.Create(CultureInfo.InvariantCulture, $"{(index < 0 ? 0 : index + 1)} of {files.Count}");
         }
     }
 
-    // Decisions ------------------------------------------------------------------------------------
-
-    [RelayCommand]
-    public async Task DismissAsync(ReviewPointViewModel? point)
-    {
-        point ??= CurrentPoint;
-        if (point is null || point.IsDismissed)
-        {
-            return;
-        }
-
-        var open = OpenPoints.ToList();
-        var index = open.IndexOf(point);
-        point.IsComposing = false;
-        point.State = ReviewPointState.Dismissed;
-        RefreshPointDerivedState();
-        await SetStateQuietlyAsync(point, ReviewPointState.Dismissed).ConfigureAwait(true);
-
-        // Move on to the next open point: dismissing is a decision, and the reviewer should keep flowing.
-        var remaining = OpenPoints.ToList();
-        if (remaining.Count > 0 && point == CurrentPoint)
-        {
-            await GoToAsync(remaining[Math.Min(Math.Max(index, 0), remaining.Count - 1)], NavigationReason.Next).ConfigureAwait(true);
-        }
-        else if (remaining.Count == 0)
-        {
-            Mode = ReviewMode.Diff;
-        }
-    }
-
-    [RelayCommand]
-    public async Task RestoreAsync(ReviewPointViewModel? point)
-    {
-        if (point is null)
-        {
-            return;
-        }
-
-        point.State = ReviewPointState.Visible;
-        RefreshPointDerivedState();
-        await SetStateQuietlyAsync(point, ReviewPointState.Visible).ConfigureAwait(true);
-    }
-
-    [RelayCommand]
-    public void StartComment(ReviewPointViewModel? point)
-    {
-        point ??= CurrentPoint;
-        if (point is null || point.IsDismissed)
-        {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(point.CommentDraft))
-        {
-            point.CommentDraft = point.SuggestedComment;
-        }
-
-        point.PostError = null;
-        point.IsComposing = true;
-        if (Mode == ReviewMode.Examine)
-        {
-            ExamineTab = "comment";
-        }
-    }
-
-    [RelayCommand]
-    public void CancelComment(ReviewPointViewModel? point)
-    {
-        point ??= CurrentPoint;
-        if (point is not null)
-        {
-            point.IsComposing = false;
-            point.PostError = null;
-        }
-    }
-
-    /// <summary>Posts to GitHub. Only ever triggered by an explicit reviewer action.</summary>
-    [RelayCommand]
-    public async Task PostCommentAsync(ReviewPointViewModel? point)
-    {
-        point ??= CurrentPoint;
-        if (point is null || point.IsPosting || string.IsNullOrWhiteSpace(point.CommentDraft))
-        {
-            return;
-        }
-
-        point.IsPosting = true;
-        point.PostError = null;
-        try
-        {
-            var reply = await _source.PostCommentAsync(
-                new PostReviewCommentRequest
-                {
-                    PullRequest = Ref,
-                    ReviewPointId = point.Id,
-                    Path = point.Path,
-                    Line = PointRange(point).Line,
-                    StartLine = PointRange(point).StartLine,
-                    Body = point.CommentDraft.Trim(),
-                },
-                _lifetime.Token).ConfigureAwait(true);
-
-            point.PostedUrl = reply.Url.Length > 0 ? reply.Url : null;
-            point.State = ReviewPointState.Commented;
-            point.IsComposing = false;
-            RefreshPointDerivedState();
-            Toast = PostedToast(reply);
-        }
-        catch (RpcException ex)
-        {
-            point.PostError = ex.Status.Detail;
-        }
-        finally
-        {
-            point.IsPosting = false;
-        }
-    }
-
-    private async Task SetStateQuietlyAsync(ReviewPointViewModel point, ReviewPointState state)
-    {
-        try
-        {
-            await _source.SetReviewPointStateAsync(Ref, point.Id, state, _lifetime.Token).ConfigureAwait(true);
-        }
-        catch (RpcException ex)
-        {
-            Toast = $"Couldn't save: {ex.Status.Detail}";
-        }
-    }
+    partial void OnSelectedFileChanged(FileEntryViewModel? value) => OnPropertyChanged(nameof(FilePositionLabel));
 
     [RelayCommand]
     public void ToggleGenerated() => ShowGenerated = !ShowGenerated;
-
-    // Precedent source ------------------------------------------------------------------------------
-
-    [ObservableProperty]
-    public partial SourcePreviewViewModel? SourcePreview { get; set; }
-
-    [RelayCommand]
-    public async Task OpenSourceAsync(PrecedentExampleViewModel? example)
-    {
-        if (example is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var file = await _source.GetSourceFileAsync(Ref, example.Path, _lifetime.Token, fromBase: true).ConfigureAwait(true);
-            SourcePreview = file.Exists
-                ? new SourcePreviewViewModel(example.Path, example.TypeName, file.Text, example.Line)
-                : new SourcePreviewViewModel(example.Path, example.TypeName, example.Snippet, example.Line, example.StartLine);
-        }
-        catch (RpcException ex)
-        {
-            Toast = $"Couldn't open {example.FileName}: {ex.Status.Detail}";
-        }
-    }
-
-    [RelayCommand]
-    public void CloseSource() => SourcePreview = null;
 
     public async ValueTask DisposeAsync()
     {

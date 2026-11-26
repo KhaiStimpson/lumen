@@ -12,7 +12,7 @@ public class TriageEvaluationTests
     {
         public HunkVerdict? Classify(HunkContext context) =>
             context.File.Path is "src/Fmt.cs" or "src/Sneaky.cs"
-                ? new(ChangeClass.Formatting, TriageTier.Skip, ["formatting only"])
+                ? new(ChangeClass.Formatting, FoldKind.Mechanical, ["formatting only"])
                 : null;
     }
 
@@ -31,7 +31,7 @@ public class TriageEvaluationTests
 
         Assert.Equal(5, labels.Count);
         var guard = labels[0];
-        Assert.Equal(("src/Order.cs", "old", 13, TriageTier.Critical, "removed null guard"), (guard.Path, guard.Side, guard.StartLine, guard.Tier, guard.Note));
+        Assert.Equal(("src/Order.cs", "old", 13, LabelTier.Critical, "removed null guard"), (guard.Path, guard.Side, guard.StartLine, guard.Tier, guard.Note));
         Assert.True(labels.Single(l => l.Path == "src/Fresh.cs").Draft);
         Assert.False(guard.Draft);
         Assert.Equal("head", labels[1].Side);
@@ -93,16 +93,15 @@ public class TriageEvaluationTests
     }
 
     [Fact]
-    public void CountsChangedLinesPerTierAndClass()
+    public void CountsChangedLinesPerFoldAndClass()
     {
         var (labels, triage) = Load();
 
         var report = TriageEvaluation.Evaluate(labels, triage);
 
-        Assert.Equal(1, report.LinesPerTier[TriageTier.WorthALook]);
-        Assert.Equal(4, report.LinesPerTier[TriageTier.Skip]);
-        Assert.Equal(3, report.LinesPerTier[TriageTier.Skim]);
-        Assert.False(report.LinesPerTier.ContainsKey(TriageTier.Critical));
+        Assert.Equal(4, report.LinesPerFold[FoldKind.Open]);
+        Assert.Equal(4, report.LinesPerFold[FoldKind.Mechanical]);
+        Assert.False(report.LinesPerFold.ContainsKey(FoldKind.Boilerplate));
         Assert.Equal(4, report.LinesPerClass[ChangeClass.Formatting]);
         Assert.Equal(8, report.TotalLines);
         Assert.Equal(1, report.DraftLabels);

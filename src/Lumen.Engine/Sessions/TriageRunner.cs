@@ -13,7 +13,7 @@ namespace Lumen.Engine.Sessions;
 public sealed partial class TriageRunner(ITriageStore store, ILogger<TriageRunner> logger)
 {
     /// <summary>Bump when a classifier changes what it proves, so cached triage from older rules is not reused.</summary>
-    public const string ClassifierVersion = "triage/3";
+    public const string ClassifierVersion = "fold/1";
 
     /// <summary>The cache version includes the classifier, mechanical path rules and the diff's merge base.</summary>
     public static string VersionFor(ReviewSettings settings, string mergeBaseSha)
@@ -33,14 +33,14 @@ public sealed partial class TriageRunner(ITriageStore store, ILogger<TriageRunne
         var version = VersionFor(settings, snapshot.MergeBaseSha);
         try
         {
-            if (await store.FindTriageAsync(snapshot.Key, snapshot.HeadSha, version, cancellationToken).ConfigureAwait(false) is { } cached)
+            if (await store.FindTriageAsync(snapshot.Target, snapshot.HeadSha, version, cancellationToken).ConfigureAwait(false) is { } cached)
             {
                 return cached;
             }
 
             var sources = await TriageSources.LoadAsync(snapshot, checkout, cancellationToken).ConfigureAwait(false);
             var result = await Task.Run(() => RoslynTriage.CreatePipeline().Run(snapshot, sources), cancellationToken).ConfigureAwait(false);
-            await store.SaveTriageAsync(snapshot.Key, snapshot.HeadSha, version, result, cancellationToken).ConfigureAwait(false);
+            await store.SaveTriageAsync(snapshot.Target, snapshot.HeadSha, version, result, cancellationToken).ConfigureAwait(false);
             LogTriaged(logger, snapshot.Key, result.Hunks.Count, result.Groups.Count);
             return result;
         }

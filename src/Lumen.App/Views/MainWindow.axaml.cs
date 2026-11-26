@@ -172,10 +172,25 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (e.KeyModifiers == KeyModifiers.Shift && e.Key == Key.N)
+        if (e.KeyModifiers == KeyModifiers.Shift)
         {
             e.Handled = true;
-            await pr.PreviousThreadAsync().ConfigureAwait(true);
+            switch (e.Key)
+            {
+                case Key.N:
+                    await pr.PreviousThreadAsync().ConfigureAwait(true);
+                    break;
+                case Key.G:
+                    await pr.PreviousFlagAsync().ConfigureAwait(true);
+                    break;
+                case Key.O:
+                    pr.OpenSliceFolds();
+                    break;
+                default:
+                    e.Handled = false;
+                    break;
+            }
+
             return;
         }
 
@@ -184,61 +199,51 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        // Keys (docs/overhaul.md, UI), rechecked against the bindings that existed: F (palette), L, K and Space stay
+        // as they were; J/K now walk slices. New: . and , for files in reading order, G for flags, O for folds,
+        // M to mark reviewed, U for since my last look, T for slices or files, I for the right pane, C to comment.
         e.Handled = true;
         switch (e.Key)
         {
-            // The Map (plan v3): M opens or leaves it; on it B / T switch the layout, L the lens, Enter opens the file.
-            case Key.M:
-                pr.ToggleMap();
-                break;
-            case Key.B when pr.IsMapTab:
-                pr.Map.ShowBlueprint();
-                break;
-            case Key.T when pr.IsMapTab:
-                pr.Map.ShowTerrain();
-                break;
-            case Key.L when pr.IsMapTab:
-                pr.Map.NextLens();
-                break;
-            case Key.Enter when pr.IsMapTab:
-                await pr.OpenMapSelectionAsync().ConfigureAwait(true);
-                break;
-            case Key.Escape when pr.IsMapTab:
-                pr.ShowTab(ViewModels.PullRequestTab.Files);
-                break;
             case Key.J:
-                await pr.NextPointAsync().ConfigureAwait(true);
+                await pr.NextSliceAsync().ConfigureAwait(true);
                 break;
             case Key.K:
-                await pr.PreviousPointAsync().ConfigureAwait(true);
+                await pr.PreviousSliceAsync().ConfigureAwait(true);
                 break;
-            case Key.Enter:
-                await pr.ExamineAsync(null).ConfigureAwait(true);
+            case Key.OemPeriod:
+                await pr.NextFileAsync().ConfigureAwait(true);
+                break;
+            case Key.OemComma:
+                await pr.PreviousFileAsync().ConfigureAwait(true);
+                break;
+            case Key.G:
+                await pr.NextFlagAsync().ConfigureAwait(true);
+                break;
+            case Key.O:
+                pr.ToggleFileFolds();
+                break;
+            case Key.M:
+                await pr.MarkSliceReviewedAsync().ConfigureAwait(true);
+                break;
+            case Key.U:
+                pr.ToggleSinceLastLook();
+                break;
+            case Key.T:
+                pr.ToggleFileList();
+                break;
+            case Key.I:
+                pr.ToggleRightPane();
                 break;
             case Key.Escape when pr.IsFindOpen:
                 pr.CloseFind();
                 break;
-            case Key.Escape when pr.IsExamining:
-                pr.CloseExamine();
-                break;
             case Key.Escape when pr.IsTrayOpen:
                 pr.IsTrayOpen = false;
                 break;
-            case Key.D:
-                await pr.DismissAsync(null).ConfigureAwait(true);
-                break;
-            case Key.A:
-                await pr.AcknowledgeCurrentGroupAsync().ConfigureAwait(true);
-                break;
             case Key.C:
-                pr.StartComment(null);
+                pr.CommentOnCurrentChange();
                 FocusComposer();
-                break;
-            case Key.P:
-                await pr.ShowPrecedentAsync(null).ConfigureAwait(true);
-                break;
-            case Key.E:
-                await pr.ShowEvidenceAsync(null).ConfigureAwait(true);
                 break;
             case Key.F:
                 OpenPalette();
@@ -255,7 +260,7 @@ public sealed partial class MainWindow : Window
             case Key.OemOpenBrackets:
                 pr.PreviousChange();
                 break;
-            case Key.R:
+            case Key.R when pr.CanPost:
                 pr.ToggleTray();
                 if (pr.IsTrayOpen)
                 {
@@ -277,8 +282,8 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// In a text box only Ctrl+Enter, Ctrl+Shift+Enter and Escape mean anything, and what they mean depends on the box:
-    /// a review point's or line's comment adds to the review (Ctrl+Enter) or posts at once (Ctrl+Shift+Enter); a
-    /// reply or a conversation comment posts; Escape cancels and hands the keyboard back.
+    /// a line's comment adds to the review (Ctrl+Enter) or posts at once (Ctrl+Shift+Enter); a reply or a
+    /// conversation comment posts; Escape cancels and hands the keyboard back.
     /// </summary>
     private async Task<bool> OnTypingKeyAsync(ViewModels.PullRequestViewModel pr, TextBox box, KeyEventArgs e)
     {
@@ -315,10 +320,6 @@ public sealed partial class MainWindow : Window
                 case ThreadCardContext thread:
                     ViewModels.PullRequestViewModel.CancelReply(thread.Thread);
                     break;
-                case CardContext or ViewModels.PullRequestViewModel when box.Name is not ("IssueComment" or "ReviewSummary")
-                                                                    && pr.CurrentPoint is { IsComposing: true } current:
-                    pr.CancelComment(current);
-                    break;
             }
 
             Focus();
@@ -349,12 +350,6 @@ public sealed partial class MainWindow : Window
         if (box.Name == "ReviewSummary")
         {
             await pr.SubmitCommentAsync().ConfigureAwait(true);
-            return true;
-        }
-
-        if (pr.CurrentPoint is { IsComposing: true } point)
-        {
-            await (ctrlShiftEnter ? pr.PostCommentAsync(point) : pr.AddPointCommentToReviewAsync(point)).ConfigureAwait(true);
             return true;
         }
 

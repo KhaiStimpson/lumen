@@ -5,7 +5,7 @@ namespace Lumen.Storage.Tests;
 
 public sealed class TriageStoreTests : IDisposable
 {
-    private static readonly PullRequestKey Pr = new(new RepositoryRef("octo", "lumen"), 7);
+    private static readonly PullRequestTarget Pr = new(new PullRequestKey(new RepositoryRef("octo", "lumen"), 7));
 
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "lumen-storage-tests", Guid.NewGuid().ToString("N"));
 
@@ -32,7 +32,7 @@ public sealed class TriageStoreTests : IDisposable
             NewStart = 3,
             NewEnd = 4,
             Class = ChangeClass.Rename,
-            Tier = TriageTier.Skip,
+            Fold = FoldKind.Mechanical,
             Reasons = ["pure rename `Foo`→`Bar`"],
             ChangedLines = 4,
             GroupId = "g0",
@@ -49,7 +49,7 @@ public sealed class TriageStoreTests : IDisposable
         var found = await store.FindTriageAsync(Pr, "head-1", "v1", Ct);
 
         var hunk = Assert.Single(found!.Hunks);
-        Assert.Equal(("a.cs", ChangeClass.Rename, TriageTier.Skip, 4, "g0"), (hunk.Path, hunk.Class, hunk.Tier, hunk.ChangedLines, hunk.GroupId));
+        Assert.Equal(("a.cs", ChangeClass.Rename, FoldKind.Mechanical, 4, "g0"), (hunk.Path, hunk.Class, hunk.Fold, hunk.ChangedLines, hunk.GroupId));
         Assert.Equal(["pure rename `Foo`→`Bar`"], hunk.Reasons);
         Assert.Equal("Renamed `Foo`→`Bar`", Assert.Single(found.Groups).Title);
     }
@@ -62,7 +62,8 @@ public sealed class TriageStoreTests : IDisposable
 
         Assert.Null(await store.FindTriageAsync(Pr, "head-2", "v1", Ct));
         Assert.Null(await store.FindTriageAsync(Pr, "head-1", "v2", Ct));
-        Assert.Null(await store.FindTriageAsync(Pr with { Number = 8 }, "head-1", "v1", Ct));
+        Assert.Null(await store.FindTriageAsync(new PullRequestTarget(Pr.PullRequest with { Number = 8 }), "head-1", "v1", Ct));
+        Assert.Null(await store.FindTriageAsync(new LocalBranchTarget(@"C:\src\lumen", "main", LocalHeadKind.WorkingTree), "head-1", "v1", Ct));
     }
 
     [Fact]
@@ -78,5 +79,19 @@ public sealed class TriageStoreTests : IDisposable
         var found = await reopened.FindTriageAsync(Pr, "head-1", "v1", Ct);
 
         Assert.Equal("b.cs", Assert.Single(found!.Hunks).Path);
+    }
+
+    [Fact]
+    public async Task LocalTargetsAreKeyedByCloneBaseAndHeadKind()
+    {
+        await using var store = new SqliteReviewStore(DatabasePath);
+        var tree = new LocalBranchTarget(@"C:\src\shop", "main", LocalHeadKind.WorkingTree);
+        var branch = new LocalBranchTarget("c:/src/shop/", "main", LocalHeadKind.Branch, "feature/x");
+
+        await store.SaveTriageAsync(tree, "snap-1", "v1", Result("tree.cs"), Ct);
+        await store.SaveTriageAsync(branch, "snap-1", "v1", Result("branch.cs"), Ct);
+
+        Assert.Equal("tree.cs", Assert.Single((await store.FindTriageAsync(new LocalBranchTarget("C:/src/shop", "main", LocalHeadKind.WorkingTree), "snap-1", "v1", Ct))!.Hunks).Path);
+        Assert.Equal("branch.cs", Assert.Single((await store.FindTriageAsync(branch, "snap-1", "v1", Ct))!.Hunks).Path);
     }
 }

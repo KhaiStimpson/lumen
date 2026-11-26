@@ -24,39 +24,6 @@ public static class Converters
     public static readonly IValueConverter NotEmpty =
         new FuncValueConverter<string?, bool>(s => !string.IsNullOrEmpty(s));
 
-    /// <summary>Review point type → marker shape geometry (never colour alone, TDD §28).</summary>
-    public static readonly IValueConverter KindToIcon = new ResourceConverter(kind => kind switch
-    {
-        "CorrectnessRisk" or "SecurityRisk" => "Icon.Correctness",
-        "BehaviourChange" => "Icon.Behaviour",
-        "ArchitectureDrift" => "Icon.Architecture",
-        _ => "Icon.Deviation",
-    });
-
-    public static readonly IValueConverter KindToBrush = new ResourceConverter(kind => kind switch
-    {
-        "CorrectnessRisk" or "SecurityRisk" => "Marker.Correctness",
-        "BehaviourChange" => "Marker.Behaviour",
-        "ArchitectureDrift" => "Marker.Architecture",
-        _ => "Marker.Deviation",
-    });
-
-    public static readonly IValueConverter SeverityToBrush = new ResourceConverter(severity => severity switch
-    {
-        "High" => "Severity.High",
-        "Medium" => "Severity.Medium",
-        _ => "Severity.Low",
-    });
-
-    /// <summary>Connection state → status dot. The status text always carries the meaning too.</summary>
-    public static readonly IValueConverter ConnectionToBrush = new ResourceConverter(state => state switch
-    {
-        "Connected" => "Marker.Verified",
-        "Error" => "Severity.High",
-        "NotConnected" => "Text.Tertiary",
-        _ => "Border.Strong",
-    });
-
     /// <summary>Check state ("success", "failure", "pending") → status dot. The tooltip and label carry it too.</summary>
     public static readonly IValueConverter CheckToBrush = new ResourceConverter(state => state switch
     {
@@ -66,23 +33,15 @@ public static class Converters
         _ => "Border.Strong",
     });
 
-    /// <summary>Walkthrough risk category → marker brush.</summary>
-    public static readonly IValueConverter RiskToBrush = new ResourceConverter(category => category switch
-    {
-        "Security" or "Concurrency" => "Marker.Correctness",
-        "BehaviourChange" => "Marker.Behaviour",
-        "MissingTests" => "Marker.Architecture",
-        _ => "Severity.Medium",
-    });
-
-    public static readonly IValueConverter StrengthToWidth =
-        new FuncValueConverter<double, double>(strength => Math.Round(strength * 56));
-
     /// <summary>
     /// An enum property against the enum member named in the parameter. Two-way, so a radio button can set it;
     /// unchecking does nothing, since checking another option already moved the value.
     /// </summary>
     public static readonly IValueConverter EnumEquals = new EnumEqualsConverter();
+
+    /// <summary>" ✓" after "Mechanical · Proven"; nothing for boilerplate, which is not verified.</summary>
+    public static readonly IValueConverter CheckIf =
+        new FuncValueConverter<bool, string>(proven => proven ? " ✓" : "");
 
     public static readonly IValueConverter DimIf =
         new FuncValueConverter<bool, double>(dim => dim ? 0.45 : 1);

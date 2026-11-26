@@ -115,6 +115,44 @@ internal static class SchemaMigrator
             At TEXT NOT NULL,
             PRIMARY KEY (Repository, PullRequest, HeadSha, Scope, SettingsHash));
         """,
+        """
+        -- The overhaul (docs/overhaul.md): the AI tables go, and what remains is keyed on a review target
+        -- ("pr:owner/repo#12" or "local:<clone>|<base>|<head kind>") instead of a pull request number.
+        DROP TABLE IF EXISTS AttentionEvaluations;
+        DROP TABLE IF EXISTS Investigations;
+        DROP TABLE IF EXISTS Walkthroughs;
+        DROP TABLE IF EXISTS ReviewInteractions;
+
+        -- Cached triage carried tiers; the classifier version bump recomputes it anyway, so it is not copied.
+        DROP TABLE IF EXISTS TriageResults;
+        CREATE TABLE TriageResults (
+            Target TEXT NOT NULL,
+            HeadSha TEXT NOT NULL,
+            Version TEXT NOT NULL,
+            Result TEXT NOT NULL,
+            At TEXT NOT NULL,
+            PRIMARY KEY (Target, HeadSha, Version));
+
+        CREATE TABLE Visits (
+            Target TEXT PRIMARY KEY,
+            LastOpenedAt TEXT NULL,
+            LastOpenedHead TEXT NULL,
+            LastReviewedAt TEXT NULL,
+            LastReviewedHead TEXT NULL);
+
+        INSERT INTO Visits (Target, LastOpenedAt, LastOpenedHead, LastReviewedAt, LastReviewedHead)
+            SELECT 'pr:' || Repository || '#' || PullRequest, LastOpenedAt, LastOpenedHead, LastReviewedAt, LastReviewedHead
+            FROM PullRequestVisits;
+        DROP TABLE PullRequestVisits;
+
+        -- Reviewed marks: one per file or member ("unit"), holding the fingerprint of its normalised changed lines.
+        CREATE TABLE Marks (
+            Target TEXT NOT NULL,
+            Unit TEXT NOT NULL,
+            Fingerprint TEXT NOT NULL,
+            At TEXT NOT NULL,
+            PRIMARY KEY (Target, Unit));
+        """,
     ];
 
     public static int LatestVersion => Migrations.Count;

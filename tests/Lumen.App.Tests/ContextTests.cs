@@ -93,7 +93,7 @@ public sealed class ContextTests
     }
 
     [AvaloniaFact]
-    public async Task SinceLastReviewShowsTheDeltaAndItsWalkthrough()
+    public async Task SinceLastReviewShowsTheDelta()
     {
         await using var session = await AppSession.OpenAsync();
         var pr = session.PullRequest;
@@ -101,13 +101,12 @@ public sealed class ContextTests
         Assert.Equal("Since your last review (4c8e1a7)", pr.LastReviewedLabel);
 
         await session.ClickAsync(session.Find<Avalonia.Controls.Primitives.ToggleButton>("SinceLastReview"));
-        await Fixture.WaitUntilAsync(() => pr.HasScope && pr.DeltaWalkthrough is not null);
+        await Fixture.WaitUntilAsync(() => pr.HasScope);
 
         Assert.True(pr.ShowSinceLastReview);
         Assert.True(pr.Scope!.IsSinceLastReview);
         Assert.Equal(27, pr.ScopeFiles.Count);
-        Assert.Equal(LastReviewed, session.Source.WalkthroughRequests.Single().Since.FromSha);
-        Assert.StartsWith("Since you last looked: 27 files", pr.DeltaWalkthrough!.Intent, StringComparison.Ordinal);
+        Assert.Equal(LastReviewed, pr.Scope.FromSha);
         await Fixture.PumpAsync(10);
         session.Capture("23-since-last-review.png");
 

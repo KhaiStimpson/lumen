@@ -38,12 +38,12 @@ public class RippleClassifierTests
             new TestFile("src/Checkout.cs", Checkout, Checkout.Replace("Quote(qty, 250)", "Quote(qty, 250, 0)", StringComparison.Ordinal).Replace("Quote(1, 100)", "Quote(1, 100, 5)", StringComparison.Ordinal)));
 
         var declaration = Assert.Single(result.Hunks, h => h.Path == "src/Pricing.cs");
-        Assert.Equal((ChangeClass.BehaviourChange, TriageTier.WorthALook), (declaration.Class, declaration.Tier));
+        Assert.Equal((ChangeClass.BehaviourChange, FoldKind.Open), (declaration.Class, declaration.Fold));
         Assert.Contains("changes the signature of `Quote`: added parameter `discount`", declaration.Reasons);
         Assert.Null(declaration.GroupId);
 
         var calls = result.Hunks.Where(h => h.Path == "src/Checkout.cs").ToList();
-        Assert.All(calls, h => Assert.Equal((ChangeClass.Ripple, TriageTier.Skim), (h.Class, h.Tier)));
+        Assert.All(calls, h => Assert.Equal((ChangeClass.Ripple, FoldKind.Open), (h.Class, h.Fold)));
         Assert.Equal("Call sites follow the new signature of `Quote`", Assert.Single(result.Groups).Title);
     }
 
@@ -67,7 +67,7 @@ public class RippleClassifierTests
         var declaration = Assert.Single(result.Hunks, h => h.Path == "src/Pricing.cs");
         Assert.Equal(ChangeClass.BehaviourChange, declaration.Class);
         Assert.Contains(declaration.Reasons, r => r.StartsWith("renames `Quote`→`PriceFor`", StringComparison.Ordinal));
-        Assert.All(result.Hunks.Where(h => h.Path == "src/Checkout.cs"), h => Assert.Equal((ChangeClass.Ripple, TriageTier.Skim), (h.Class, h.Tier)));
+        Assert.All(result.Hunks.Where(h => h.Path == "src/Checkout.cs"), h => Assert.Equal((ChangeClass.Ripple, FoldKind.Open), (h.Class, h.Fold)));
     }
 
     [Fact]
@@ -107,6 +107,6 @@ public class RippleClassifierTests
             new TestFile("src/Pricing.cs", Pricing, Pricing.Replace("int qty, int unit)", "int qty, int unit, int discount)", StringComparison.Ordinal)),
             new TestFile("src/Checkout.cs", Checkout, Checkout.Replace("Quote(qty, 250)", "Quote(qty, 250, 0)", StringComparison.Ordinal)));
 
-        Assert.DoesNotContain(result.Hunks, h => h.Class == ChangeClass.Ripple && h.Tier == TriageTier.Skip);
+        Assert.DoesNotContain(result.Hunks, h => h.Class == ChangeClass.Ripple && h.Fold == FoldKind.Mechanical);
     }
 }

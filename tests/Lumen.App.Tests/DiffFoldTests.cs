@@ -21,12 +21,16 @@ public sealed class DiffFoldTests
             Assert.Equal(0, pr.CurrentDiff.Additions);
             var fold = pr.ResolveFold(badge.CardId!)!;
             Assert.StartsWith("pure rename `RedactedAiAuditEntry`→`AiAuditEntry`", fold.Reason, StringComparison.Ordinal);
-            Assert.Equal(("2 lines", false, "Show"), (fold.LinesLabel, fold.IsExpanded, fold.ToggleLabel));
+            Assert.Equal(("2 lines", false, "Open"), (fold.LinesLabel, fold.IsExpanded, fold.ToggleLabel));
+            Assert.Equal(("Mechanical · Proven", true, false), (fold.KindLabel, fold.IsMechanical, fold.IsBoilerplate));
+            Assert.False(pr.IsFoldOpened(fold.Id));
 
             fold.ToggleCommand.Execute(null);
 
+            // An opened fold shows every line.
             Assert.True(pr.CurrentDiff!.Additions > 0);
             Assert.True(pr.ResolveFold(badge.CardId!)!.IsExpanded);
+            Assert.True(pr.IsFoldOpened(fold.Id));
         }
         finally
         {
@@ -57,8 +61,9 @@ public sealed class DiffFoldTests
         var pr = await Fixture.LoadAsync(Fixture.CreateAuditSource());
         try
         {
-            var group = pr.ReviewPlan.Groups.Single(g => g.Title == "Renamed `RedactedAiAuditEntry`→`AiAuditEntry`");
-            await pr.SelectTriageGroupAsync(group);
+            var group = pr.Triage!.Groups.Single(g => g.Title == "Renamed `RedactedAiAuditEntry`→`AiAuditEntry`");
+            var members = pr.Triage.Hunks.Where(h => h.GroupId == group.Id).ToList();
+            await pr.SelectFileAsync(pr.Files.Single(f => f.Path == members[0].Path));
             var first = pr.SelectedFile!.Path;
             var badge = pr.CurrentDiff!.Rows.First(r => r.CardId?.StartsWith(DiffFold.CardPrefix, StringComparison.Ordinal) == true);
             var fold = pr.ResolveFold(badge.CardId!)!;
@@ -68,10 +73,9 @@ public sealed class DiffFoldTests
 
             await fold.NextCommand.ExecuteAsync(null);
 
-            Assert.Equal(group.Members[1].Path, pr.SelectedFile!.Path);
-            Assert.True(group.IsCurrent);
+            Assert.Equal(members[1].Path, pr.SelectedFile!.Path);
             Assert.NotNull(pr.FocusRange);
-            Assert.True(first != pr.SelectedFile.Path || group.Members[0].NewStart != group.Members[1].NewStart);
+            Assert.True(first != pr.SelectedFile.Path || members[0].NewStart != members[1].NewStart);
         }
         finally
         {

@@ -118,30 +118,6 @@ public sealed class ReviewClientTests
     }
 
     [AvaloniaFact]
-    public async Task ReviewPointCommentsAddToTheReviewOrPostNowFromTheKeyboard()
-    {
-        await using var session = await AppSession.OpenAsync();
-        var pr = session.PullRequest;
-        var point = pr.CurrentPoint!;
-
-        await session.PressAsync(PhysicalKey.C);
-        await session.PressAsync(PhysicalKey.Enter, RawInputModifiers.Control);
-        await Fixture.WaitUntilAsync(() => point.IsCommented);
-        Assert.Equal(point.Id, session.Source.Pending.Comments.Single().ReviewPointId);
-        Assert.Empty(session.Source.PostedComments);
-
-        // Ctrl+Shift+Enter posts at once — here into the pending review, as GitHub insists.
-        await pr.NextPointAsync();
-        var next = pr.CurrentPoint!;
-        await session.PressAsync(PhysicalKey.C);
-        await session.PressAsync(PhysicalKey.Enter, RawInputModifiers.Control | RawInputModifiers.Shift);
-        await Fixture.WaitUntilAsync(() => next.IsCommented);
-        Assert.Equal(2, pr.PendingComments.Count);
-    }
-
-    // ---------------------------------------------------------------- M4
-
-    [AvaloniaFact]
     public async Task ThreadsShowInlineWithCountsAndNWalksTheOpenOnes()
     {
         await using var session = await AppSession.OpenAsync();
@@ -234,7 +210,6 @@ public sealed class ReviewClientTests
         await using var session = await AppSession.OpenAsync(viewer: "andrew-reviewer");
         var pr = session.PullRequest;
         Assert.True(pr.CanApprove);
-        Assert.Equal("Walkthrough", pr.WalkthroughTitle);
         await OpenFileAsync(session, ProgramPath);
         foreach (var (line, body) in new[] { (229, "One"), (230, "Two") })
         {
