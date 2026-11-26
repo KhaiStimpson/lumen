@@ -12,7 +12,7 @@
       <Border Classes="card" Padding="16,14">
         <StackPanel Spacing="8">
           <TextBlock FontSize="12">
-            <Run Text="{Binding Author}" FontWeight="SemiBold" /><Run Text=" opened this pull request" Foreground="{DynamicResource Text.Secondary}" />
+            <Run Text="{Binding Author, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" opened this pull request" Foreground="{DynamicResource Text.Secondary}" />
           </TextBlock>
           <md:MarkdownView Name="Description" Markdown="{Binding Description}" IsVisible="{Binding HasDescription}" />
           <TextBlock Classes="caption tertiary" Text="No description provided." IsVisible="{Binding !HasDescription}" />
@@ -34,7 +34,7 @@
                   <Path Data="{StaticResource Icon.Comment}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="12" Height="12" VerticalAlignment="Top" Margin="0,3,0,0" />
                   <StackPanel Grid.Column="1" Spacing="2">
                     <TextBlock FontSize="12.5" TextTrimming="CharacterEllipsis">
-                      <Run Text="{Binding FirstAuthor}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Summary}" />
+                      <Run Text="{Binding FirstAuthor, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Summary, Mode=OneWay}" />
                     </TextBlock>
                     <TextBlock Classes="caption tertiary" Text="{Binding LocationLabel}" />
                   </StackPanel>
@@ -61,8 +61,8 @@
                 <StackPanel Spacing="6">
                   <Grid ColumnDefinitions="*,Auto">
                     <TextBlock FontSize="12">
-                      <Run Text="{Binding Author}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding ActionLabel}" Foreground="{DynamicResource Text.Secondary}" />
-                      <Run Text=" · " Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding AgeLabel}" Foreground="{DynamicResource Text.Tertiary}" />
+                      <Run Text="{Binding Author, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding ActionLabel, Mode=OneWay}" Foreground="{DynamicResource Text.Secondary}" />
+                      <Run Text=" · " Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding AgeLabel, Mode=OneWay}" Foreground="{DynamicResource Text.Tertiary}" />
                     </TextBlock>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                       <TextBlock Classes="caption tertiary" Text="{Binding CommentCountLabel}" VerticalAlignment="Center" />

@@ -22,7 +22,7 @@
         </Grid>
         <TextBlock Name="MarkHint" Classes="caption" Foreground="{DynamicResource Gauge.Warn}" TextWrapping="Wrap"
                    IsVisible="{Binding MarkReviewed.HasHint}">
-          <Run Text="Still open: " /><Run Text="{Binding MarkReviewed.Hint}" FontWeight="SemiBold" />
+          <Run Text="Still open: " /><Run Text="{Binding MarkReviewed.Hint, Mode=OneWay}" FontWeight="SemiBold" />
         </TextBlock>
 
         <!-- To read / boilerplate / mechanical, written as numbers and drawn as a bar whose segments are 3:1 apart -->
@@ -51,7 +51,7 @@
       <!-- Flags in this slice (or in the whole change when there are no slices) -->
       <StackPanel Name="FlagsSection" Spacing="6" IsVisible="{Binding HasFlags}">
         <TextBlock Classes="section">
-          <Run Text="Flags" /><Run Text=" · " /><Run Text="{Binding CurrentSliceFlagCount}" />
+          <Run Text="Flags" /><Run Text=" · " /><Run Text="{Binding CurrentSliceFlagCount, Mode=OneWay}" />
         </TextBlock>
         <TextBlock Classes="caption tertiary" Text="None in this slice." IsVisible="{Binding !CurrentSliceFlagCount}" />
         <ItemsControl Name="FlagList" ItemsSource="{Binding CurrentSliceFlags}">
@@ -94,7 +94,7 @@
         <ItemsControl ItemsSource="{Binding CurrentSlice.Edges, FallbackValue={x:Null}}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:SliceEdgeViewModel">
-              <TextBlock Classes="caption" TextWrapping="Wrap" Margin="0,2" Text="{Binding Reason}" />
+              <TextBlock Classes="caption" TextWrapping="Wrap" Margin="0,2" views:CodeText.Text="{Binding Reason}" />
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
@@ -103,7 +103,7 @@
           <ItemsControl ItemsSource="{Binding CurrentSlice.PossibleLinks, FallbackValue={x:Null}}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:SliceEdgeViewModel">
-                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="0,2" Text="{Binding Reason}" />
+                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="0,2" views:CodeText.Text="{Binding Reason}" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -113,7 +113,7 @@
           <ItemsControl ItemsSource="{Binding CurrentSlice.PageLinks, FallbackValue={x:Null}}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:SliceEdgeViewModel">
-                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="0,2" Text="{Binding Reason}" />
+                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="0,2" views:CodeText.Text="{Binding Reason}" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>

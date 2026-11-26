@@ -1,4 +1,5 @@
 using Avalonia.Headless.XUnit;
+using Avalonia.VisualTree;
 using Lumen.App.Diff;
 using Lumen.App.ViewModels;
 using Lumen.Contracts;
@@ -184,6 +185,30 @@ public sealed class SliceTests
         }
         finally
         {
+            await pr.DisposeAsync();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task AFlagCardMarkedNewRendersWithoutWritingItsLabelBack()
+    {
+        // Run.Text binds two-way by default; with a StringFormat it once wrote "  · New" back into the label, forever.
+        var pr = await Fixture.LoadAsync(Fixture.CreateSource());
+        var window = new Avalonia.Controls.Window();
+        try
+        {
+            var flag = new FlagViewModel(new RedFlag { Id = "f1", Kind = FlagKind.RawOutput, Path = "a.cs", Line = 1, Message = "`@Html.Raw(` writes without encoding." }) { ChangeLabel = "New" };
+            window.Content = new Views.FlagCardView { DataContext = new FlagCardContext(pr, flag) };
+            window.Show();
+            window.UpdateLayout();
+
+            Assert.Equal("New", flag.ChangeLabel);
+            var text = window.GetVisualDescendants().OfType<Avalonia.Controls.TextBlock>().First().Inlines!.OfType<Avalonia.Controls.Documents.Run>().Select(r => r.Text);
+            Assert.Equal("Flag  Raw output  · New", string.Concat(text));
+        }
+        finally
+        {
+            window.Close();
             await pr.DisposeAsync();
         }
     }

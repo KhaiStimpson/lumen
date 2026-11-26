@@ -58,6 +58,9 @@ public sealed partial class SliceFileViewModel(SliceFile file, FileEntryViewMode
 
     public string Section => Model.Section;
 
+    /// <summary>"`EditModel` injects `IOrderService` · section OnPostSave": why it is here, and its handler section if any.</summary>
+    public string WhyLine => Section.Length > 0 ? $"{Why} · section {Section}" : Why;
+
     public bool HasSection => Model.Section.Length > 0;
 
     public string OutsideCallersLabel => Model.OutsideCallers switch

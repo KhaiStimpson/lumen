@@ -35,7 +35,7 @@
           </Button>
           <Border Height="1" Background="{DynamicResource Border.Subtle}" Margin="2,5" />
           <TextBlock Classes="caption tertiary" Margin="9,2,9,4" TextTrimming="CharacterEllipsis">
-            <Run Text="{Binding NumberLabel}" FontWeight="SemiBold" /><Run Text=" · " /><Run Text="{Binding StateLabel}" />
+            <Run Text="{Binding NumberLabel, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " /><Run Text="{Binding StateLabel, Mode=OneWay}" />
           </TextBlock>
           <RadioButton Name="NavSlices" Classes="navitem" GroupName="PrTab" IsChecked="{Binding IsSlicesNav, Mode=OneWay}"
                        Command="{Binding ShowSlicesCommand}" ToolTip.Tip="The change as feature slices">
@@ -99,16 +99,16 @@
           <StackPanel Margin="18,18,18,14" Spacing="6">
             <TextBlock Classes="section" Text="{Binding ReviewKindLabel}" />
             <TextBlock TextWrapping="Wrap" MaxLines="3" TextTrimming="WordEllipsis" LineHeight="21">
-              <Run Text="{Binding NumberLabel}" FontWeight="Bold" FontSize="15" />
+              <Run Text="{Binding NumberLabel, Mode=OneWay}" FontWeight="Bold" FontSize="15" />
               <Run Text=" " />
-              <Run Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" />
+              <Run Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" FontSize="14" />
             </TextBlock>
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2,0,0">
               <Border Classes="pill open" IsVisible="{Binding StateLabel, Converter={x:Static views:Converters.NotEmpty}}">
                 <TextBlock Text="{Binding StateLabel}" />
               </Border>
               <TextBlock Classes="caption" VerticalAlignment="Center">
-                <Run Text="by " /><Run Text="{Binding Author}" FontWeight="Medium" />
+                <Run Text="by " /><Run Text="{Binding Author, Mode=OneWay}" FontWeight="Medium" />
               </TextBlock>
             </StackPanel>
             <TextBlock Classes="caption tertiary" Text="{Binding BranchLabel}" TextTrimming="CharacterEllipsis" />
@@ -269,9 +269,9 @@
               <StackPanel Spacing="2">
                 <TextBlock Classes="h2" Text="{Binding CurrentSlice.Title, FallbackValue=''}" TextTrimming="CharacterEllipsis" />
                 <TextBlock Classes="caption" TextTrimming="CharacterEllipsis">
-                  <Run Text="{Binding CurrentSlice.Caption, FallbackValue=''}" FontFamily="{StaticResource CodeFont}" FontSize="11.5" />
-                  <Run Text="{Binding CurrentSlice.SectionsLabel, FallbackValue='', StringFormat=' · {0}'}" />
-                  <Run Text=" · " /><Run Text="{Binding CurrentSlice.LinesLabel, FallbackValue=''}" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" />
+                  <Run Text="{Binding CurrentSlice.Caption, FallbackValue='', Mode=OneWay}" FontFamily="{StaticResource CodeFont}" FontSize="11.5" />
+                  <Run Text="{Binding CurrentSlice.SectionsLabel, FallbackValue='', Mode=OneWay, StringFormat=' · {0}'}" />
+                  <Run Text=" · " /><Run Text="{Binding CurrentSlice.LinesLabel, FallbackValue='', Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" />
                 </TextBlock>
               </StackPanel>
               <Button Name="SliceFlags" Grid.Column="1" Classes="subtle" VerticalAlignment="Center" IsVisible="{Binding CurrentSlice.HasFlags, FallbackValue=False}"
@@ -285,7 +285,7 @@
                           <Button Classes="row" Padding="8,5" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                                   Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).SelectFlagCommand}" CommandParameter="{Binding}">
                             <StackPanel Spacing="1">
-                              <TextBlock FontSize="12.5"><Run Text="Flag " FontWeight="SemiBold" Foreground="{DynamicResource Gauge.Crit}" /><Run Text="{Binding KindLabel}" /></TextBlock>
+                              <TextBlock FontSize="12.5"><Run Text="Flag " FontWeight="SemiBold" Foreground="{DynamicResource Gauge.Crit}" /><Run Text="{Binding KindLabel, Mode=OneWay}" /></TextBlock>
                               <TextBlock Classes="caption tertiary" FontFamily="{StaticResource CodeFont}" FontSize="11.5" Text="{Binding LocationLabel}" />
                             </StackPanel>
                           </Button>
@@ -324,7 +324,7 @@
                             Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).SelectSliceFileCommand}"
                             CommandParameter="{Binding}" ToolTip.Tip="{Binding Why}">
                       <TextBlock FontSize="11.5" FontFamily="{StaticResource CodeFont}">
-                        <Run Text="{Binding Name}" /><Run Text=" ✓" Foreground="{DynamicResource Gauge.Ok}" FontFamily="{StaticResource UiFont}"
+                        <Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" ✓" Foreground="{DynamicResource Gauge.Ok}" FontFamily="{StaticResource UiFont}"
                                                           Classes.hidden="{Binding !IsMarked}" />
                       </TextBlock>
                     </Button>
@@ -336,7 +336,7 @@
         </Border>
 
         <!-- File header: its place in the reading order and why it is in the slice -->
-        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="22,12,22,8">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" Margin="22,12,22,8">
           <Grid ColumnDefinitions="Auto,Auto,Auto" ClipToBounds="True">
             <TextBlock Classes="h2" Text="{Binding SelectedFile.Name, FallbackValue='Loading…'}" TextTrimming="CharacterEllipsis" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="10,0,8,0" VerticalAlignment="Center">
@@ -354,19 +354,19 @@
               <TextBlock Classes="removed" Text="{Binding SelectedFile.DeletionsLabel, FallbackValue=''}" />
             </StackPanel>
           </Grid>
-          <TextBlock Grid.Row="1" Classes="caption tertiary" Margin="0,3,0,0" Text="{Binding SelectedFile.Directory, FallbackValue=''}" TextTrimming="CharacterEllipsis"
+          <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Classes="caption tertiary" Margin="0,3,0,0" Text="{Binding SelectedFile.Directory, FallbackValue=''}" TextTrimming="CharacterEllipsis"
                      IsVisible="{Binding !SelectedFile.IsRenamed, FallbackValue=True}" />
           <!-- A rename, git style: shared/{old → new}/shared, with the part that changed marked. Runs touch: whitespace between them would show. -->
-          <TextBlock Name="RenamePath" Grid.Row="1" Classes="caption" Margin="0,3,0,0" FontFamily="{StaticResource CodeFont}" FontSize="11.5"
+          <TextBlock Name="RenamePath" Grid.Row="1" Grid.ColumnSpan="2" Classes="caption" Margin="0,3,0,0" FontFamily="{StaticResource CodeFont}" FontSize="11.5"
                      TextTrimming="CharacterEllipsis" IsVisible="{Binding SelectedFile.IsRenamed, FallbackValue=False}"
-                     ToolTip.Tip="{Binding SelectedFile.Model.OldPath, StringFormat='Renamed from {0}', FallbackValue=''}"><Run Text="{Binding SelectedFile.PathChange.Head, FallbackValue=''}" Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding SelectedFile.PathChange.OldMiddle, FallbackValue=''}" Foreground="{DynamicResource Diff.Removed.Sign}" Background="{DynamicResource Diff.Removed.Bg}" TextDecorations="Strikethrough" /><Run Text=" → " Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding SelectedFile.PathChange.NewMiddle, FallbackValue=''}" Foreground="{DynamicResource Diff.Added.Sign}" Background="{DynamicResource Diff.Added.Bg}" FontWeight="Medium" /><Run Text="{Binding SelectedFile.PathChange.Tail, FallbackValue=''}" Foreground="{DynamicResource Text.Tertiary}" /></TextBlock>
+                     ToolTip.Tip="{Binding SelectedFile.Model.OldPath, StringFormat='Renamed from {0}', FallbackValue=''}"><Run Text="{Binding SelectedFile.PathChange.Head, FallbackValue='', Mode=OneWay}" Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding SelectedFile.PathChange.OldMiddle, FallbackValue='', Mode=OneWay}" Foreground="{DynamicResource Diff.Removed.Sign}" Background="{DynamicResource Diff.Removed.Bg}" TextDecorations="Strikethrough" /><Run Text=" → " Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding SelectedFile.PathChange.NewMiddle, FallbackValue='', Mode=OneWay}" Foreground="{DynamicResource Diff.Added.Sign}" Background="{DynamicResource Diff.Added.Bg}" FontWeight="Medium" /><Run Text="{Binding SelectedFile.PathChange.Tail, FallbackValue='', Mode=OneWay}" Foreground="{DynamicResource Text.Tertiary}" /></TextBlock>
 
-          <TextBlock Name="WhyHere" Grid.Row="2" Classes="caption" Margin="0,4,0,0" TextWrapping="Wrap"
-                     IsVisible="{Binding CurrentSliceFile, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <Run Text="{Binding CurrentSliceFile.PositionLabel, FallbackValue='', StringFormat='{}{0} · '}" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" />
-            <Run Text="{Binding CurrentSliceFile.Why, FallbackValue=''}" />
-            <Run Text="{Binding CurrentSliceFile.Section, FallbackValue='', StringFormat=' · section {0}'}" Foreground="{DynamicResource Text.Tertiary}" />
-          </TextBlock>
+          <Grid Name="WhyHere" Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*" Margin="0,4,0,0"
+                IsVisible="{Binding CurrentSliceFile, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Classes="caption" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
+                       Text="{Binding CurrentSliceFile.PositionLabel, FallbackValue='', StringFormat='{}{0} · '}" />
+            <TextBlock Grid.Column="1" Classes="caption" TextWrapping="Wrap" views:CodeText.Text="{Binding CurrentSliceFile.WhyLine, FallbackValue=''}" />
+          </Grid>
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="16,0,0,0">
             <!-- Only the hunks, or the whole file with the changes in place (X toggles) -->
             <Border Classes="segmented" VerticalAlignment="Center" Margin="0,0,6,0">
@@ -382,7 +382,7 @@
             </Button>
             <Border Padding="6,0" VerticalAlignment="Center">
               <TextBlock FontSize="12.5">
-                <Run Text="File " Foreground="{DynamicResource Text.Secondary}" /><Run Text="{Binding FilePositionLabel}" />
+                <Run Text="File " Foreground="{DynamicResource Text.Secondary}" /><Run Text="{Binding FilePositionLabel, Mode=OneWay}" />
               </TextBlock>
             </Border>
             <Button Classes="subtle" Padding="7,5" Command="{Binding NextFileCommand}" ToolTip.Tip="Next file in reading order (N)">
@@ -390,7 +390,7 @@
             </Button>
           </StackPanel>
           <!-- Scope and view options -->
-          <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" Margin="0,6,2,0">
+          <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" Margin="0,6,2,0">
             <!-- Step through this file's changes ([ and ]); the ruler beside the diff shows where they are -->
             <StackPanel Name="ChangeNav" Orientation="Horizontal" Spacing="2" Margin="0,0,8,0" VerticalAlignment="Center" IsVisible="{Binding HasChanges}">
               <Button Classes="ghost" Padding="5" Command="{Binding PreviousChangeCommand}" ToolTip.Tip="Previous change ([)">

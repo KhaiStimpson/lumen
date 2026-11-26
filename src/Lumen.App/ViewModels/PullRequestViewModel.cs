@@ -488,7 +488,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         Title = snapshot.Title;
         Author = snapshot.Author;
         ViewerLogin = snapshot.ViewerLogin;
-        StateLabel = IsLocal ? "Local" : snapshot.IsDraft ? "Draft" : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(snapshot.State);
+        StateLabel = IsLocal ? "Read-only" : snapshot.IsDraft ? "Draft" : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(snapshot.State);
         Url = snapshot.Url;
         BranchLabel = $"{snapshot.HeadRef} → {snapshot.BaseRef}";
         Additions = snapshot.Files.Sum(f => f.Additions);

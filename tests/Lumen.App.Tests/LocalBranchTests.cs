@@ -83,6 +83,11 @@ public sealed class LocalBranchTests
             Assert.Equal(9, pr.SliceGroups.SelectMany(g => g.Slices).Count(s => s.Kind == SliceKind.Feature));
             Assert.Equal(17, pr.Flags.Count);
 
+            // Orders / Edit was marked before the follow-up push touched it.
+            var edit = pr.SliceGroups.SelectMany(g => g.Slices).Single(s => s.Title == "Orders / Edit");
+            await Fixture.WaitUntilAsync(() => edit.ChangedSinceMark);
+            Assert.Equal("Changed after review", edit.StateLabel);
+
             // The follow-up commit: three files, two flags fixed and one new.
             pr.ShowSinceLastLook = true;
             await Fixture.WaitUntilAsync(() => pr.FixedFlags.Count > 0);
@@ -124,7 +129,7 @@ public sealed class LocalBranchTests
             Assert.False(pr.CanPost);
             Assert.Equal("Local", pr.NumberLabel);
             Assert.Equal("Local branch", pr.ReviewKindLabel);
-            Assert.Equal("Local", pr.StateLabel);
+            Assert.Equal("Read-only", pr.StateLabel);
 
             // Viewed ticks are GitHub's; a local branch never sends one.
             await pr.ToggleViewedCommand.ExecuteAsync(pr.Files[0]);

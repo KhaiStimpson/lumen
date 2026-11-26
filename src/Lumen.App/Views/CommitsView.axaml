@@ -18,7 +18,7 @@
                 <StackPanel Grid.Column="1" Spacing="2">
                   <TextBlock Text="{Binding Headline}" FontSize="12.5" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
                   <TextBlock Classes="caption">
-                    <Run Text="{Binding Author}" /><Run Text=" · " /><Run Text="{Binding AgeLabel}" />
+                    <Run Text="{Binding Author, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding AgeLabel, Mode=OneWay}" />
                   </TextBlock>
                 </StackPanel>
                 <TextBlock Grid.Column="2" Text="{Binding ShortSha}" FontFamily="{StaticResource CodeFont}" FontSize="11.5" Classes="secondary" VerticalAlignment="Center" />

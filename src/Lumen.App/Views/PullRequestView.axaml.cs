@@ -49,9 +49,17 @@ public sealed partial class PullRequestView : UserControl, IDisposable
             Layout.ColumnDefinitions[0].Width = new GridLength(Math.Max(0, left));
         }
 
+        // A closed pane keeps the saved width for when it opens; applying it now would reserve the empty column.
         if (shell.PaneWidths.Right is { } right)
         {
-            Layout.ColumnDefinitions[4].Width = new GridLength(Math.Max(0, right));
+            if (_rightWidth is null)
+            {
+                Layout.ColumnDefinitions[4].Width = new GridLength(Math.Max(0, right));
+            }
+            else
+            {
+                _rightWidth = new GridLength(Math.Max(0, right));
+            }
         }
 
         void Commit(object? sender, VectorEventArgs args) => shell.SavePaneWidths(Layout.ColumnDefinitions[0].ActualWidth, _rightWidth?.Value ?? Layout.ColumnDefinitions[4].ActualWidth);

@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
              x:Class="Lumen.App.Views.FlagCardView"
              x:DataType="vm:FlagCardContext"
              FontFamily="{StaticResource UiFont}">
@@ -9,9 +10,9 @@
           CornerRadius="{StaticResource Radius.Card}" Padding="10,6,10,7">
     <StackPanel Spacing="2">
       <TextBlock FontSize="12" TextWrapping="Wrap">
-        <Run Text="Flag" FontWeight="SemiBold" Foreground="{DynamicResource Gauge.Crit}" /><Run Text="  " /><Run Text="{Binding Flag.KindLabel}" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" /><Run Text="{Binding Flag.ChangeLabel, StringFormat='  · {0}'}" Foreground="{DynamicResource Gauge.Warn}" />
+        <Run Text="Flag" FontWeight="SemiBold" Foreground="{DynamicResource Gauge.Crit}" /><Run Text="  " /><Run Text="{Binding Flag.KindLabel, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" /><Run Text="{Binding Flag.ChangeLabel, Mode=OneWay, StringFormat='  · {0}'}" Foreground="{DynamicResource Gauge.Warn}" Classes.hidden="{Binding !Flag.HasChangeLabel}" />
       </TextBlock>
-      <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource Text.Body}" Text="{Binding Flag.Message}" />
+      <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource Text.Body}" views:CodeText.Text="{Binding Flag.Message}" />
     </StackPanel>
   </Border>
 </UserControl>

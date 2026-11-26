@@ -103,6 +103,12 @@ public sealed partial class FixtureReviewSource
 
         _localBranchMode = _events.Any(e => e.Snapshot is { Local: not null });
 
+        // Marks the recording carried (made before a follow-up push) are the replay's starting marks.
+        foreach (var mark in _events.Where(e => e.MarksUpdated is not null).SelectMany(e => e.MarksUpdated.Marks))
+        {
+            _marks[mark.Unit] = mark.Fingerprint;
+        }
+
         var inbox = Path.Combine(directory, "..", "inbox", "inbox.json");
         _inbox = File.Exists(inbox) ? parser.Parse<Inbox>(File.ReadAllText(inbox)) : SynthesizedInbox();
     }

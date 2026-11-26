@@ -50,7 +50,7 @@
             IsVisible="{Binding PullRequest.NeedsReanalysis, FallbackValue=False}">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
         <TextBlock FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center">
-          <Run Text="Review settings changed. " /><Run Text="{Binding PullRequest.NumberLabel, FallbackValue=''}" Foreground="{DynamicResource Text.Secondary}" /><Run Text=" still shows the earlier results." Foreground="{DynamicResource Text.Secondary}" />
+          <Run Text="Review settings changed. " /><Run Text="{Binding PullRequest.NumberLabel, FallbackValue='', Mode=OneWay}" Foreground="{DynamicResource Text.Secondary}" /><Run Text=" still shows the earlier results." Foreground="{DynamicResource Text.Secondary}" />
         </TextBlock>
         <Button Name="ReanalyseButton" Grid.Column="1" Classes="primary" Content="{Binding PullRequest.ReanalyseLabel, FallbackValue='Re-analyse'}"
                 Command="{Binding ReanalyseCommand}" />

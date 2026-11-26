@@ -13,7 +13,7 @@
             <TextBlock Classes="h1" Text="Inbox" />
             <TextBlock Classes="caption" TextWrapping="Wrap">
               <Run Text="Pull requests waiting on you, your own, and the repositories you watch." />
-              <Run Text="{Binding UpdatedLabel}" Foreground="{DynamicResource Text.Tertiary}" />
+              <Run Text="{Binding UpdatedLabel, Mode=OneWay}" Foreground="{DynamicResource Text.Tertiary}" />
             </TextBlock>
           </StackPanel>
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -84,8 +84,8 @@
                                 <Border Classes="pill" IsVisible="{Binding IsDraft}"><TextBlock Text="Draft" /></Border>
                               </StackPanel>
                               <TextBlock Classes="caption">
-                                <Run Text="{Binding RepositoryLabel}" /><Run Text=" " /><Run Text="{Binding NumberLabel}" FontWeight="SemiBold" />
-                                <Run Text=" · " /><Run Text="{Binding Author}" /><Run Text=" · " /><Run Text="{Binding AgeLabel}" />
+                                <Run Text="{Binding RepositoryLabel, Mode=OneWay}" /><Run Text=" " /><Run Text="{Binding NumberLabel, Mode=OneWay}" FontWeight="SemiBold" />
+                                <Run Text=" · " /><Run Text="{Binding Author, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding AgeLabel, Mode=OneWay}" />
                               </TextBlock>
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Right">

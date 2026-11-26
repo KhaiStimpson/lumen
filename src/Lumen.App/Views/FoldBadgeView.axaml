@@ -17,12 +17,12 @@
       </Panel>
       <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="12" Margin="0,5" FontWeight="SemiBold"
                  Foreground="{DynamicResource Text.Primary}">
-        <Run Text="{Binding KindLabel}" /><Run Text="{Binding IsMechanical, Converter={x:Static views:Converters.CheckIf}}" Foreground="{DynamicResource Gauge.Ok}" />
+        <Run Text="{Binding KindLabel, Mode=OneWay}" /><Run Text="{Binding IsMechanical, Converter={x:Static views:Converters.CheckIf}}" Foreground="{DynamicResource Gauge.Ok}" />
       </TextBlock>
       <TextBlock Grid.Column="2" VerticalAlignment="Center" FontSize="12" TextTrimming="CharacterEllipsis">
-        <Run Text="{Binding Reason}" Foreground="{DynamicResource Text.Secondary}" />
+        <Run Text="{Binding Reason, Mode=OneWay}" Foreground="{DynamicResource Text.Secondary}" />
         <Run Text="  ·  " Foreground="{DynamicResource Text.Tertiary}" />
-        <Run Text="{Binding LinesLabel}" Foreground="{DynamicResource Text.Tertiary}" />
+        <Run Text="{Binding LinesLabel, Mode=OneWay}" Foreground="{DynamicResource Text.Tertiary}" />
       </TextBlock>
       <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" IsVisible="{Binding HasGroup}">
         <Button Classes="ghost" Padding="5" Command="{Binding PreviousCommand}" IsHitTestVisible="{Binding HasPrevious}" Opacity="{Binding !HasPrevious, Converter={x:Static views:Converters.DimIf}}" ToolTip.Tip="Previous in this group">

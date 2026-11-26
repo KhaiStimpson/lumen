@@ -51,7 +51,7 @@ internal static class DevCapture
     /// <c>files</c> (the file tree), <c>fold</c> (open the current file's folds), <c>slicefolds</c>, <c>flag</c> (the
     /// next flag), <c>mark</c> (press Mark reviewed), <c>since</c> (since my last look), <c>all</c>, <c>pane</c> (toggle
     /// the right pane), <c>unlinked</c>, <c>shared</c>, <c>mechanical</c>. Review client: <c>inbox</c>,
-    /// <c>open</c>, <c>conversation</c>, <c>commits</c>, <c>checks</c>, <c>thread</c>, <c>draft</c>, <c>tray</c>,
+    /// <c>open</c>, <c>local</c> (open the first local branch), <c>conversation</c>, <c>commits</c>, <c>checks</c>, <c>thread</c>, <c>draft</c>, <c>tray</c>,
     /// <c>split</c>, <c>find</c>, <c>palette</c>, <c>file:name</c>. Setup: <c>dark</c>, <c>light</c>, <c>size:WxH</c>.
     /// </summary>
     private static async Task ApplyAsync(MainWindowViewModel viewModel, string step)
@@ -64,6 +64,10 @@ internal static class DevCapture
                 break;
             case "open" when viewModel.Home.AllItems.FirstOrDefault() is { } item:
                 await viewModel.OpenAsync(item.Reference).ConfigureAwait(true);
+                await Task.Delay(1500).ConfigureAwait(true);
+                break;
+            case "local" when viewModel.Home.LocalBranches.FirstOrDefault() is { } branch:
+                await viewModel.Home.OpenLocalItemCommand.ExecuteAsync(branch).ConfigureAwait(true);
                 await Task.Delay(1500).ConfigureAwait(true);
                 break;
             case "generated" when pr is not null:
