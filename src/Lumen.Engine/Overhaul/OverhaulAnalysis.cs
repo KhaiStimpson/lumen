@@ -51,7 +51,7 @@ public sealed partial class OverhaulAnalysis(
         session.Units = Units(snapshot, triage, slices.FellBack ? null : session.Index, options.MemberUnitLines);
         session.Publish(new PullRequestEvent { SlicesReady = ToProto(slices, session.Units.Values) });
 
-        session.Flags = Flags(snapshot, triage, settings, session.Index);
+        session.Flags = triage?.Flags ?? [];
         var flags = new FlagsReady();
         flags.Flags.AddRange(session.Flags.Select(ProtoMapper.ToProto));
         session.Publish(new PullRequestEvent { FlagsReady = flags });
@@ -60,9 +60,6 @@ public sealed partial class OverhaulAnalysis(
         await tracking.RememberAsync(session, snapshot.HeadSha, cancellationToken).ConfigureAwait(false);
         await SaveSummaryAsync(session, snapshot, triage, cancellationToken).ConfigureAwait(false);
     }
-
-    /// <summary>Red flags come with Phase 7; until then there are none.</summary>
-    private static partial List<Domain.RedFlag> Flags(Domain.PullRequestSnapshot snapshot, TriageResult? triage, ReviewSettings settings, RepositoryIndex? index);
 
     public static string CacheKey(ReviewTarget target, string head, string mergeBase) => $"slices:{Slicer.Version}:{target.Key}:{head}:{mergeBase}";
 

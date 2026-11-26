@@ -1,4 +1,5 @@
 using Lumen.Domain;
+using Lumen.Roslyn.Flags;
 using Lumen.Roslyn.Slicing;
 using Lumen.Roslyn.Triage;
 using Lumen.TestSupport;
@@ -7,7 +8,7 @@ namespace Lumen.Analysis.Tests.Slicing;
 
 /// <summary>
 /// The Razor Pages fixture's change, analysed the way the engine does: git diff of base..head, triage over both sides,
-/// the head's link graph and the slicer. Built once per test run (git and parsing take a couple of seconds).
+/// red flags, the head's link graph and the slicer. Built once per test run (git and parsing take a couple of seconds).
 /// </summary>
 internal sealed class FixtureChange
 {
@@ -56,7 +57,9 @@ internal sealed class FixtureChange
         var baseTexts = files.Where(f => Read(baseDir, f.OldPath ?? f.Path) is not null).ToDictionary(f => f.Path, f => Read(baseDir, f.OldPath ?? f.Path)!, StringComparer.Ordinal);
         var headTexts = files.Where(f => Read(headDir, f.Path) is not null).ToDictionary(f => f.Path, f => Read(headDir, f.Path)!, StringComparer.Ordinal);
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var triage = RoslynTriage.CreatePipeline().Run(snapshot, new TriageSources(baseTexts, headTexts));
+        // As the engine's TriageRunner does it: red flags from the same sources, and no fold hides one.
+        var sources = new TriageSources(baseTexts, headTexts);
+        var triage = RedFlags.OpenFlaggedFolds(RoslynTriage.CreatePipeline().Run(snapshot, sources), RedFlags.Detect(snapshot, sources, new ReviewSettings()));
         var triageTime = stopwatch.Elapsed;
 
         var graph = LinkResolver.Build(FixtureSources.Index("head"));

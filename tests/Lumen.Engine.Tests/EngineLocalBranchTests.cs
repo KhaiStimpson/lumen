@@ -160,6 +160,29 @@ public sealed class EngineLocalBranchTests : IAsyncLifetime
     private TimeSpan? SnapshotAt { get; set; }
 
     [Fact]
+    public async Task TheFixturesPlantedFlagsArriveAndNoFoldHidesOne()
+    {
+        var events = await WatchAsync(new LocalBranchRef { ClonePath = _repo.Root, BaseRef = "main", HeadRef = FixtureRepository.HeadBranch });
+
+        var flags = Assert.Single(events, e => e.FlagsReady is not null).FlagsReady.Flags;
+        Assert.Equal(18, flags.Count);
+        var antiforgery = Assert.Single(flags, f => f.Kind == Contracts.FlagKind.AntiforgeryOff && f.Path == "src/Shop.Web/Pages/Orders/BulkEdit.cshtml.cs");
+        Assert.Equal(11, antiforgery.Line);
+        Assert.Equal("BulkEditModel", antiforgery.Member);
+        Assert.Matches("^f[0-9a-f]{12}$", antiforgery.Id);
+        Assert.Contains(flags, f => f.Kind == Contracts.FlagKind.AuthorisationLoosened && f.Side == Contracts.DiffSide.Left && f.Line == 13);
+
+        // Flags arrive after triage, and no fold in the triage hides one.
+        var triage = Assert.Single(events, e => e.TriageReady is not null).TriageReady;
+        foreach (var flag in flags)
+        {
+            Assert.DoesNotContain(triage.Hunks, h => h.Path == flag.Path && h.Fold != Contracts.FoldKind.Open && (flag.Side == Contracts.DiffSide.Right
+                ? h.NewStart <= flag.Line && h.NewEnd >= flag.Line
+                : h.OldStart <= flag.Line && h.OldEnd >= flag.Line));
+        }
+    }
+
+    [Fact]
     public async Task ARepositoryWithNoEntryPointsStaysOnTheFileList()
     {
         _repo.Git("checkout", "-q", "-b", "docs-only", "main");

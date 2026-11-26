@@ -91,6 +91,9 @@ public sealed record TriageGroup
 public sealed record TriageResult(IReadOnlyList<HunkTriage> Hunks, IReadOnlyList<TriageGroup> Groups)
 {
     public static readonly TriageResult Empty = new([], []);
+
+    /// <summary>Red flags found with the same sources, cached with the triage (docs/overhaul.md, Red flags).</summary>
+    public IReadOnlyList<RedFlag> Flags { get; init; } = [];
 }
 
 /// <summary>Triage is computed once per head commit and triage version, then served from here (like investigations).</summary>
