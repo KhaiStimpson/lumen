@@ -153,6 +153,13 @@ public sealed class EngineLocalBranchTests : IAsyncLifetime
         // Files first, slices within the budget (measured: see docs/overhaul.md, Phase 4 results).
         var kinds = events.Select(e => e.EventCase).ToList();
         Assert.True(kinds.IndexOf(PullRequestEvent.EventOneofCase.Snapshot) < kinds.IndexOf(PullRequestEvent.EventOneofCase.SlicesReady));
+
+        // Flags don't wait on slicing, and slicing says what it's doing so the app can show it's under way.
+        Assert.True(kinds.IndexOf(PullRequestEvent.EventOneofCase.FlagsReady) < kinds.IndexOf(PullRequestEvent.EventOneofCase.SlicesReady));
+        var steps = events.Select((e, i) => (e, i)).Where(x => x.e.Progress?.Stage == Overhaul.OverhaulAnalysis.SlicesStage).ToList();
+        Assert.NotEmpty(steps);
+        Assert.All(steps, x => Assert.True(x.i < kinds.IndexOf(PullRequestEvent.EventOneofCase.SlicesReady)));
+        Assert.All(steps, x => Assert.StartsWith("Building feature slices", x.e.Progress.Message, StringComparison.Ordinal));
         Assert.True(slicesAt - SnapshotAt!.Value < TimeSpan.FromSeconds(3), $"slices took {(slicesAt - SnapshotAt.Value).TotalMilliseconds:N0} ms after the files");
         Console.WriteLine($"Fixture: files after {SnapshotAt.Value.TotalMilliseconds:N0} ms, slices after {slicesAt.TotalMilliseconds:N0} ms (slicer {ready.DurationMs} ms)");
     }

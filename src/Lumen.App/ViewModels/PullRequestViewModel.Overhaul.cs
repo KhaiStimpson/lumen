@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Grpc.Core;
@@ -35,6 +37,56 @@ public sealed partial class PullRequestViewModel
     /// <summary>Slicing ran but fell back to the file list (not Razor/WebForms-shaped, failed or over budget).</summary>
     [ObservableProperty]
     public partial string? SliceFallbackReason { get; private set; }
+
+    /// <summary>The engine's progress stage while it builds slices (OverhaulAnalysis.SlicesStage).</summary>
+    internal const string SlicesStage = "slices";
+
+    private readonly Stopwatch _slicingClock = new();
+    private DispatcherTimer? _slicingTimer;
+
+    /// <summary>
+    /// Slicing is under way. It runs after the diff, folds and flags arrive and can take minutes on a big change, so
+    /// the file list says so and counts up; the slices replace it when they're ready.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsSlicing { get; private set; }
+
+    /// <summary>The engine's current step: "Building feature slices: linking files…".</summary>
+    [ObservableProperty]
+    public partial string SlicingStatus { get; private set; } = "";
+
+    /// <summary>How long slicing has run, as m:ss.</summary>
+    [ObservableProperty]
+    public partial string SlicingElapsedLabel { get; private set; } = "";
+
+    private void OnSlicingProgress(string message)
+    {
+        SlicingStatus = message;
+        if (IsSlicing)
+        {
+            return;
+        }
+
+        IsSlicing = true;
+        _slicingClock.Restart();
+        TickSlicing();
+        _slicingTimer ??= new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => TickSlicing());
+        _slicingTimer.Start();
+    }
+
+    internal void TickSlicing() => SlicingElapsedLabel = FormatElapsed(_slicingClock.Elapsed);
+
+    internal static string FormatElapsed(TimeSpan elapsed) =>
+        string.Create(CultureInfo.InvariantCulture, $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:00}");
+
+    private void StopSlicing()
+    {
+        _slicingTimer?.Stop();
+        _slicingClock.Reset();
+        IsSlicing = false;
+        SlicingStatus = "";
+        SlicingElapsedLabel = "";
+    }
 
     /// <summary>The file tree shows when chosen, or when there are no slices to show instead.</summary>
     public bool ShowsFileTree => ShowFileList || !HasSlices;
@@ -89,6 +141,7 @@ public sealed partial class PullRequestViewModel
 
     partial void ApplySlices(SlicesReady slices)
     {
+        StopSlicing();
         _slices.Clear();
         _units.Clear();
         SliceGroups.Clear();
@@ -787,6 +840,7 @@ public sealed partial class PullRequestViewModel
 
     partial void ResetOverhaulState()
     {
+        StopSlicing();
         _slices.Clear();
         _units.Clear();
         _marks.Clear();

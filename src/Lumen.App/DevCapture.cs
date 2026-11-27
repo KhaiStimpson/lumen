@@ -123,6 +123,19 @@ internal static class DevCapture
             case "pane" when pr is not null:
                 pr.ToggleRightPane();
                 break;
+            case "slicing" when pr is not null:
+                // What a big change shows before its slices arrive: the file list, with slicing under way.
+                if (!pr.ShowsFileTree)
+                {
+                    pr.ToggleFileList();
+                }
+
+                await pr.ApplyAsync(new Contracts.PullRequestEvent
+                {
+                    Progress = new Contracts.AnalysisProgress { Stage = PullRequestViewModel.SlicesStage, Message = "Building feature slices: linking files…" },
+                }).ConfigureAwait(true);
+                await Task.Delay(2200).ConfigureAwait(true);
+                break;
 
             // Review client states.
             case "conversation" when pr is not null:

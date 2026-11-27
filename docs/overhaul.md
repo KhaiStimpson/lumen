@@ -368,8 +368,10 @@ Your OK on them is still wanted.
   their slice. The slicer lists every changed member of a file (including test helpers such as `CreateDb`,
   interface members, new data types, and each member of the wholly new `CartService`); the key lists fewer.
 - Timing (engine, fixture as a local branch): files after 191–285 ms, slices after 0.6–1.4 s (the slicer itself
-  12–283 ms, the rest is indexing the repository); the engine test fails above 3 s. The budget before falling back
-  to the file list is 20 s.
+  12–283 ms, the rest is indexing the repository); the engine test fails above 3 s. Slicing runs in the background
+  after the diff, folds and red flags are published, with a 10-minute safety net before falling back to the file
+  list (it was 20 s; raised for large work PRs). While it runs, the file list shows "Building feature slices" with
+  the engine's current step and a running clock.
 - andrew-crm#58 (60 files) replayed locally through the engine (`LUMEN_SLICE_REPLAY`, local git only): files after
   346 ms, slicing done after 4.9 s (slicer 2.4 s), no fallback; 11 feature slices (5 pages and 6 seeded by test
   classes whose subject no page reaches), Shared 8 files, Unlinked 1 + 5, Mechanical only 14. The recorded #58

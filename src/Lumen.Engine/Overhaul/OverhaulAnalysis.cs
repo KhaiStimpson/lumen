@@ -14,8 +14,11 @@ namespace Lumen.Engine.Overhaul;
 /// <summary>Limits for the overhaul's analysis. The slicing budget is measured on the fixture (docs/overhaul.md, Phase 4).</summary>
 public sealed record OverhaulOptions
 {
-    /// <summary>Past this, slicing stops and the review stays on the file list with the mechanical folds.</summary>
-    public TimeSpan SliceBudget { get; init; } = TimeSpan.FromSeconds(20);
+    /// <summary>
+    /// A safety net, not a target: past this, slicing stops and the review stays on the file list with the mechanical
+    /// folds. Slicing runs after the diff, folds and red flags are published, so a long one never blocks reading.
+    /// </summary>
+    public TimeSpan SliceBudget { get; init; } = TimeSpan.FromMinutes(10);
 
     /// <summary>A file with more changed lines than this, and at least two changed members, is marked per member.</summary>
     public int MemberUnitLines { get; init; } = 150;
@@ -46,17 +49,17 @@ public sealed partial class OverhaulAnalysis(
         TriageResult? triage,
         CancellationToken cancellationToken)
     {
-        var slices = await SliceAsync(session, snapshot, checkout, triage, cancellationToken).ConfigureAwait(false);
-        session.Slices = slices.FellBack ? null : slices;
-        session.Units = Units(snapshot, triage, slices.FellBack ? null : session.Index, options.MemberUnitLines);
-        session.Publish(new PullRequestEvent { SlicesReady = ToProto(slices, session.Units.Values) });
-
+        // Flags come from triage and marks from storage: neither waits on slicing, which can take minutes on a big change.
         session.Flags = triage?.Flags ?? [];
         var flags = new FlagsReady();
         flags.Flags.AddRange(session.Flags.Select(ProtoMapper.ToProto));
         session.Publish(new PullRequestEvent { FlagsReady = flags });
-
         await PublishMarksAsync(session, cancellationToken).ConfigureAwait(false);
+
+        var slices = await SliceAsync(session, snapshot, checkout, triage, cancellationToken).ConfigureAwait(false);
+        session.Slices = slices.FellBack ? null : slices;
+        session.Units = Units(snapshot, triage, slices.FellBack ? null : session.Index, options.MemberUnitLines);
+        session.Publish(new PullRequestEvent { SlicesReady = ToProto(slices, session.Units.Values) });
         await tracking.RememberAsync(session, snapshot.HeadSha, cancellationToken).ConfigureAwait(false);
         await SaveSummaryAsync(session, snapshot, triage, cancellationToken).ConfigureAwait(false);
     }
@@ -70,6 +73,7 @@ public sealed partial class OverhaulAnalysis(
         budget.CancelAfter(options.SliceBudget);
         try
         {
+            SliceProgress(session, "Building feature slices: reading the repository…");
             var index = await BuildIndexAsync(checkout, budget.Token).ConfigureAwait(false);
             session.Index = index;
             var key = CacheKey(session.Target, snapshot.HeadSha, snapshot.MergeBaseSha);
@@ -78,7 +82,9 @@ public sealed partial class OverhaulAnalysis(
                 return hit;
             }
 
-            var graph = LinkResolver.Build(index);
+            SliceProgress(session, "Building feature slices: linking files…");
+            var graph = await Task.Run(() => LinkResolver.Build(index), budget.Token).ConfigureAwait(false);
+            SliceProgress(session, "Building feature slices: grouping changes…");
             var result = await Task.Run(() => Slicer.Slice(graph, Slicer.Facts(snapshot, triage), options.Slicer, budget.Token), budget.Token).ConfigureAwait(false);
             result = result with { Duration = stopwatch.Elapsed };
             await cache.SetCacheAsync(key, JsonSerializer.Serialize(result, Json), ct).ConfigureAwait(false);
@@ -88,7 +94,7 @@ public sealed partial class OverhaulAnalysis(
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             LogOverBudget(logger, session.Key, (long)options.SliceBudget.TotalMilliseconds);
-            return SliceResult.Fallback($"Slicing took longer than {options.SliceBudget.TotalSeconds:0} s, so the change is shown as a file list.", stopwatch.Elapsed);
+            return SliceResult.Fallback($"Slicing took longer than {Describe(options.SliceBudget)}, so the change is shown as a file list.", stopwatch.Elapsed);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -96,6 +102,16 @@ public sealed partial class OverhaulAnalysis(
             return SliceResult.Fallback("Slicing failed, so the change is shown as a file list.", stopwatch.Elapsed);
         }
     }
+
+    /// <summary>The stage the app watches to show slicing is under way; it stops when SlicesReady arrives.</summary>
+    public const string SlicesStage = "slices";
+
+    private static void SliceProgress(PullRequestSession session, string message) =>
+        session.Publish(new PullRequestEvent { Progress = new AnalysisProgress { Stage = SlicesStage, Message = message } });
+
+    private static string Describe(TimeSpan span) => span.TotalMinutes >= 1
+        ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{span.TotalMinutes:0.#} min")
+        : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{span.TotalSeconds:0} s");
 
     /// <summary>Every file at head, reading the ones the link resolver understands (code, views, scripts, WebForms).</summary>
     public static async Task<RepositoryIndex> BuildIndexAsync(IPullRequestCheckout checkout, CancellationToken ct)

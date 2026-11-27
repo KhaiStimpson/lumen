@@ -122,6 +122,9 @@
 
       <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Text="{Binding SliceFallbackReason}"
                  IsVisible="{Binding SliceFallbackReason, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      <TextBlock Name="SlicingStep" Classes="caption" TextWrapping="Wrap" IsVisible="{Binding IsSlicing}">
+        <Run Text="{Binding SlicingStatus, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding SlicingElapsedLabel, Mode=OneWay}" />
+      </TextBlock>
 
       <!-- Keys: rechecked against the existing bindings (F, L, K and Space were taken) -->
       <StackPanel Name="KeysSection" Spacing="6">

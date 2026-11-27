@@ -152,6 +152,18 @@
             </Grid>
             <Button Name="BackToSlices" Classes="link" HorizontalAlignment="Left" Content="Back to slices" Command="{Binding ShowSlicesCommand}"
                     IsVisible="{Binding HasSlices}" />
+            <!-- Slicing runs in the background after the diff is readable; it can take minutes on a big change -->
+            <Border Name="SlicingBanner" IsVisible="{Binding IsSlicing}" Background="{DynamicResource Accent.Soft}"
+                    CornerRadius="{StaticResource Radius.Control}" Padding="10,8" Margin="0,4,0,0">
+              <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="2">
+                <Ellipse Width="7" Height="7" Fill="{DynamicResource Accent}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="Building feature slices" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="2" Name="SlicingElapsed" Classes="caption" FontFamily="{StaticResource CodeFont}"
+                           Text="{Binding SlicingElapsedLabel}" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Classes="caption" TextWrapping="Wrap"
+                           Text="Read the files while you wait; the slices replace this list when they're ready." />
+              </Grid>
+            </Border>
           </StackPanel>
 
           <TreeView Grid.Row="3" Name="FileTree" ItemsSource="{Binding Tree}" SelectedItem="{Binding SelectedNode}"

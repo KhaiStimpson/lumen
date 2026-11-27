@@ -389,6 +389,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
     private void Fail(string message, bool isAuthentication)
     {
+        StopSlicing();
         Error = message;
         IsAuthenticationError = isAuthentication;
         IsAnalysing = false;
@@ -402,6 +403,11 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
         {
             case PullRequestEvent.EventOneofCase.Progress:
                 Status = evt.Progress.Message;
+                if (evt.Progress.Stage == SlicesStage)
+                {
+                    OnSlicingProgress(evt.Progress.Message);
+                }
+
                 break;
 
             case PullRequestEvent.EventOneofCase.Snapshot:
@@ -436,6 +442,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
             case PullRequestEvent.EventOneofCase.Complete:
                 IsAnalysing = false;
+                StopSlicing();
                 _completeStatus = string.Create(CultureInfo.InvariantCulture, $"Analysed in {evt.Complete.DurationMs / 1000.0:0.0}s");
                 Status = _completeStatus;
                 break;
@@ -823,6 +830,7 @@ public sealed partial class PullRequestViewModel : ObservableObject, IAsyncDispo
 
     public async ValueTask DisposeAsync()
     {
+        _slicingTimer?.Stop();
         await _lifetime.CancelAsync().ConfigureAwait(false);
         _lifetime.Dispose();
         _watchCts.Dispose();

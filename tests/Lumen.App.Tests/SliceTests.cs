@@ -317,4 +317,47 @@ public sealed class SliceTests
             await pr.DisposeAsync();
         }
     }
+
+    [AvaloniaFact]
+    public async Task WhileSlicingRunsTheFileListSaysSoAndCountsUpUntilTheSlicesArrive()
+    {
+        var source = Fixture.CreateSource();
+        var pr = await Fixture.LoadAsync(source);
+        var window = new Avalonia.Controls.Window { Content = new Views.PullRequestView { DataContext = pr }, Width = 1280, Height = 800 };
+        window.Show();
+        try
+        {
+            Assert.False(pr.IsSlicing);
+            source.Publish(new PullRequestEvent { Progress = new AnalysisProgress { Stage = "slices", Message = "Building feature slices: linking files…" } });
+            await Fixture.WaitUntilAsync(() => pr.IsSlicing);
+            Assert.True(pr.ShowsFileTree);
+            Assert.Equal("Building feature slices: linking files…", pr.SlicingStatus);
+            Assert.Equal("0:00", pr.SlicingElapsedLabel);
+            var banner = window.GetVisualDescendants().OfType<Avalonia.Controls.Border>().Single(b => b.Name == "SlicingBanner");
+            Assert.True(banner.IsEffectivelyVisible);
+
+            // Another kind of progress leaves it alone; the next step updates the text, not the clock.
+            source.Publish(new PullRequestEvent { Progress = new AnalysisProgress { Stage = "slices", Message = "Building feature slices: grouping changes…" } });
+            await Fixture.WaitUntilAsync(() => pr.SlicingStatus.EndsWith("grouping changes…", StringComparison.Ordinal));
+            Assert.True(pr.IsSlicing);
+
+            source.Publish(new PullRequestEvent { SlicesReady = Slices(pr) });
+            await Fixture.WaitUntilAsync(() => pr.HasSlices);
+            Assert.False(pr.IsSlicing);
+            Assert.False(banner.IsEffectivelyVisible);
+        }
+        finally
+        {
+            window.Close();
+            await pr.DisposeAsync();
+        }
+    }
+
+    [Theory]
+    [InlineData(0, "0:00")]
+    [InlineData(59, "0:59")]
+    [InlineData(61, "1:01")]
+    [InlineData(725, "12:05")]
+    public void SlicingTimeReadsAsMinutesAndSeconds(int seconds, string label) =>
+        Assert.Equal(label, PullRequestViewModel.FormatElapsed(TimeSpan.FromSeconds(seconds)));
 }
