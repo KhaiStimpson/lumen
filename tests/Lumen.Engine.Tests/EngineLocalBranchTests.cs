@@ -160,6 +160,8 @@ public sealed class EngineLocalBranchTests : IAsyncLifetime
         Assert.NotEmpty(steps);
         Assert.All(steps, x => Assert.True(x.i < kinds.IndexOf(PullRequestEvent.EventOneofCase.SlicesReady)));
         Assert.All(steps, x => Assert.StartsWith("Building feature slices", x.e.Progress.Message, StringComparison.Ordinal));
+        Assert.Contains(steps, x => System.Text.RegularExpressions.Regex.IsMatch(x.e.Progress.Message, @"^Building feature slices: linking [\d,]+ files \(read in [\d.]+ s\)…$"));
+        Assert.Contains(steps, x => System.Text.RegularExpressions.Regex.IsMatch(x.e.Progress.Message, @"^Building feature slices: grouping [\d,]+ changed files \(linked in [\d.]+ s\)…$"));
         Assert.True(slicesAt - SnapshotAt!.Value < TimeSpan.FromSeconds(3), $"slices took {(slicesAt - SnapshotAt.Value).TotalMilliseconds:N0} ms after the files");
         Console.WriteLine($"Fixture: files after {SnapshotAt.Value.TotalMilliseconds:N0} ms, slices after {slicesAt.TotalMilliseconds:N0} ms (slicer {ready.DurationMs} ms)");
     }

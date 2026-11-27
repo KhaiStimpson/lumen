@@ -135,6 +135,7 @@ Opt-in suites that touch the network or a local clone:
 | `LUMEN_SLICE_REPLAY=<clone>\|<base>\|<head>` | Opens a local branch through the engine and prints its slices, flags and timings (local git only) |
 | `LUMEN_RECORD_RAZOR=<tests/fixtures>` | Re-records the Razor Pages fixtures through the engine (no network) |
 | `LUMEN_SLICE_PROBE=1` | Prints the fixture's link graph, for reading by hand |
+| `LUMEN_SLICE_BENCH=<areas>` | Slices a generated large repository (1,600 areas is about 14,000 files) and prints each step's time (in memory, no git) |
 
 ## Part of Kelpie
 

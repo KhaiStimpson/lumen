@@ -73,7 +73,7 @@ public sealed class EngineSliceBudgetTests : IAsyncLifetime
 
         var ready = Assert.Single(events, e => e.SlicesReady is not null).SlicesReady;
         Assert.True(ready.FellBack);
-        Assert.Equal("Slicing took longer than 0 s, so the change is shown as a file list.", ready.FallbackReason);
+        Assert.Equal("Slicing took longer than 0 s (it stopped while reading the repository), so the change is shown as a file list.", ready.FallbackReason);
         Assert.Single(events, e => e.TriageReady is not null);
         Assert.NotEmpty(Assert.Single(events, e => e.FlagsReady is not null).FlagsReady.Flags);
         Assert.Single(events, e => e.Complete is not null);

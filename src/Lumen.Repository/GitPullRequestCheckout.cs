@@ -151,6 +151,30 @@ internal sealed class GitPullRequestCheckout : IPullRequestCheckout
         return blob.StandardOutput;
     }
 
+    /// <summary>
+    /// Several head files at once, read in parallel: the slicer reads every code file in the repository, and one at a
+    /// time that is slow on a large repository (more so with a virus scanner inspecting each open). A file that can't
+    /// be read is left out.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, string>> ReadHeadFilesAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        var texts = new System.Collections.Concurrent.ConcurrentDictionary<string, string>(StringComparer.Ordinal);
+        await Parallel.ForEachAsync(paths, new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = cancellationToken }, async (path, ct) =>
+        {
+            try
+            {
+                if (await ReadHeadFileAsync(path, ct).ConfigureAwait(false) is { } text)
+                {
+                    texts[path] = text;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+            }
+        }).ConfigureAwait(false);
+        return new Dictionary<string, string>(texts, StringComparer.Ordinal);
+    }
+
     public async Task<string?> ReadHeadFileAsync(string path, CancellationToken cancellationToken)
     {
         var fullPath = ResolveUnderRoot(NormalizeRelative(path));

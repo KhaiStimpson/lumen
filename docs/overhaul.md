@@ -372,6 +372,15 @@ Your OK on them is still wanted.
   after the diff, folds and red flags are published, with a 10-minute safety net before falling back to the file
   list (it was 20 s; raised for large work PRs). While it runs, the file list shows "Building feature slices" with
   the engine's current step and a running clock.
+- Scale (generated repository, `LUMEN_SLICE_BENCH`; Razor pages, controllers, a service per area, one DbContext,
+  shared partials and scripts, common ids like `#grid`, a 3 MB minified vendor script): a large work PR ran past the
+  10-minute budget. Measured causes, each fixed and tested: an id declared in many views linked every script selecting
+  it to every such view (52,809 links became 7.7 million at 14,000 files); the slicer scanned all links once per slice;
+  interface implementations, partials, tag helpers, view components, script paths, page routes and `@model` types were
+  each found by scanning the whole repository per use. After: 14,400 files slice in 3.7 s (was 17 s, quadratic),
+  57,600 in 5.4 s, 115,000 in 11 s (index 4.9 s, links 5.5 s, slices 0.9 s). Files are read and parsed in parallel;
+  `*.min.js` and files over 2 MB aren't read for links. Slicing progress shows file counts and each step's time, and
+  a fallback says which step it stopped in.
 - andrew-crm#58 (60 files) replayed locally through the engine (`LUMEN_SLICE_REPLAY`, local git only): files after
   346 ms, slicing done after 4.9 s (slicer 2.4 s), no fallback; 11 feature slices (5 pages and 6 seeded by test
   classes whose subject no page reaches), Shared 8 files, Unlinked 1 + 5, Mechanical only 14. The recorded #58

@@ -11,6 +11,9 @@ namespace Lumen.Roslyn.Slicing;
 /// </summary>
 public static partial class LinkResolver
 {
+    /// <summary>An id declared in more views than this is too common to suggest which one a script means.</summary>
+    private const int MaxPossibleIdViews = 3;
+
     private static readonly HashSet<string> Wrappers = new(StringComparer.Ordinal)
     {
         "IEnumerable", "IList", "ICollection", "IReadOnlyList", "IReadOnlyCollection", "List", "Func", "Lazy", "IOptions", "IOptionsSnapshot", "IOptionsMonitor",
@@ -178,11 +181,7 @@ public static partial class LinkResolver
         }
     }
 
-    private static List<TypeInfo> Implementations(Names names, TypeInfo contract) =>
-    [
-        .. names.Index.Types.Where(t => !t.IsInterface && t.Kind is "class" or "record" && t.BaseTypes.Any(b =>
-            b.Name == contract.SimpleName && names.Resolve(b, names.Index.CSharp[t.Path]) is { } resolved && resolved.QualifiedName == contract.QualifiedName)),
-    ];
+    private static List<TypeInfo> Implementations(Names names, TypeInfo contract) => names.Implementations(contract);
 
     public static bool IsDbContext(TypeInfo type) => type.DerivesFrom("DbContext") || type.DerivesFrom("IdentityDbContext") || type.DbSets.Count > 0;
 
@@ -346,7 +345,7 @@ public static partial class LinkResolver
     private static string? ResolvePartial(RepositoryIndex index, string from, string name)
     {
         var file = name.EndsWith(".cshtml", StringComparison.OrdinalIgnoreCase) ? Path.GetFileName(name) : Path.GetFileName(name) + ".cshtml";
-        var candidates = index.Razor.Keys.Where(p => Path.GetFileName(p).Equals(file, StringComparison.OrdinalIgnoreCase)).ToList();
+        var candidates = Lookups.For(index).RazorNamed(file);
         if (name.Contains('/', StringComparison.Ordinal))
         {
             var suffix = name.TrimStart('~', '/').Replace(".cshtml", "", StringComparison.OrdinalIgnoreCase) + ".cshtml";
@@ -357,7 +356,10 @@ public static partial class LinkResolver
         return candidates.OrderByDescending(c => CommonPrefix(c, from)).FirstOrDefault();
     }
 
-    private static IEnumerable<string> ResolveViewComponent(RepositoryIndex index, string name)
+    private static List<string> ResolveViewComponent(RepositoryIndex index, string name) =>
+        Lookups.For(index).ViewComponents.GetOrAdd(name, n => [.. FindViewComponent(index, n)]);
+
+    private static IEnumerable<string> FindViewComponent(RepositoryIndex index, string name)
     {
         var type = index.Types.FirstOrDefault(t => t.SimpleName == name + "ViewComponent" || t.AttributeText.Any(a => a.Contains($"\"{name}\"", StringComparison.Ordinal) && a.StartsWith("ViewComponent", StringComparison.Ordinal)));
         if (type is not null)
@@ -371,7 +373,10 @@ public static partial class LinkResolver
         }
     }
 
-    private static TypeInfo? ResolveTagHelper(RepositoryIndex index, string element)
+    private static TypeInfo? ResolveTagHelper(RepositoryIndex index, string element) =>
+        Lookups.For(index).TagHelpers.GetOrAdd(element, e => FindTagHelper(index, e));
+
+    private static TypeInfo? FindTagHelper(RepositoryIndex index, string element)
     {
         var byAttribute = index.Types.Where(t => t.AttributeText.Any(a => a.Contains($"\"{element}\"", StringComparison.Ordinal) && a.StartsWith("HtmlTargetElement", StringComparison.Ordinal))).ToList();
         if (byAttribute.Count == 1)
@@ -402,10 +407,11 @@ public static partial class LinkResolver
         if (clean.Contains('*', StringComparison.Ordinal))
         {
             var pattern = "wwwroot/" + clean;
-            return [.. index.AllPaths.Where(p => p.EndsWith(extension, StringComparison.OrdinalIgnoreCase) && Analysis.PathPattern.Matches("**/" + pattern, p))];
+            return Lookups.For(index).Globs.GetOrAdd(pattern, _ =>
+                [.. index.AllPaths.Where(p => p.EndsWith(extension, StringComparison.OrdinalIgnoreCase) && Analysis.PathPattern.Matches("**/" + pattern, p))]);
         }
 
-        var candidates = index.AllPaths.Where(p => p.EndsWith("wwwroot/" + clean, StringComparison.OrdinalIgnoreCase)).ToList();
+        var candidates = Lookups.For(index).UnderWwwroot(clean);
         return [.. candidates.OrderByDescending(c => CommonPrefix(c, from)).Take(1)];
     }
 
@@ -420,10 +426,11 @@ public static partial class LinkResolver
         else
         {
             // "./Details" or "Details": relative to the current page's folder.
-            var current = pages.FirstOrDefault(p => p.View == from)?.Route ?? "/";
+            var byView = PageLookup.For(pages).ByView;
+            var current = byView.GetValueOrDefault(from)?.Route ?? "/";
             var folder = current.Contains('/', StringComparison.Ordinal) ? current[..current.LastIndexOf('/')] : "";
             var fromFile = Path.GetFileNameWithoutExtension(from);
-            if (fromFile == "Index" && pages.Any(p => p.View == from))
+            if (fromFile == "Index" && byView.ContainsKey(from))
             {
                 folder = current;
             }
@@ -432,7 +439,7 @@ public static partial class LinkResolver
         }
 
         route = route.Replace("/Index", "", StringComparison.Ordinal);
-        return pages.FirstOrDefault(p => p.Route.Equals(route.Length == 0 ? "/" : route, StringComparison.OrdinalIgnoreCase));
+        return PageLookup.For(pages).ByRoute.GetValueOrDefault(route.Length == 0 ? "/" : route);
     }
 
     private static IEnumerable<string> HandlerMembers(CSharpFile pageModel, string handler, string? verb)
@@ -457,11 +464,15 @@ public static partial class LinkResolver
         var loadedBy = links.Where(l => l.Kind == EdgeKind.Script && l.To.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
             .GroupBy(l => l.To, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.Select(l => l.From).ToList(), StringComparer.Ordinal);
-        var ids = index.Razor.Values.SelectMany(v => v.Ids.Select(i => (i.Value, v.Path))).ToLookup(x => x.Value, x => x.Path, StringComparer.Ordinal);
+        // Views declaring each id (distinct, in index order), and each view's ids: a common id is declared in thousands.
+        var ids = index.Razor.Values.SelectMany(v => v.Ids.Select(i => (i.Value, v.Path))).GroupBy(x => x.Value, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Path).Distinct(StringComparer.Ordinal).ToList(), StringComparer.Ordinal);
+        var viewIds = index.Razor.Values.ToDictionary(v => v.Path, v => v.Ids.Select(i => i.Value).ToHashSet(StringComparer.Ordinal), StringComparer.Ordinal);
+        var parents = links.Where(l => l.Kind is EdgeKind.Partial or EdgeKind.ViewComponent or EdgeKind.TagHelper).ToLookup(l => l.To, l => l.From, StringComparer.Ordinal);
 
         foreach (var script in index.Scripts.Values.Where(s => !s.IsVendored))
         {
-            var owners = PagesLoading(index, links, loadedBy, script.Path);
+            var owners = PagesLoading(index, parents, loadedBy, script.Path);
             foreach (var url in script.AjaxUrls)
             {
                 foreach (var owner in owners.DefaultIfEmpty(""))
@@ -477,24 +488,38 @@ public static partial class LinkResolver
 
             foreach (var selector in script.IdSelectors.DistinctBy(s => s.Value))
             {
-                var declaring = ids[selector.Value].Distinct(StringComparer.Ordinal).ToList();
+                var declaring = ids.GetValueOrDefault(selector.Value) ?? [];
                 if (declaring.Count == 1)
                 {
                     links.Add(new Link(script.Path, declaring[0], EdgeKind.IdSelector, $"`{Path.GetFileName(script.Path)}` selects `#{selector.Value}`, declared in `{Path.GetFileName(declaring[0])}`", selector.Line));
                 }
-                else if (declaring.Count > 1)
+                else if (declaring.Count > 1 && owners.Where(o => viewIds.TryGetValue(o, out var declared) && declared.Contains(selector.Value)).Distinct(StringComparer.Ordinal).ToList() is { Count: > 0 and <= MaxPossibleIdViews } loading)
+                {
+                    // Of the views declaring it, the ones that load this script are the ones it means.
+                    foreach (var view in loading)
+                    {
+                        links.Add(new Link(script.Path, view, EdgeKind.IdSelector, $"`{Path.GetFileName(script.Path)}` selects `#{selector.Value}`, declared in `{Path.GetFileName(view)}`, which loads it", selector.Line));
+                    }
+                }
+                else if (declaring.Count is > 1 and <= MaxPossibleIdViews)
                 {
                     foreach (var view in declaring)
                     {
                         links.Add(new Link(script.Path, view, EdgeKind.Possible, $"`#{selector.Value}` is declared in {declaring.Count} views: `{Path.GetFileName(view)}` is one", selector.Line));
                     }
                 }
+                else if (declaring.Count > MaxPossibleIdViews)
+                {
+                    // A common id (`#grid`, `#save`) says nothing about which view a script belongs to. One note, not a
+                    // link per view: per view, a large app's scripts × views ran to millions of links.
+                    links.Add(new Link(script.Path, "", EdgeKind.Possible, $"`#{selector.Value}` is declared in {declaring.Count:N0} views, too many to tie `{Path.GetFileName(script.Path)}` to one", selector.Line));
+                }
             }
         }
     }
 
     /// <summary>Pages that load a script directly or through a partial, view component or tag helper.</summary>
-    private static List<string> PagesLoading(RepositoryIndex index, List<Link> links, Dictionary<string, List<string>> loadedBy, string script)
+    private static List<string> PagesLoading(RepositoryIndex index, ILookup<string, string> parents, Dictionary<string, List<string>> loadedBy, string script)
     {
         var pages = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -513,9 +538,9 @@ public static partial class LinkResolver
                 continue;
             }
 
-            foreach (var parent in links.Where(l => l.To == node && l.Kind is EdgeKind.Partial or EdgeKind.ViewComponent or EdgeKind.TagHelper))
+            foreach (var parent in parents[node])
             {
-                queue.Enqueue(parent.From);
+                queue.Enqueue(parent);
             }
         }
 
@@ -532,8 +557,8 @@ public static partial class LinkResolver
             pagePart = pagePart[..^"/Index".Length];
         }
         PageRoute? page = pagePart.Length > 0 && !pagePart.Contains('{', StringComparison.Ordinal)
-            ? pages.FirstOrDefault(p => p.Route.Equals(pagePart.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
-            : pages.FirstOrDefault(p => p.View == ownerPage);
+            ? PageLookup.For(pages).ByRoute.GetValueOrDefault(pagePart.TrimEnd('/'))
+            : PageLookup.For(pages).ByView.GetValueOrDefault(ownerPage);
         if (page?.PageModel is not { } modelPath || !index.CSharp.TryGetValue(modelPath, out var model))
         {
             if (handler.Success)
@@ -614,6 +639,44 @@ public static partial class LinkResolver
     internal sealed class Names(RepositoryIndex index)
     {
         private readonly Dictionary<(string, string), TypeInfo?> _cache = [];
+        private readonly Dictionary<string, List<TypeInfo>> _implementations = new(StringComparer.Ordinal);
+        private ILookup<string, TypeInfo>? _byBaseName;
+        private List<RazorFile>? _viewImports;
+        private Dictionary<string, List<TypeInfo>>? _bySuffix;
+
+        /// <summary>
+        /// Types whose qualified name is <paramref name="name"/> or ends with "." + <paramref name="name"/>, in index
+        /// order. Every dotted suffix is indexed once; scanning each simple name's candidates per view was quadratic
+        /// when every page's model is called IndexModel.
+        /// </summary>
+        public List<TypeInfo> QualifiedSuffix(string name)
+        {
+            if (_bySuffix is null)
+            {
+                var map = new Dictionary<string, List<TypeInfo>>(StringComparer.Ordinal);
+                foreach (var type in Index.Types)
+                {
+                    var qualified = type.QualifiedName;
+                    for (var at = 0; at >= 0; at = qualified.IndexOf('.', at) is var dot and >= 0 ? dot + 1 : -1)
+                    {
+                        var suffix = qualified[at..];
+                        if (!map.TryGetValue(suffix, out var list))
+                        {
+                            map[suffix] = list = [];
+                        }
+
+                        if (list.Count == 0 || !ReferenceEquals(list[^1], type))
+                        {
+                            list.Add(type);
+                        }
+                    }
+                }
+
+                _bySuffix = map;
+            }
+
+            return _bySuffix.GetValueOrDefault(name) ?? [];
+        }
 
         public RepositoryIndex Index { get; } = index;
 
@@ -626,6 +689,27 @@ public static partial class LinkResolver
             }
 
             return ResolveSimple(reference.Name, file);
+        }
+
+        /// <summary>
+        /// Classes and records implementing <paramref name="contract"/>. Indexed by base-type name once, then cached per
+        /// contract: scanning every type for each injected interface was quadratic on a large repository.
+        /// </summary>
+        public List<TypeInfo> Implementations(TypeInfo contract)
+        {
+            if (_implementations.TryGetValue(contract.QualifiedName, out var known))
+            {
+                return known;
+            }
+
+            _byBaseName ??= Index.Types.Where(t => !t.IsInterface && t.Kind is "class" or "record")
+                .SelectMany(t => t.BaseTypes.Select(b => (b.Name, Type: t)))
+                .ToLookup(x => x.Name, x => x.Type, StringComparer.Ordinal);
+            var found = _byBaseName[contract.SimpleName].Distinct()
+                .Where(t => t.BaseTypes.Any(b => b.Name == contract.SimpleName && Resolve(b, Index.CSharp[t.Path]) is { } resolved && resolved.QualifiedName == contract.QualifiedName))
+                .ToList();
+            _implementations[contract.QualifiedName] = found;
+            return found;
         }
 
         public TypeInfo? ResolveSimple(string name, CSharpFile file)
@@ -646,7 +730,7 @@ public static partial class LinkResolver
             if (clean.Contains('.', StringComparison.Ordinal))
             {
                 var simple = clean[(clean.LastIndexOf('.') + 1)..];
-                var exact = Index.Named(simple).Where(t => t.QualifiedName == clean || t.QualifiedName.EndsWith("." + clean, StringComparison.Ordinal)).ToList();
+                var exact = QualifiedSuffix(clean);
                 if (exact.Count == 1)
                 {
                     return exact[0];
@@ -658,7 +742,8 @@ public static partial class LinkResolver
             // _ViewImports up the folder chain supply the namespace and usings a view sees.
             var usings = new List<string>(view.Usings);
             string? ns = view.Namespace;
-            foreach (var imports in Index.Razor.Values.Where(v => v.IsViewImports && view.Path.StartsWith(Path.GetDirectoryName(v.Path)!.Replace('\\', '/') + "/", StringComparison.Ordinal)))
+            _viewImports ??= [.. Index.Razor.Values.Where(v => v.IsViewImports)];
+            foreach (var imports in _viewImports.Where(v => view.Path.StartsWith(Path.GetDirectoryName(v.Path)!.Replace('\\', '/') + "/", StringComparison.Ordinal)))
             {
                 usings.AddRange(imports.Usings);
                 ns ??= imports.Namespace;
@@ -696,5 +781,96 @@ public static partial class LinkResolver
             var imported = candidates.Where(c => visible.Contains(c.Namespace)).ToList();
             return imported.Count == 1 ? imported[0] : null;
         }
+    }
+
+    /// <summary>
+    /// Lookups the resolver would otherwise answer by scanning the whole repository once per view, element or script
+    /// tag, which made building the graph quadratic on a large repository. One set per index.
+    /// </summary>
+    private sealed class Lookups
+    {
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<RepositoryIndex, Lookups> All = [];
+        private readonly RepositoryIndex _index;
+        private readonly Lock _gate = new();
+        private Dictionary<string, List<string>>? _wwwroot;
+        private Dictionary<string, List<string>>? _razorByName;
+
+        private Lookups(RepositoryIndex index) => _index = index;
+
+        public static Lookups For(RepositoryIndex index) => All.GetValue(index, i => new Lookups(i));
+
+        public System.Collections.Concurrent.ConcurrentDictionary<string, List<string>> ViewComponents { get; } = new(StringComparer.Ordinal);
+
+        public System.Collections.Concurrent.ConcurrentDictionary<string, TypeInfo?> TagHelpers { get; } = new(StringComparer.Ordinal);
+
+        public System.Collections.Concurrent.ConcurrentDictionary<string, List<string>> Globs { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Razor views with this file name (case-insensitive), in the index's order.</summary>
+        public List<string> RazorNamed(string fileName)
+        {
+            lock (_gate)
+            {
+                _razorByName ??= _index.Razor.Keys.GroupBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key!, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+            }
+
+            return [.. _razorByName.GetValueOrDefault(fileName) ?? []];
+        }
+
+        /// <summary>Paths ending in "wwwroot/" + <paramref name="relative"/> (case-insensitive), in the index's order.</summary>
+        public List<string> UnderWwwroot(string relative)
+        {
+            lock (_gate)
+            {
+                _wwwroot ??= BuildWwwroot(_index);
+            }
+
+            return _wwwroot.GetValueOrDefault(relative) ?? [];
+        }
+
+        private static Dictionary<string, List<string>> BuildWwwroot(RepositoryIndex index)
+        {
+            const string Root = "wwwroot/";
+            var map = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var path in index.AllPaths)
+            {
+                for (var at = path.IndexOf(Root, StringComparison.OrdinalIgnoreCase); at >= 0; at = path.IndexOf(Root, at + 1, StringComparison.OrdinalIgnoreCase))
+                {
+                    var key = path[(at + Root.Length)..];
+                    if (!map.TryGetValue(key, out var list))
+                    {
+                        map[key] = list = [];
+                    }
+
+                    if (!list.Contains(path))
+                    {
+                        list.Add(path);
+                    }
+                }
+            }
+
+            return map;
+        }
+    }
+
+    /// <summary>Pages by route (case-insensitive; the first wins, as a list scan did) and by view.</summary>
+    private sealed class PageLookup
+    {
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<List<PageRoute>, PageLookup> All = [];
+
+        private PageLookup(List<PageRoute> pages)
+        {
+            foreach (var page in pages)
+            {
+                ByRoute.TryAdd(page.Route, page);
+                ByView.TryAdd(page.View, page);
+            }
+        }
+
+        public Dictionary<string, PageRoute> ByRoute { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public Dictionary<string, PageRoute> ByView { get; } = new(StringComparer.Ordinal);
+
+        public static PageLookup For(List<PageRoute> pages) => All.GetValue(pages, p => new PageLookup(p));
     }
 }

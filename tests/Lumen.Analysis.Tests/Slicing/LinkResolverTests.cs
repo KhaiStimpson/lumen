@@ -312,4 +312,45 @@ public sealed class LinkResolverTests
         var graph = Graph(("Pages/Shared/_Layout.cshtml", "<link rel=\"stylesheet\" href=\"~/css/site.css\" />"), ("wwwroot/css/site.css", ""));
         Assert.Equal(EdgeKind.SiteWide, Single(graph, "Pages/Shared/_Layout.cshtml", "wwwroot/css/site.css").Kind);
     }
+
+    [Fact]
+    public void ACommonIdGivesOneNoteNotALinkPerView()
+    {
+        // `#grid` in ten views: a script loaded by none of them can't be tied to one, and says so once.
+        var views = Enumerable.Range(0, 10).Select(i => ($"Pages/P{i}/Index.cshtml", "@page\n<div id=\"grid\"></div>\n"));
+        var graph = Graph([.. views, ("wwwroot/js/grid.js", "$('#grid').show();\n")]);
+
+        var note = Assert.Single(graph.From("wwwroot/js/grid.js"));
+        Assert.Equal((EdgeKind.Possible, ""), (note.Kind, note.To));
+        Assert.Equal("`#grid` is declared in 10 views, too many to tie `grid.js` to one", note.Reason);
+    }
+
+    [Fact]
+    public void OfTheViewsDeclaringAnIdTheOneLoadingTheScriptIsLinked()
+    {
+        var views = Enumerable.Range(1, 9).Select(i => ($"Pages/P{i}/Index.cshtml", "@page\n<div id=\"grid\"></div>\n"));
+        var graph = Graph(
+            [.. views,
+            ("Pages/Occupants/Index.cshtml", "@page\n<div id=\"grid\"></div>\n<script src=\"~/js/occupants.js\"></script>\n"),
+            ("wwwroot/js/occupants.js", "$('#grid').kendoGrid({});\n")]);
+
+        var link = Single(graph, "wwwroot/js/occupants.js", "Pages/Occupants/Index.cshtml", EdgeKind.IdSelector);
+        Assert.Equal("`occupants.js` selects `#grid`, declared in `Index.cshtml`, which loads it", link.Reason);
+        Assert.DoesNotContain(graph.From("wwwroot/js/occupants.js"), l => l.To.StartsWith("Pages/P", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void MinifiedAndOversizedFilesAreKnownButNotRead()
+    {
+        var index = RepositoryIndex.Build(
+        [
+            new("Scripts/kendo/kendo.all.min.js", "$('#grid').data();"),
+            new("Data/Generated.cs", "namespace Shop.Data; public class Generated { }" + new string(' ', RepositoryIndex.MaxIndexedChars)),
+            new("Data/Order.cs", "namespace Shop.Data; public class Order { }"),
+        ]);
+
+        Assert.Contains("Scripts/kendo/kendo.all.min.js", index.AllPaths);
+        Assert.Empty(index.Scripts);
+        Assert.Equal(["Data/Order.cs"], index.CSharp.Keys);
+    }
 }

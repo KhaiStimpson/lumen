@@ -143,11 +143,15 @@ public sealed class RepositoryIndex
 
     public IReadOnlyList<TypeInfo> Named(string simpleName) => _bySimpleName.TryGetValue(simpleName, out var list) ? list : [];
 
-    /// <summary>The files worth reading for links: code, views, scripts and WebForms markup; never build output or vendored libraries.</summary>
+    /// <summary>Files larger than this (about 2 MB) are generated or bundled, not read for links.</summary>
+    public const int MaxIndexedChars = 2_000_000;
+
+    /// <summary>The files worth reading for links: code, views, scripts and WebForms markup; never build output, vendored libraries or minified scripts.</summary>
     public static bool IsIndexed(string path)
     {
         var p = path.Replace('\\', '/');
-        if (p.Split('/').Any(s => s is "bin" or "obj" or "node_modules" or ".git" or ".vs") || p.Contains("/wwwroot/lib/", StringComparison.OrdinalIgnoreCase))
+        if (p.Split('/').Any(s => s is "bin" or "obj" or "node_modules" or ".git" or ".vs") || p.Contains("/wwwroot/lib/", StringComparison.OrdinalIgnoreCase)
+            || p.EndsWith(".min.js", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -169,38 +173,52 @@ public sealed class RepositoryIndex
         var scripts = new Dictionary<string, ScriptFile>(StringComparer.Ordinal);
         var webForms = new Dictionary<string, WebFormsFile>(StringComparer.Ordinal);
         var all = new HashSet<string>(StringComparer.Ordinal);
+        var toParse = new List<(string Path, string Text)>();
         foreach (var (rawPath, text) in files)
         {
             var path = rawPath.Replace('\\', '/');
             all.Add(path);
-            if (!IsIndexed(path))
-            {
-                // Known to exist (a script tag can point at it), but not read for links.
-                continue;
-            }
 
+            // Known to exist (a script tag can point at it), but not read for links: outside the indexed kinds,
+            // minified, or too big to be hand-written (generated code, bundles).
+            if (IsIndexed(path) && text.Length <= MaxIndexedChars)
+            {
+                toParse.Add((path, text));
+            }
+        }
+
+        // Parsed in parallel, added in the files' order so the graph (and its link order) doesn't depend on timing.
+        var results = new object?[toParse.Count];
+        Parallel.For(0, toParse.Count, i =>
+        {
+            var (path, text) = toParse[i];
             try
             {
-                var parsed = cache is null ? Parse(path, text) : cache.GetOrParse(path, text, Parse);
-                switch (parsed)
-                {
-                    case CSharpFile cs:
-                        csharp[path] = cs;
-                        break;
-                    case RazorFile view:
-                        razor[path] = view;
-                        break;
-                    case ScriptFile script:
-                        scripts[path] = script;
-                        break;
-                    case WebFormsFile form:
-                        webForms[path] = form;
-                        break;
-                }
+                results[i] = cache is null ? Parse(path, text) : cache.GetOrParse(path, text, Parse);
             }
             catch (Exception)
             {
                 // An unreadable file simply has no links.
+            }
+        });
+
+        for (var i = 0; i < toParse.Count; i++)
+        {
+            var path = toParse[i].Path;
+            switch (results[i])
+            {
+                case CSharpFile cs:
+                    csharp[path] = cs;
+                    break;
+                case RazorFile view:
+                    razor[path] = view;
+                    break;
+                case ScriptFile script:
+                    scripts[path] = script;
+                    break;
+                case WebFormsFile form:
+                    webForms[path] = form;
+                    break;
             }
         }
 

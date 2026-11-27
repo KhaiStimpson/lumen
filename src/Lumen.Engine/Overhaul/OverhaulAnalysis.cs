@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -69,12 +70,17 @@ public sealed partial class OverhaulAnalysis(
     private async Task<SliceResult> SliceAsync(PullRequestSession session, Domain.PullRequestSnapshot snapshot, IPullRequestCheckout checkout, TriageResult? triage, CancellationToken ct)
     {
         var stopwatch = Stopwatch.StartNew();
+        var step = Stopwatch.StartNew();
+        var stage = "reading the repository";
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
         budget.CancelAfter(options.SliceBudget);
         try
         {
+            // Each step says how much it has to do and how long the last one took, so a slow repository shows where
+            // the time goes in the app itself (no log needed).
             SliceProgress(session, "Building feature slices: reading the repository…");
             var index = await BuildIndexAsync(checkout, budget.Token).ConfigureAwait(false);
+            var indexed = index.CSharp.Count + index.Razor.Count + index.Scripts.Count + index.WebForms.Count;
             session.Index = index;
             var key = CacheKey(session.Target, snapshot.HeadSha, snapshot.MergeBaseSha);
             if (await cache.GetCacheAsync(key, ct).ConfigureAwait(false) is { } cached && JsonSerializer.Deserialize<SliceResult>(cached, Json) is { } hit)
@@ -82,9 +88,13 @@ public sealed partial class OverhaulAnalysis(
                 return hit;
             }
 
-            SliceProgress(session, "Building feature slices: linking files…");
+            stage = "linking files";
+            SliceProgress(session, string.Create(CultureInfo.InvariantCulture, $"Building feature slices: linking {indexed:N0} files (read in {Describe(step.Elapsed)})…"));
+            step.Restart();
             var graph = await Task.Run(() => LinkResolver.Build(index), budget.Token).ConfigureAwait(false);
-            SliceProgress(session, "Building feature slices: grouping changes…");
+            stage = "grouping changes";
+            SliceProgress(session, string.Create(CultureInfo.InvariantCulture, $"Building feature slices: grouping {snapshot.Files.Count:N0} changed files (linked in {Describe(step.Elapsed)})…"));
+            step.Restart();
             var result = await Task.Run(() => Slicer.Slice(graph, Slicer.Facts(snapshot, triage), options.Slicer, budget.Token), budget.Token).ConfigureAwait(false);
             result = result with { Duration = stopwatch.Elapsed };
             await cache.SetCacheAsync(key, JsonSerializer.Serialize(result, Json), ct).ConfigureAwait(false);
@@ -94,12 +104,12 @@ public sealed partial class OverhaulAnalysis(
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             LogOverBudget(logger, session.Key, (long)options.SliceBudget.TotalMilliseconds);
-            return SliceResult.Fallback($"Slicing took longer than {Describe(options.SliceBudget)}, so the change is shown as a file list.", stopwatch.Elapsed);
+            return SliceResult.Fallback($"Slicing took longer than {Describe(options.SliceBudget)} (it stopped while {stage}), so the change is shown as a file list.", stopwatch.Elapsed);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogSliceFailed(logger, ex, session.Key);
-            return SliceResult.Fallback("Slicing failed, so the change is shown as a file list.", stopwatch.Elapsed);
+            return SliceResult.Fallback($"Slicing failed while {stage} ({ex.GetType().Name}), so the change is shown as a file list.", stopwatch.Elapsed);
         }
     }
 
@@ -110,8 +120,8 @@ public sealed partial class OverhaulAnalysis(
         session.Publish(new PullRequestEvent { Progress = new AnalysisProgress { Stage = SlicesStage, Message = message } });
 
     private static string Describe(TimeSpan span) => span.TotalMinutes >= 1
-        ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{span.TotalMinutes:0.#} min")
-        : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{span.TotalSeconds:0} s");
+        ? string.Create(CultureInfo.InvariantCulture, $"{span.TotalMinutes:0.#} min")
+        : string.Create(CultureInfo.InvariantCulture, $"{span.TotalSeconds:0.#} s");
 
     /// <summary>Every file at head, reading the ones the link resolver understands (code, views, scripts, WebForms).</summary>
     public static async Task<RepositoryIndex> BuildIndexAsync(IPullRequestCheckout checkout, CancellationToken ct)

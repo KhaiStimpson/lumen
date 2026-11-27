@@ -233,7 +233,7 @@ public static class Slicer
 
             sliceFiles = Sections(graph, seed, sliceFiles, changed, options);
             var reachedNodes = reached.Keys.ToHashSet(StringComparer.Ordinal);
-            var possible = graph.All.Where(l => l.Kind == EdgeKind.Possible && reachedNodes.Contains(l.From))
+            var possible = reachedNodes.SelectMany(graph.From).Where(l => l.Kind == EdgeKind.Possible)
                 .Select(l => new SliceEdge(l.From, l.To, l.Reason, Possible: true)).Distinct().ToList();
             var pageLinks = seed.Files.SelectMany(graph.From).Where(l => l.Kind == EdgeKind.PageLink)
                 .Select(l => new SliceEdge(l.From, l.To, l.Reason)).Distinct().ToList();
