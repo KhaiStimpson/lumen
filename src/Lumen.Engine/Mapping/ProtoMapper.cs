@@ -37,18 +37,33 @@ public static partial class ProtoMapper
             UpdatedAt = Timestamp.FromDateTimeOffset(snapshot.Metadata.UpdatedAt),
             ViewerLogin = viewer,
             ReviewThreadCount = snapshot.Threads.Count(t => !t.IsResolved && !t.IsPendingOnly),
+            TargetKey = snapshot.Target.Key,
         };
+        if (snapshot.Target is LocalBranchTarget local)
+        {
+            proto.Local = ToProto(local);
+        }
 
         proto.Files.AddRange(snapshot.Files.Select(f => ToSummary(f, viewedFiles.Contains(f.Path))));
         return proto;
     }
 
-    /// <summary>The TriageReady event: every hunk, the groups, a summary, and the files with lines per tier.</summary>
+    public static LocalBranchRef ToProto(LocalBranchTarget target) => new()
+    {
+        ClonePath = target.ClonePath,
+        BaseRef = target.BaseRef,
+        WorkingTree = target.HeadKind == LocalHeadKind.WorkingTree,
+        HeadRef = target.HeadRef ?? "",
+    };
+
+    public static LocalBranchTarget FromProto(LocalBranchRef value) =>
+        new(value.ClonePath, value.BaseRef, value.WorkingTree ? LocalHeadKind.WorkingTree : LocalHeadKind.Branch, value.WorkingTree ? null : value.HeadRef);
+
+    /// <summary>The TriageReady event: every hunk, the groups, a summary, and the files with lines per fold.</summary>
     public static TriageReady ToProto(
         D.TriageResult triage,
         D.PullRequestSnapshot snapshot,
-        IReadOnlySet<string> viewedFiles,
-        IReadOnlySet<string>? acknowledgedGroups = null)
+        IReadOnlySet<string> viewedFiles)
     {
         var ready = new TriageReady { Summary = Summarise(triage) };
         ready.Hunks.AddRange(triage.Hunks.Select(ToProto));
@@ -59,14 +74,13 @@ public static partial class ProtoMapper
             Title = g.Title,
             MemberCount = g.Members.Count,
             ChangedLines = g.Members.Sum(m => m.ChangedLines),
-            Acknowledged = acknowledgedGroups?.Contains(g.Id) ?? false,
         }));
 
         var byPath = triage.Hunks.ToLookup(h => h.Path, StringComparer.Ordinal);
         ready.Files.AddRange(snapshot.Files.Select(f =>
         {
             var summary = ToSummary(f, viewedFiles.Contains(f.Path));
-            summary.TierLines = TierLinesOf(byPath[f.Path]);
+            summary.FoldLines = FoldLinesOf(byPath[f.Path]);
             return summary;
         }));
         return ready;
@@ -96,7 +110,7 @@ public static partial class ProtoMapper
             NewStart = h.NewStart ?? 0,
             NewEnd = h.NewEnd ?? 0,
             ChangeClass = ToProto(h.Class),
-            Tier = ToProto(h.Tier),
+            Fold = ToProto(h.Fold),
             ChangedLines = h.ChangedLines,
             GroupId = h.GroupId ?? "",
         };
@@ -112,23 +126,22 @@ public static partial class ProtoMapper
         NewStart = h.NewStart == 0 ? null : h.NewStart,
         NewEnd = h.NewEnd == 0 ? null : h.NewEnd,
         Class = FromProto(h.ChangeClass),
-        Tier = FromProto(h.Tier),
+        Fold = FromProto(h.Fold),
         Reasons = [.. h.Reasons],
         ChangedLines = h.ChangedLines,
         GroupId = h.GroupId.Length == 0 ? null : h.GroupId,
     };
 
-    public static TierLines TierLinesOf(IEnumerable<D.HunkTriage> hunks)
+    public static FoldLines FoldLinesOf(IEnumerable<D.HunkTriage> hunks)
     {
-        var lines = new TierLines();
+        var lines = new FoldLines();
         foreach (var h in hunks)
         {
-            switch (h.Tier)
+            switch (h.Fold)
             {
-                case D.TriageTier.Critical: lines.Critical += h.ChangedLines; break;
-                case D.TriageTier.WorthALook: lines.WorthALook += h.ChangedLines; break;
-                case D.TriageTier.Skim: lines.Skim += h.ChangedLines; break;
-                case D.TriageTier.Skip: lines.Skip += h.ChangedLines; break;
+                case D.FoldKind.Mechanical: lines.Mechanical += h.ChangedLines; break;
+                case D.FoldKind.Boilerplate: lines.Boilerplate += h.ChangedLines; break;
+                default: lines.Open += h.ChangedLines; break;
             }
         }
 
@@ -137,13 +150,13 @@ public static partial class ProtoMapper
 
     public static TriageSummary Summarise(D.TriageResult triage) => new()
     {
-        Text = Analysis.TriageSummaryText.Describe(triage),
         TotalLines = triage.Hunks.Sum(h => h.ChangedLines),
-        MechanicalLines = Analysis.TriageSummaryText.ProvenMechanical(triage),
-        LikelyMechanicalLines = Analysis.TriageSummaryText.LikelyMechanical(triage),
+        MechanicalLines = triage.Hunks.Where(h => h.Fold == D.FoldKind.Mechanical).Sum(h => h.ChangedLines),
+        BoilerplateLines = triage.Hunks.Where(h => h.Fold == D.FoldKind.Boilerplate).Sum(h => h.ChangedLines),
+        OpenLines = triage.Hunks.Where(h => h.Fold == D.FoldKind.Open).Sum(h => h.ChangedLines),
+        LikelyMechanicalLines = triage.Hunks.Where(h => h.Class.IsMechanical() && h.Fold == D.FoldKind.Open).Sum(h => h.ChangedLines),
         NewCodeLines = triage.Hunks.Where(h => h.Class == D.ChangeClass.NewCode).Sum(h => h.ChangedLines),
         BehaviourChangeLines = triage.Hunks.Where(h => h.Class == D.ChangeClass.BehaviourChange).Sum(h => h.ChangedLines),
-        TierLines = TierLinesOf(triage.Hunks),
     };
 
     public static Contracts.ChangeClass ToProto(D.ChangeClass value) => value switch
@@ -172,20 +185,29 @@ public static partial class ProtoMapper
         _ => D.ChangeClass.BehaviourChange,
     };
 
-    public static Contracts.TriageTier ToProto(D.TriageTier value) => value switch
+    public static Contracts.FoldKind ToProto(D.FoldKind value) => value switch
     {
-        D.TriageTier.Critical => Contracts.TriageTier.Critical,
-        D.TriageTier.Skim => Contracts.TriageTier.Skim,
-        D.TriageTier.Skip => Contracts.TriageTier.Skip,
-        _ => Contracts.TriageTier.WorthALook,
+        D.FoldKind.Mechanical => Contracts.FoldKind.Mechanical,
+        D.FoldKind.Boilerplate => Contracts.FoldKind.Boilerplate,
+        _ => Contracts.FoldKind.Open,
     };
 
-    public static D.TriageTier FromProto(Contracts.TriageTier value) => value switch
+    public static D.FoldKind FromProto(Contracts.FoldKind value) => value switch
     {
-        Contracts.TriageTier.Critical => D.TriageTier.Critical,
-        Contracts.TriageTier.Skim => D.TriageTier.Skim,
-        Contracts.TriageTier.Skip => D.TriageTier.Skip,
-        _ => D.TriageTier.WorthALook,
+        Contracts.FoldKind.Mechanical => D.FoldKind.Mechanical,
+        Contracts.FoldKind.Boilerplate => D.FoldKind.Boilerplate,
+        _ => D.FoldKind.Open,
+    };
+
+    public static Contracts.RedFlag ToProto(D.RedFlag flag) => new()
+    {
+        Id = flag.Id,
+        Kind = (Contracts.FlagKind)flag.Kind,
+        Path = flag.Path,
+        Side = flag.Side == D.DiffSide.Left ? Contracts.DiffSide.Left : Contracts.DiffSide.Right,
+        Line = flag.Line,
+        Message = flag.Message,
+        Member = flag.Member,
     };
 
     public static FileDiff ToProto(ChangedFile file)
@@ -214,140 +236,4 @@ public static partial class ProtoMapper
         return diff;
     }
 
-    public static Contracts.ReviewPoint ToProto(D.ReviewPoint point)
-    {
-        var proto = new Contracts.ReviewPoint
-        {
-            Id = point.Id,
-            Type = point.Type.ToString(),
-            Severity = (Contracts.ReviewSeverity)point.Severity,
-            State = ToProto(point.State),
-            EvidenceState = point.EvidenceState switch
-            {
-                D.EvidenceState.Verified => Contracts.EvidenceState.Verified,
-                D.EvidenceState.StrongEvidence => Contracts.EvidenceState.Strong,
-                D.EvidenceState.ConflictingEvidence => Contracts.EvidenceState.Conflicting,
-                D.EvidenceState.HumanDecision => Contracts.EvidenceState.HumanDecision,
-                _ => Contracts.EvidenceState.Unverified,
-            },
-            Title = point.Title,
-            Summary = point.Summary,
-            WhyItMatters = point.WhyItMatters,
-            SuggestedComment = point.SuggestedComment,
-            Anchor = ToProto(point.Anchor),
-            Priority = point.Priority,
-            RoutingReason = point.RoutingReason ?? "",
-        };
-
-        proto.OtherLocations.AddRange(point.OtherLocations.Select(ToProto));
-        proto.Evidence.AddRange(point.Evidence.Select(ToProto));
-
-        if (point.Surface is D.ComparisonSurface comparison)
-        {
-            proto.Comparison = new Contracts.ComparisonSurface
-            {
-                Current = ToProto(comparison.Current),
-                Precedent = ToProto(comparison.Precedent),
-            };
-        }
-
-        return proto;
-    }
-
-    public static Contracts.ReviewPointState ToProto(D.ReviewPointState state) => state switch
-    {
-        D.ReviewPointState.Examined => Contracts.ReviewPointState.Examined,
-        D.ReviewPointState.Dismissed => Contracts.ReviewPointState.Dismissed,
-        D.ReviewPointState.Commented => Contracts.ReviewPointState.Commented,
-        D.ReviewPointState.Resolved => Contracts.ReviewPointState.Resolved,
-        _ => Contracts.ReviewPointState.Visible,
-    };
-
-    public static ReviewAction ToAction(Contracts.ReviewPointState state) => state switch
-    {
-        Contracts.ReviewPointState.Dismissed => ReviewAction.Dismissed,
-        Contracts.ReviewPointState.Commented => ReviewAction.Commented,
-        Contracts.ReviewPointState.Examined => ReviewAction.Examined,
-        Contracts.ReviewPointState.Resolved => ReviewAction.Resolved,
-        _ => ReviewAction.Restored,
-    };
-
-    public static ConventionsFound ToProto(IEnumerable<RepositoryConvention> conventions)
-    {
-        var proto = new ConventionsFound();
-        proto.Conventions.AddRange(conventions.Select(c =>
-        {
-            var convention = new Convention
-            {
-                Id = c.Id,
-                Statement = c.Statement,
-                PeerGroup = c.PeerGroup,
-                Supporting = c.Supporting,
-                PeerCount = c.PeerCount,
-            };
-            convention.Examples.AddRange(c.Examples.Select(ToProto));
-            return convention;
-        }));
-        return proto;
-    }
-
-    private static Contracts.Evidence ToProto(D.Evidence evidence)
-    {
-        var proto = new Contracts.Evidence
-        {
-            Id = evidence.Id,
-            Source = evidence.Source.ToString(),
-            Producer = evidence.Producer,
-            Summary = evidence.Summary,
-            IsCounterEvidence = evidence.IsCounterEvidence,
-            CreatedAt = Timestamp.FromDateTimeOffset(evidence.CreatedAt),
-        };
-
-        switch (evidence)
-        {
-            case RepositoryPrecedentEvidence precedent:
-                proto.Convention = precedent.Convention;
-                proto.Supporting = precedent.Supporting;
-                proto.PeerCount = precedent.PeerCount;
-                proto.Examples.AddRange(precedent.Examples.Select(e => new Contracts.PrecedentExample
-                {
-                    Location = ToProto(e.Location),
-                    TypeName = e.TypeName,
-                    Snippet = e.Snippet,
-                    SnippetStartLine = e.SnippetStartLine,
-                }));
-                break;
-            case StaticAnalysisEvidence analysis:
-                proto.Location = ToProto(analysis.Location);
-                break;
-            case AgentInvestigationEvidence { Location: { } location }:
-                proto.Location = ToProto(location);
-                break;
-        }
-
-        return proto;
-    }
-
-    private static Contracts.ComparisonSide ToProto(D.ComparisonSide side)
-    {
-        var proto = new Contracts.ComparisonSide
-        {
-            Title = side.Title,
-            Caption = side.Caption,
-            Source = ToProto(side.Source),
-            Snippet = side.Snippet,
-            SnippetStartLine = side.SnippetStartLine,
-        };
-        proto.HighlightLines.AddRange(side.HighlightLines);
-        proto.Points.AddRange(side.Points);
-        return proto;
-    }
-
-    private static Contracts.CodeLocation ToProto(D.CodeLocation location) => new()
-    {
-        Path = location.Path,
-        StartLine = location.StartLine,
-        EndLine = location.EndLine,
-        Symbol = location.Symbol ?? "",
-    };
 }

@@ -10,13 +10,15 @@ public enum PullRequestTab
     Conversation,
     Commits,
     Checks,
-    Map,
 }
 
 /// <summary>Which changes the Files tab shows: a commit, a range, or everything since the last review (plan v2 M2).</summary>
 public sealed record DiffScope(string FromSha, string ToSha, string Label, bool IsSinceLastReview)
 {
-    public string Key => $"{FromSha}..{ToSha}";
+    public string Key => KeyOverride ?? $"{FromSha}..{ToSha}";
+
+    /// <summary>Set for since-my-last-look, whose per-file diffs come from the engine's merge-base comparison.</summary>
+    public string? KeyOverride { get; init; }
 
     public string? Note { get; init; }
 }

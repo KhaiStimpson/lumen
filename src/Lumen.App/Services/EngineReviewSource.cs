@@ -20,17 +20,19 @@ public sealed class EngineReviewSource : IReviewSource
 
     public string Description => _processId == 0 ? "Local engine" : $"Local engine · pid {_processId}";
 
+    public IAsyncEnumerable<PullRequestEvent> WatchAsync(PullRequestRef pullRequest, bool refresh, CancellationToken cancellationToken) =>
+        WatchAsync(new WatchPullRequestRequest { PullRequest = pullRequest, Refresh = refresh }, cancellationToken);
+
     public async IAsyncEnumerable<PullRequestEvent> WatchAsync(
-        PullRequestRef pullRequest,
-        bool refresh,
+        WatchPullRequestRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         for (var attempt = 0; ; attempt++)
         {
             var client = await ClientAsync(cancellationToken).ConfigureAwait(false);
-            using var call = client.WatchPullRequest(
-                new WatchPullRequestRequest { PullRequest = pullRequest, Refresh = refresh || attempt > 0 },
-                cancellationToken: cancellationToken);
+            var attemptRequest = request.Clone();
+            attemptRequest.Refresh = request.Refresh || attempt > 0;
+            using var call = client.WatchPullRequest(attemptRequest, cancellationToken: cancellationToken);
 
             var enumerator = call.ResponseStream.ReadAllAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
             var lost = false;
@@ -74,13 +76,6 @@ public sealed class EngineReviewSource : IReviewSource
             .GetSourceFileAsync(new GetSourceFileRequest { PullRequest = pullRequest, Path = path, FromBase = fromBase }, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-    public async Task SetReviewPointStateAsync(PullRequestRef pullRequest, string reviewPointId, ReviewPointState state, CancellationToken cancellationToken) =>
-        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
-            .SetReviewPointStateAsync(
-                new SetReviewPointStateRequest { PullRequest = pullRequest, ReviewPointId = reviewPointId, State = state },
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-
     public async Task<PostReviewCommentReply> PostCommentAsync(PostReviewCommentRequest request, CancellationToken cancellationToken) =>
         await (await ClientAsync(cancellationToken).ConfigureAwait(false))
             .PostReviewCommentAsync(request, cancellationToken: cancellationToken)
@@ -91,33 +86,6 @@ public sealed class EngineReviewSource : IReviewSource
             .SetFileViewedAsync(
                 new SetFileViewedRequest { PullRequest = pullRequest, Path = path, Viewed = viewed },
                 cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-
-    public async Task SetTriageGroupAcknowledgedAsync(PullRequestRef pullRequest, string groupId, bool acknowledged, CancellationToken cancellationToken) =>
-        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
-            .SetTriageGroupAcknowledgedAsync(
-                new SetTriageGroupAcknowledgedRequest { PullRequest = pullRequest, GroupId = groupId, Acknowledged = acknowledged },
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-
-    public async Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken) =>
-        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
-            .GetConnectionsAsync(new GetConnectionsRequest(), cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-
-    public async Task<Connections> SetOpenRouterKeyAsync(string key, CancellationToken cancellationToken) =>
-        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
-            .SetOpenRouterKeyAsync(new SetOpenRouterKeyRequest { Key = key }, cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-
-    public async Task<Connections> RemoveOpenRouterKeyAsync(CancellationToken cancellationToken) =>
-        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
-            .RemoveOpenRouterKeyAsync(new RemoveOpenRouterKeyRequest(), cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-
-    public async Task<Connections> UpdateConnectionSettingsAsync(ConnectionSettings settings, CancellationToken cancellationToken) =>
-        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
-            .UpdateConnectionSettingsAsync(settings, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
     public async Task<ReviewSettingsReply> GetReviewSettingsAsync(ReviewSettingsRequest request, CancellationToken cancellationToken) =>
@@ -205,19 +173,19 @@ public sealed class EngineReviewSource : IReviewSource
             .SubmitReviewAsync(request, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-    public async Task<Connections> SetCloudflareCredentialsAsync(string accountId, string apiToken, CancellationToken cancellationToken) =>
+    public async Task<LocalBranches> ListLocalBranchesAsync(CancellationToken cancellationToken) =>
         await (await ClientAsync(cancellationToken).ConfigureAwait(false))
-            .SetCloudflareCredentialsAsync(new SetCloudflareCredentialsRequest { AccountId = accountId, ApiToken = apiToken }, cancellationToken: cancellationToken)
+            .ListLocalBranchesAsync(new ListLocalBranchesRequest(), cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-    public async Task<Connections> RemoveCloudflareCredentialsAsync(CancellationToken cancellationToken) =>
+    public async Task<MarksUpdated> SetMarkedAsync(SetMarkedRequest request, CancellationToken cancellationToken) =>
         await (await ClientAsync(cancellationToken).ConfigureAwait(false))
-            .RemoveCloudflareCredentialsAsync(new RemoveCloudflareCredentialsRequest(), cancellationToken: cancellationToken)
+            .SetMarkedAsync(request, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-    public async Task StartWalkthroughAsync(StartWalkthroughRequest request, CancellationToken cancellationToken) =>
+    public async Task<SinceLastLook> GetSinceLastLookAsync(PullRequestRef pullRequest, CancellationToken cancellationToken) =>
         await (await ClientAsync(cancellationToken).ConfigureAwait(false))
-            .StartWalkthroughAsync(request, cancellationToken: cancellationToken)
+            .GetSinceLastLookAsync(new GetSinceLastLookRequest { PullRequest = pullRequest }, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
     private async Task<ReviewEngine.ReviewEngineClient> ClientAsync(CancellationToken cancellationToken)

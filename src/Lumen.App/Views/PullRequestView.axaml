@@ -35,14 +35,14 @@
           </Button>
           <Border Height="1" Background="{DynamicResource Border.Subtle}" Margin="2,5" />
           <TextBlock Classes="caption tertiary" Margin="9,2,9,4" TextTrimming="CharacterEllipsis">
-            <Run Text="{Binding NumberLabel}" FontWeight="SemiBold" /><Run Text=" · " /><Run Text="{Binding StateLabel}" />
+            <Run Text="{Binding NumberLabel, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " /><Run Text="{Binding StateLabel, Mode=OneWay}" />
           </TextBlock>
-          <RadioButton Name="NavPlan" Classes="navitem" GroupName="PrTab" IsChecked="{Binding IsPlanNav, Mode=OneWay}"
-                       Command="{Binding ShowPlanCommand}" ToolTip.Tip="The places that need your judgement, in order">
+          <RadioButton Name="NavSlices" Classes="navitem" GroupName="PrTab" IsChecked="{Binding IsSlicesNav, Mode=OneWay}"
+                       Command="{Binding ShowSlicesCommand}" ToolTip.Tip="The change as feature slices">
             <Grid ColumnDefinitions="16,*,Auto" ColumnSpacing="9">
               <Path Data="{StaticResource Icon.Risk}" Classes="stroke" Width="13" Height="13" />
-              <TextBlock Grid.Column="1" Text="Review plan" />
-              <TextBlock Grid.Column="2" Classes="count" Text="{Binding ReviewPlan.ItemsCount}" />
+              <TextBlock Grid.Column="1" Text="Slices" />
+              <TextBlock Grid.Column="2" Classes="count" Text="{Binding SliceCountLabel}" />
             </Grid>
           </RadioButton>
           <RadioButton Name="TabFiles" Classes="navitem" GroupName="PrTab" IsChecked="{Binding IsFilesNav, Mode=OneWay}"
@@ -51,13 +51,6 @@
               <Path Data="{StaticResource Icon.File}" Classes="stroke" Width="13" Height="13" />
               <TextBlock Grid.Column="1" Text="Files" />
               <TextBlock Grid.Column="2" Classes="count" Text="{Binding ViewedCount}" />
-            </Grid>
-          </RadioButton>
-          <RadioButton Name="TabMap" Classes="navitem" GroupName="PrTab" ToolTip.Tip="The change as the system it builds (M)"
-                       IsChecked="{Binding Tab, Converter={x:Static views:Converters.EnumEquals}, ConverterParameter=Map}">
-            <Grid ColumnDefinitions="16,*" ColumnSpacing="9">
-              <Path Data="{StaticResource Icon.Map}" Classes="stroke" Width="13" Height="13" />
-              <TextBlock Grid.Column="1" Text="Map" />
             </Grid>
           </RadioButton>
           <RadioButton Name="TabConversation" Classes="navitem" GroupName="PrTab"
@@ -99,169 +92,23 @@
       <!-- ===================== Left: pull request + files ===================== -->
       <Border Classes="pane" Background="{DynamicResource Surface.Window}" BorderThickness="0,0,1,0">
         <Panel>
-        <!-- Review plan list (the default): plain verdict first, then the places to look, in order -->
-        <Grid Name="PlanList" RowDefinitions="Auto,*" IsVisible="{Binding !ShowFileList}">
-          <Border BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1" Padding="14,8">
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Classes="h3" FontSize="14" Text="Review plan" />
-              <TextBlock Grid.Column="1" Classes="caption" Text="{Binding ReviewPlan.ItemsLabel}" VerticalAlignment="Center" />
-            </Grid>
-          </Border>
-          <ScrollViewer Grid.Row="1">
-            <StackPanel Margin="14,12,14,14">
-                <!-- Review plan: summary, lines per tier, then the tiers in the order to work through them (docs/design/review-plan.md) -->
-                <StackPanel Name="ReviewPlan" Spacing="10" DataContext="{Binding ReviewPlan}" x:DataType="vm:ReviewPlanViewModel">
-                  <TextBlock Classes="body" Text="{Binding Summary}" TextWrapping="Wrap" LineHeight="19"
-                             IsVisible="{Binding HasTriage}" />
-                  <Grid Name="TierBar" Height="6" ClipToBounds="True" IsVisible="{Binding HasTriage}">
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="{Binding TierLines[0], Converter={x:Static views:Converters.LinesToStar}}" />
-                      <ColumnDefinition Width="{Binding TierLines[1], Converter={x:Static views:Converters.LinesToStar}}" />
-                      <ColumnDefinition Width="{Binding TierLines[2], Converter={x:Static views:Converters.LinesToStar}}" />
-                      <ColumnDefinition Width="{Binding TierLines[3], Converter={x:Static views:Converters.LinesToStar}}" />
-                    </Grid.ColumnDefinitions>
-                    <Border Grid.ColumnSpan="4" Background="{DynamicResource Surface.Sunken}" CornerRadius="3" />
-                    <Border Grid.Column="0" Background="{DynamicResource Severity.High}" CornerRadius="3,0,0,3" ToolTip.Tip="Critical" />
-                    <Border Grid.Column="1" Background="{DynamicResource Severity.Medium}" ToolTip.Tip="Worth a look" />
-                    <Border Grid.Column="2" Background="{DynamicResource Severity.Low}" ToolTip.Tip="Skim" />
-                    <Border Grid.Column="3" Background="{DynamicResource Border.Strong}" CornerRadius="0,3,3,0" ToolTip.Tip="Skip" />
-                  </Grid>
-                  <!-- Progress: coverage of Critical and Worth a look. The fill eases forward; instant with reduced motion (TDD §25). -->
-                  <StackPanel Name="Coverage" Spacing="5" x:DataType="vm:PullRequestViewModel"
-                              DataContext="{Binding $parent[views:PullRequestView].DataContext}"
-                              IsVisible="{Binding CoverageLabel, Converter={x:Static views:Converters.NotEmpty}}">
-                    <TextBlock Classes="caption" Text="{Binding CoverageLabel}" />
-                    <Panel Height="4" ClipToBounds="True">
-                      <Border Background="{DynamicResource Border.Subtle}" CornerRadius="2" />
-                      <Border Name="CoverageFill" Background="{DynamicResource Marker.Verified}" CornerRadius="2"
-                              RenderTransformOrigin="0%,50%">
-                        <Border.RenderTransform>
-                          <ScaleTransform ScaleX="{Binding CoverageFraction}" ScaleY="1" />
-                        </Border.RenderTransform>
-                      </Border>
-                    </Panel>
-                  </StackPanel>
-                  <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
-                             IsVisible="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).IsAnalysing}"
-                             Text="Comparing this change with repository precedent…" />
-
-                  <ItemsControl ItemsSource="{Binding Sections}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:PlanSectionViewModel">
-                        <StackPanel Spacing="2" Margin="0,6,0,0">
-                          <!-- Tier header: a pill, then the line count. Skip and Consistency fold. -->
-                          <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,5" IsVisible="{Binding !IsFoldable}">
-                            <Border Classes="pill" Classes.High="{Binding IsCritical}" Classes.Medium="{Binding IsWorthALook}"
-                                    Classes.Low="{Binding IsSkim}">
-                              <TextBlock Text="{Binding Title}" />
-                            </Border>
-                            <TextBlock Grid.Column="2" Classes="caption tertiary" Text="{Binding CountLabel}" VerticalAlignment="Center" />
-                          </Grid>
-                          <Button Classes="row" Margin="-14,0" Padding="14,5" Command="{Binding ToggleCommand}" IsVisible="{Binding IsFoldable}"
-                                  ToolTip.Tip="Show or hide">
-                            <Grid ColumnDefinitions="Auto,Auto,*,Auto">
-                              <Panel Width="10" Height="10" Margin="0,0,6,0">
-                                <Path Data="{StaticResource Icon.ChevronRight}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke"
-                                      Width="10" Height="10" IsVisible="{Binding !IsExpanded}" />
-                                <Path Data="{StaticResource Icon.ChevronDown}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke"
-                                      Width="10" Height="10" IsVisible="{Binding IsExpanded}" />
-                              </Panel>
-                              <Border Grid.Column="1" Classes="pill">
-                                <TextBlock Text="{Binding Title}" />
-                              </Border>
-                              <TextBlock Grid.Column="3" Classes="caption tertiary" Text="{Binding CountLabel}" VerticalAlignment="Center" />
-                            </Grid>
-                          </Button>
-                          <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding IsExpanded}">
-                            <ItemsControl.DataTemplates>
-                              <!-- Review point: the row it has always had -->
-                              <DataTemplate DataType="vm:ReviewPointViewModel">
-                                <Button Classes="row" Classes.current="{Binding IsCurrent}" Margin="-14,0" Padding="14,8"
-                                        Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).SelectPointCommand}"
-                                        CommandParameter="{Binding}" Opacity="{Binding IsDismissed, Converter={x:Static views:Converters.DimIf}}">
-                                  <Grid ColumnDefinitions="Auto,*,Auto">
-                                    <Path Data="{Binding Kind, Converter={x:Static views:Converters.KindToIcon}}" Fill="{DynamicResource Text.Secondary}"
-                                          Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Top" Margin="0,3,10,0" />
-                                    <StackPanel Grid.Column="1" Spacing="2">
-                                      <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="2" TextTrimming="WordEllipsis" />
-                                      <TextBlock Classes="caption" Text="{Binding LocationLabel}" TextTrimming="CharacterEllipsis" />
-                                      <TextBlock Classes="caption" FontWeight="Medium" Text="{Binding StateLabel}"
-                                                 IsVisible="{Binding StateLabel, Converter={x:Static views:Converters.NotEmpty}}" />
-                                    </StackPanel>
-                                    <Border Grid.Column="2" Classes="pill" VerticalAlignment="Top" Margin="8,0,0,0"
-                                            Classes.High="{Binding Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=High}"
-                                            Classes.Medium="{Binding Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=Medium}"
-                                            Classes.Low="{Binding Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=Low}">
-                                      <TextBlock Text="{Binding Severity}" />
-                                    </Border>
-                                  </Grid>
-                                </Button>
-                              </DataTemplate>
-
-                              <!-- Group: one idea across hunks, cleared in one go -->
-                              <DataTemplate DataType="vm:TriageGroupViewModel">
-                                <Button Classes="row" Classes.current="{Binding IsCurrent}" Margin="-14,0" Padding="14,8"
-                                        Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).SelectTriageGroupCommand}"
-                                        CommandParameter="{Binding}" Opacity="{Binding Acknowledged, Converter={x:Static views:Converters.DimIf}}">
-                                  <Grid ColumnDefinitions="Auto,*,Auto">
-                                    <Path Data="{StaticResource Icon.Generated}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke"
-                                          Width="11" Height="11" VerticalAlignment="Top" Margin="0,3,10,0" />
-                                    <StackPanel Grid.Column="1" Spacing="2">
-                                      <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
-                                      <TextBlock Classes="caption" Text="{Binding Caption}" TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                    <Button Grid.Column="2" Classes="ghost" Padding="4" VerticalAlignment="Top" Margin="8,0,0,0"
-                                            Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).ToggleGroupAcknowledgedCommand}"
-                                            CommandParameter="{Binding}" ToolTip.Tip="Acknowledge the whole group (A)">
-                                      <Panel>
-                                        <Border Classes="kbd" IsVisible="{Binding !Acknowledged}"><TextBlock Text="A" /></Border>
-                                        <Path Data="{StaticResource Icon.Verified}" Fill="{DynamicResource Marker.Verified}" Width="12" Height="12"
-                                              Stretch="Uniform" IsVisible="{Binding Acknowledged}" />
-                                      </Panel>
-                                    </Button>
-                                  </Grid>
-                                </Button>
-                              </DataTemplate>
-
-                              <!-- The tier's remaining hunks, folded into one quiet row -->
-                              <DataTemplate DataType="vm:MoreChangesViewModel">
-                                <Button Classes="row" Margin="-14,0" Padding="14,7"
-                                        Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).SelectMoreChangesCommand}"
-                                        CommandParameter="{Binding}">
-                                  <StackPanel Spacing="1" Margin="21,0,0,0">
-                                    <TextBlock Classes="caption" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Classes="caption tertiary" Text="{Binding Reason}" TextTrimming="CharacterEllipsis"
-                                               IsVisible="{Binding Reason, Converter={x:Static views:Converters.NotEmpty}}" />
-                                  </StackPanel>
-                                </Button>
-                              </DataTemplate>
-                            </ItemsControl.DataTemplates>
-                          </ItemsControl>
-                        </StackPanel>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </StackPanel>
-
-            </StackPanel>
-          </ScrollViewer>
-        </Grid>
+        <views:SliceListView Name="SliceList" IsVisible="{Binding !ShowsFileTree}" />
 
         <!-- File list: the pull request, then every changed file -->
-        <Grid Name="FileList" RowDefinitions="Auto,Auto,Auto,*,Auto" IsVisible="{Binding ShowFileList}">
+        <Grid Name="FileList" RowDefinitions="Auto,Auto,Auto,*,Auto" IsVisible="{Binding ShowsFileTree}">
           <StackPanel Margin="18,18,18,14" Spacing="6">
-            <TextBlock Classes="section" Text="Pull request" />
+            <TextBlock Classes="section" Text="{Binding ReviewKindLabel}" />
             <TextBlock TextWrapping="Wrap" MaxLines="3" TextTrimming="WordEllipsis" LineHeight="21">
-              <Run Text="{Binding NumberLabel}" FontWeight="Bold" FontSize="15" />
+              <Run Text="{Binding NumberLabel, Mode=OneWay}" FontWeight="Bold" FontSize="15" />
               <Run Text=" " />
-              <Run Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" />
+              <Run Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" FontSize="14" />
             </TextBlock>
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2,0,0">
               <Border Classes="pill open" IsVisible="{Binding StateLabel, Converter={x:Static views:Converters.NotEmpty}}">
                 <TextBlock Text="{Binding StateLabel}" />
               </Border>
               <TextBlock Classes="caption" VerticalAlignment="Center">
-                <Run Text="by " /><Run Text="{Binding Author}" FontWeight="Medium" />
+                <Run Text="by " /><Run Text="{Binding Author, Mode=OneWay}" FontWeight="Medium" />
               </TextBlock>
             </StackPanel>
             <TextBlock Classes="caption tertiary" Text="{Binding BranchLabel}" TextTrimming="CharacterEllipsis" />
@@ -301,16 +148,22 @@
           <StackPanel Grid.Row="2" Margin="18,14,18,8" Spacing="6">
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Classes="h3" Text="Files changed" />
-              <!-- Progress is coverage of what matters, not files opened; the Viewed count stays as the tooltip. -->
-              <TextBlock Grid.Column="1" Classes="caption" Text="{Binding ViewedSummary}" ToolTip.Tip="GitHub's Viewed ticks"
-                         IsVisible="{Binding CoverageShort, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
-              <TextBlock Grid.Column="1" Name="CoverageShort" Classes="caption" Text="{Binding CoverageShort}" ToolTip.Tip="{Binding ViewedSummary}"
-                         IsVisible="{Binding CoverageShort, Converter={x:Static views:Converters.NotEmpty}}" />
+              <TextBlock Grid.Column="1" Classes="caption" Text="{Binding ViewedSummary}" ToolTip.Tip="GitHub's Viewed ticks" IsVisible="{Binding CanPost}" />
             </Grid>
-            <ToggleButton Name="GroupOrder" Classes="ghost chip" IsChecked="{Binding GroupOrder}" IsVisible="{Binding CanUseGroupOrder}"
-                          HorizontalAlignment="Left" Padding="8,2" ToolTip.Tip="Order files by the walkthrough's reading order">
-              <TextBlock Text="Reading order" FontSize="11.5" />
-            </ToggleButton>
+            <Button Name="BackToSlices" Classes="link" HorizontalAlignment="Left" Content="Back to slices" Command="{Binding ShowSlicesCommand}"
+                    IsVisible="{Binding HasSlices}" />
+            <!-- Slicing runs in the background after the diff is readable; it can take minutes on a big change -->
+            <Border Name="SlicingBanner" IsVisible="{Binding IsSlicing}" Background="{DynamicResource Accent.Soft}"
+                    CornerRadius="{StaticResource Radius.Control}" Padding="10,8" Margin="0,4,0,0">
+              <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="2">
+                <Ellipse Width="7" Height="7" Fill="{DynamicResource Accent}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="Building feature slices" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="2" Name="SlicingElapsed" Classes="caption" FontFamily="{StaticResource CodeFont}"
+                           Text="{Binding SlicingElapsedLabel}" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Classes="caption" TextWrapping="Wrap"
+                           Text="Read the files while you wait; the slices replace this list when they're ready." />
+              </Grid>
+            </Border>
           </StackPanel>
 
           <TreeView Grid.Row="3" Name="FileTree" ItemsSource="{Binding Tree}" SelectedItem="{Binding SelectedNode}"
@@ -334,7 +187,7 @@
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,3,6,3">
                   <Path Data="{StaticResource Icon.Folder}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke"
                         Width="12" Height="12" Margin="0,0,8,0" IsVisible="{Binding IsFolder}" />
-                  <CheckBox Classes="viewed" IsVisible="{Binding !IsFolder}"
+                  <CheckBox Classes="viewed" IsVisible="{Binding !IsFolder}" IsEnabled="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).CanPost, FallbackValue=True}"
                             IsChecked="{Binding File.IsViewed, Mode=OneWay, FallbackValue=False}"
                             Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).ToggleViewedCommand}"
                             CommandParameter="{Binding File}" ToolTip.Tip="Viewed" />
@@ -347,13 +200,8 @@
                     <TextBlock Classes="caption tertiary" FontSize="11" Text="{Binding File.RenamedFromLabel, FallbackValue=''}" TextTrimming="CharacterEllipsis"
                                IsVisible="{Binding File.IsRenamed, FallbackValue=False}" ToolTip.Tip="{Binding File.Model.OldPath, FallbackValue=''}" />
                   </StackPanel>
-                  <!-- Triage heat: a Critical hunk is marked by shape as well as colour (TDD §28) -->
-                  <Path Grid.Column="2" Name="CriticalMark" Data="{StaticResource Icon.Correctness}" Fill="{DynamicResource Severity.High}"
-                        Width="10" Height="10" Stretch="Uniform" Margin="6,0,0,0" VerticalAlignment="Center" ToolTip.Tip="Has Critical changes"
-                        IsVisible="{Binding File.HasCritical, FallbackValue=False}" />
-                  <Path Grid.Column="3" Data="{StaticResource Icon.Deviation}" Fill="{DynamicResource Marker.Deviation}"
-                        Width="10" Height="10" Stretch="Uniform" Margin="6,0,6,0"
-                        IsVisible="{Binding File.HasReviewPoints, FallbackValue=False}" />
+                  <TextBlock Grid.Column="2" Classes="caption" Foreground="{DynamicResource Severity.High}" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center"
+                             Text="{Binding File.FlagCountLabel, FallbackValue=''}" IsVisible="{Binding File.HasFlags, FallbackValue=False}" ToolTip.Tip="Red flags" />
                   <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="3" Margin="0,0,6,0" VerticalAlignment="Center"
                               IsVisible="{Binding File.HasThreads, FallbackValue=False}" ToolTip.Tip="Open review threads">
                     <Path Data="{StaticResource Icon.Comment}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke" Width="10" Height="10" />
@@ -408,7 +256,7 @@
       </Border>
 
       <!-- ===================== Center: code ===================== -->
-      <Grid Grid.Column="2" Name="Center" RowDefinitions="Auto,Auto,*" IsVisible="{Binding !IsExamining}">
+      <Grid Grid.Column="2" Name="Center" RowDefinitions="Auto,Auto,*">
         <!-- New commits were pushed while open -->
         <Border Name="NewHeadBanner" Grid.Row="1" Background="{DynamicResource Accent.Soft}" CornerRadius="{StaticResource Radius.Card}"
                 Margin="16,8,16,0" Padding="14,8,8,8" IsVisible="{Binding NewHeadLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
@@ -421,11 +269,94 @@
         <views:ConversationView Grid.Row="2" Name="ConversationTab" IsVisible="{Binding IsConversationTab}" />
         <views:CommitsView Grid.Row="2" Name="CommitsTab" IsVisible="{Binding IsCommitsTab}" />
         <views:ChecksView Grid.Row="2" Name="ChecksTab" IsVisible="{Binding IsChecksTab}" />
-        <views:MapView Grid.Row="2" Name="MapTab" IsVisible="{Binding IsMapTab}" />
 
         <Grid Grid.Row="2" Name="FilesTab" RowDefinitions="Auto,Auto,Auto,*" IsVisible="{Binding IsFilesTab}">
-        <!-- Guided review header -->
-        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="22,12,22,8">
+        <StackPanel>
+        <!-- The current slice (docs/overhaul.md, UI): what it is, how much is left to read, the reading order, and its flags
+             (reachable here even with the right pane closed). -->
+        <Border Name="SliceHeader" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1" Padding="22,10,22,10"
+                IsVisible="{Binding HasCurrentSlice}">
+          <StackPanel Spacing="6">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+              <StackPanel Spacing="2">
+                <TextBlock Classes="h2" Text="{Binding CurrentSlice.Title, FallbackValue=''}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="caption" TextTrimming="CharacterEllipsis">
+                  <Run Text="{Binding CurrentSlice.Caption, FallbackValue='', Mode=OneWay}" FontFamily="{StaticResource CodeFont}" FontSize="11.5" />
+                  <Run Text="{Binding CurrentSlice.SectionsSuffix, FallbackValue='', Mode=OneWay}" />
+                  <Run Text=" · " /><Run Text="{Binding CurrentSlice.LinesLabel, FallbackValue='', Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" />
+                </TextBlock>
+              </StackPanel>
+              <Button Name="SliceFlags" Grid.Column="1" Classes="subtle" VerticalAlignment="Center" IsVisible="{Binding CurrentSlice.HasFlags, FallbackValue=False}"
+                      ToolTip.Tip="Flags in this slice (G)">
+                <TextBlock FontWeight="SemiBold" Foreground="{DynamicResource Gauge.Crit}" Text="{Binding CurrentSlice.FlagLabel, FallbackValue=''}" />
+                <Button.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedRight">
+                    <ItemsControl ItemsSource="{Binding CurrentSliceFlags}" MinWidth="280">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FlagViewModel">
+                          <Button Classes="row" Padding="8,5" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                  Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).SelectFlagCommand}" CommandParameter="{Binding}">
+                            <StackPanel Spacing="1">
+                              <TextBlock FontSize="12.5"><Run Text="Flag " FontWeight="SemiBold" Foreground="{DynamicResource Gauge.Crit}" /><Run Text="{Binding KindLabel, Mode=OneWay}" /></TextBlock>
+                              <TextBlock Classes="caption tertiary" FontFamily="{StaticResource CodeFont}" FontSize="11.5" Text="{Binding LocationLabel}" />
+                            </StackPanel>
+                          </Button>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+              <Button Name="SliceMarkReviewed" Grid.Column="2" Classes="subtle" VerticalAlignment="Center" Command="{Binding MarkSliceReviewedCommand}"
+                      Classes.primary="{Binding MarkReviewed.IsArmed}" IsVisible="{Binding !IsRightPaneOpen}" ToolTip.Tip="Mark the slice reviewed (M)">
+                <TextBlock Text="{Binding MarkReviewed.Label}" />
+              </Button>
+            </Grid>
+            <!-- To read / boilerplate / mechanical; the segments are 3:1 apart and the words say the same -->
+            <Grid Name="SliceBar" Height="6" ClipToBounds="True">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="{Binding CurrentSlice.OpenLines, Converter={x:Static views:Converters.LinesToStar}, FallbackValue=0}" />
+                <ColumnDefinition Width="{Binding CurrentSlice.BoilerplateLines, Converter={x:Static views:Converters.LinesToStar}, FallbackValue=0}" />
+                <ColumnDefinition Width="{Binding CurrentSlice.MechanicalLines, Converter={x:Static views:Converters.LinesToStar}, FallbackValue=0}" />
+              </Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Background="{DynamicResource Bar.ToRead}" CornerRadius="3,0,0,3" ToolTip.Tip="To read" />
+              <Border Grid.Column="1" Background="{DynamicResource Bar.Boilerplate}" ToolTip.Tip="Boilerplate, not verified" />
+              <Border Grid.Column="2" Background="{DynamicResource Bar.Mechanical}" CornerRadius="0,3,3,0" ToolTip.Tip="Mechanical, proven" />
+            </Grid>
+            <!-- Mechanical only: its groups, not its files -->
+            <ItemsControl Name="MechanicalGroups" ItemsSource="{Binding MechanicalGroups}" IsVisible="{Binding IsMechanicalSlice}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <TextBlock Classes="caption" Margin="0,1" views:CodeText.Text="{Binding}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <!-- Read in this order -->
+            <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding !IsMechanicalSlice}">
+              <TextBlock Classes="caption" Text="Read in this order:" VerticalAlignment="Center" Margin="0,0,4,0" />
+              <ItemsControl Name="ReadingOrder" ItemsSource="{Binding CurrentSlice.Files, FallbackValue={x:Null}}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SliceFileViewModel">
+                    <Button Classes="crumb" Classes.current="{Binding IsCurrent}" Padding="5,1" Margin="0,0,2,0"
+                            Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).SelectSliceFileCommand}"
+                            CommandParameter="{Binding}" ToolTip.Tip="{Binding Why}">
+                      <TextBlock FontSize="11.5" FontFamily="{StaticResource CodeFont}">
+                        <Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" ✓" Foreground="{DynamicResource Gauge.Ok}" FontFamily="{StaticResource UiFont}"
+                                                          Classes.hidden="{Binding !IsMarked}" />
+                      </TextBlock>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- File header: its place in the reading order and why it is in the slice -->
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" Margin="22,12,22,8">
           <Grid ColumnDefinitions="Auto,Auto,Auto" ClipToBounds="True">
             <TextBlock Classes="h2" Text="{Binding SelectedFile.Name, FallbackValue='Loading…'}" TextTrimming="CharacterEllipsis" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="10,0,8,0" VerticalAlignment="Center">
@@ -443,13 +374,19 @@
               <TextBlock Classes="removed" Text="{Binding SelectedFile.DeletionsLabel, FallbackValue=''}" />
             </StackPanel>
           </Grid>
-          <TextBlock Grid.Row="1" Classes="caption tertiary" Margin="0,3,0,0" Text="{Binding SelectedFile.Directory, FallbackValue=''}" TextTrimming="CharacterEllipsis"
+          <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Classes="caption tertiary" Margin="0,3,0,0" Text="{Binding SelectedFile.Directory, FallbackValue=''}" TextTrimming="CharacterEllipsis"
                      IsVisible="{Binding !SelectedFile.IsRenamed, FallbackValue=True}" />
           <!-- A rename, git style: shared/{old → new}/shared, with the part that changed marked. Runs touch: whitespace between them would show. -->
-          <TextBlock Name="RenamePath" Grid.Row="1" Classes="caption" Margin="0,3,0,0" FontFamily="{StaticResource CodeFont}" FontSize="11.5"
+          <TextBlock Name="RenamePath" Grid.Row="1" Grid.ColumnSpan="2" Classes="caption" Margin="0,3,0,0" FontFamily="{StaticResource CodeFont}" FontSize="11.5"
                      TextTrimming="CharacterEllipsis" IsVisible="{Binding SelectedFile.IsRenamed, FallbackValue=False}"
-                     ToolTip.Tip="{Binding SelectedFile.Model.OldPath, StringFormat='Renamed from {0}', FallbackValue=''}"><Run Text="{Binding SelectedFile.PathChange.Head, FallbackValue=''}" Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding SelectedFile.PathChange.OldMiddle, FallbackValue=''}" Foreground="{DynamicResource Diff.Removed.Sign}" Background="{DynamicResource Diff.Removed.Bg}" TextDecorations="Strikethrough" /><Run Text=" → " Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding SelectedFile.PathChange.NewMiddle, FallbackValue=''}" Foreground="{DynamicResource Diff.Added.Sign}" Background="{DynamicResource Diff.Added.Bg}" FontWeight="Medium" /><Run Text="{Binding SelectedFile.PathChange.Tail, FallbackValue=''}" Foreground="{DynamicResource Text.Tertiary}" /></TextBlock>
+                     ToolTip.Tip="{Binding SelectedFile.Model.OldPath, StringFormat='Renamed from {0}', FallbackValue=''}"><Run Text="{Binding SelectedFile.PathChange.Head, FallbackValue='', Mode=OneWay}" Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding SelectedFile.PathChange.OldMiddle, FallbackValue='', Mode=OneWay}" Foreground="{DynamicResource Diff.Removed.Sign}" Background="{DynamicResource Diff.Removed.Bg}" TextDecorations="Strikethrough" /><Run Text=" → " Foreground="{DynamicResource Text.Tertiary}" /><Run Text="{Binding SelectedFile.PathChange.NewMiddle, FallbackValue='', Mode=OneWay}" Foreground="{DynamicResource Diff.Added.Sign}" Background="{DynamicResource Diff.Added.Bg}" FontWeight="Medium" /><Run Text="{Binding SelectedFile.PathChange.Tail, FallbackValue='', Mode=OneWay}" Foreground="{DynamicResource Text.Tertiary}" /></TextBlock>
 
+          <Grid Name="WhyHere" Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*" Margin="0,4,0,0"
+                IsVisible="{Binding CurrentSliceFile, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Classes="caption" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
+                       Text="{Binding CurrentSliceFile.PositionLabel, FallbackValue='', StringFormat='{}{0} · '}" />
+            <TextBlock Grid.Column="1" Classes="caption" TextWrapping="Wrap" views:CodeText.Text="{Binding CurrentSliceFile.WhyLine, FallbackValue=''}" />
+          </Grid>
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="16,0,0,0">
             <!-- Only the hunks, or the whole file with the changes in place (X toggles) -->
             <Border Classes="segmented" VerticalAlignment="Center" Margin="0,0,6,0">
@@ -460,20 +397,20 @@
                              IsChecked="{Binding ShowFullFile}" ToolTip.Tip="Show the whole file with the changes in place (X)" />
               </StackPanel>
             </Border>
-            <Button Classes="subtle" Padding="7,5" Command="{Binding PreviousPointCommand}" ToolTip.Tip="Previous in the plan (K)">
+            <Button Classes="subtle" Padding="7,5" Command="{Binding PreviousFileCommand}" ToolTip.Tip="Previous file in reading order (P)">
               <Path Data="{StaticResource Icon.ChevronLeft}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="12" Height="12" />
             </Button>
             <Border Padding="6,0" VerticalAlignment="Center">
               <TextBlock FontSize="12.5">
-                <Run Text="Point " Foreground="{DynamicResource Text.Secondary}" /><Run Text="{Binding PositionLabel}" />
+                <Run Text="File " Foreground="{DynamicResource Text.Secondary}" /><Run Text="{Binding FilePositionLabel, Mode=OneWay}" />
               </TextBlock>
             </Border>
-            <Button Classes="subtle" Padding="7,5" Command="{Binding NextPointCommand}" ToolTip.Tip="Next in the plan (J)">
+            <Button Classes="subtle" Padding="7,5" Command="{Binding NextFileCommand}" ToolTip.Tip="Next file in reading order (N)">
               <Path Data="{StaticResource Icon.ChevronRight}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="12" Height="12" />
             </Button>
           </StackPanel>
           <!-- Scope and view options -->
-          <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" Margin="0,6,2,0">
+          <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" Margin="0,6,2,0">
             <!-- Step through this file's changes ([ and ]); the ruler beside the diff shows where they are -->
             <StackPanel Name="ChangeNav" Orientation="Horizontal" Spacing="2" Margin="0,0,8,0" VerticalAlignment="Center" IsVisible="{Binding HasChanges}">
               <Button Classes="ghost" Padding="5" Command="{Binding PreviousChangeCommand}" ToolTip.Tip="Previous change ([)">
@@ -485,7 +422,7 @@
                 <Path Data="{StaticResource Icon.ChevronDown}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="10" Height="10" />
               </Button>
             </StackPanel>
-            <ToggleButton Name="SinceLastReview" Classes="ghost chip" IsChecked="{Binding ShowSinceLastReview}" IsEnabled="{Binding CanShowSinceLastReview}"
+            <ToggleButton Name="SinceLastReview" Classes="ghost chip" IsChecked="{Binding ShowSinceLastReview}" IsEnabled="{Binding CanShowSinceLastReview}" IsVisible="{Binding CanPost}"
                           ToolTip.Tip="{Binding LastReviewedLabel}" Padding="8,2">
               <TextBlock Text="Since last review" FontSize="11.5" />
             </ToggleButton>
@@ -501,6 +438,7 @@
             </ToggleButton>
           </StackPanel>
         </Grid>
+        </StackPanel>
 
         <!-- Review settings changed since this analysis: offer to re-run it, never run it unasked. -->
         <Border Name="ReanalyseBanner" Grid.Row="1" Background="{DynamicResource Accent.Soft}" CornerRadius="{StaticResource Radius.Card}"
@@ -584,185 +522,18 @@
         </Grid>
       </Grid>
 
-      <!-- ===================== Right: review focus / precedent / patterns ===================== -->
-      <Border Grid.Column="4" Name="RightPane" Classes="pane" BorderThickness="1,0,0,0" IsVisible="{Binding !IsExamining}">
+      <!-- ===================== Right: why these files, flags in this slice, keys (collapsible) ===================== -->
+      <Border Grid.Column="4" Name="RightPane" Classes="pane" BorderThickness="1,0,0,0" IsVisible="{Binding IsRightPaneOpen}">
         <Grid RowDefinitions="*,Auto">
-        <ScrollViewer>
-          <StackPanel Margin="18,18,18,18" Spacing="22">
-            <!-- Inspector: the current review point. Plain verdict, then the evidence, then what you can do. -->
-            <StackPanel Name="Inspector" Spacing="8" IsVisible="{Binding HasCurrentPoint}">
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Classes="h3" FontSize="14" Text="Review point" />
-                <TextBlock Grid.Column="1" Classes="caption" Text="{Binding PositionLabel}" VerticalAlignment="Center" />
-              </Grid>
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <Border Classes="pill" VerticalAlignment="Center"
-                        Classes.High="{Binding CurrentPoint.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=High, FallbackValue=False}"
-                        Classes.Medium="{Binding CurrentPoint.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=Medium, FallbackValue=False}"
-                        Classes.Low="{Binding CurrentPoint.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=Low, FallbackValue=False}">
-                  <TextBlock Text="{Binding CurrentPoint.Severity, FallbackValue=''}" />
-                </Border>
-                <TextBlock Classes="secondary" FontSize="12.5" Text="{Binding CurrentPoint.TypeLabel, FallbackValue=''}" VerticalAlignment="Center" />
-              </StackPanel>
-              <TextBlock Classes="h2" Text="{Binding CurrentPoint.Title, FallbackValue=''}" TextWrapping="Wrap" LineHeight="20" />
-              <TextBlock Classes="body" Text="{Binding CurrentPoint.Summary, FallbackValue=''}" />
-              <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="4" Margin="0,2,0,0">
-                <TextBlock Classes="caption" Text="Evidence" />
-                <TextBlock Grid.Column="1" FontSize="12.5" Classes="h3" FontWeight="Normal" TextWrapping="Wrap" Text="{Binding CurrentPoint.EvidenceLabel, FallbackValue=''}" />
-                <TextBlock Grid.Row="1" Classes="caption" Text="Support" />
-                <TextBlock Grid.Row="1" Grid.Column="1" FontSize="12.5" Classes="h3" FontWeight="Normal" TextWrapping="Wrap" Text="{Binding CurrentPoint.SupportLabel, FallbackValue=''}" />
-                <TextBlock Grid.Row="2" Classes="caption" Text="Where" />
-                <TextBlock Grid.Row="2" Grid.Column="1" FontSize="12.5" Classes="h3" FontWeight="Normal" TextWrapping="Wrap" Text="{Binding CurrentPoint.LocationLabel, FallbackValue=''}" />
-              </Grid>
-              <WrapPanel Margin="0,4,0,0" ItemSpacing="8" LineSpacing="8">
-                <Button Classes="subtle" Command="{Binding ShowPrecedentCommand}" CommandParameter="{Binding CurrentPoint}">
-                  <StackPanel Orientation="Horizontal" Spacing="7">
-                    <TextBlock Text="Show precedent" /><Border Classes="kbd"><TextBlock Text="P" /></Border>
-                  </StackPanel>
-                </Button>
-                <Button Classes="subtle" Command="{Binding ExamineCommand}" CommandParameter="{Binding CurrentPoint}">
-                  <StackPanel Orientation="Horizontal" Spacing="7">
-                    <TextBlock Text="Why this matters" /><Border Classes="kbd"><TextBlock Text="↵" /></Border>
-                  </StackPanel>
-                </Button>
-                <Button Classes="subtle" Command="{Binding StartCommentCommand}" CommandParameter="{Binding CurrentPoint}">
-                  <StackPanel Orientation="Horizontal" Spacing="7">
-                    <TextBlock Text="Comment" /><Border Classes="kbd"><TextBlock Text="C" /></Border>
-                  </StackPanel>
-                </Button>
-                <Button Classes="ghost" Command="{Binding DismissCommand}" CommandParameter="{Binding CurrentPoint}">
-                  <StackPanel Orientation="Horizontal" Spacing="7">
-                    <TextBlock Text="Dismiss" /><Border Classes="kbd"><TextBlock Text="D" /></Border>
-                  </StackPanel>
-                </Button>
-              </WrapPanel>
-            </StackPanel>
-
-            <views:WalkthroughView Name="Walkthrough" />
-
-            <StackPanel Spacing="8" IsVisible="{Binding HasCurrentPoint}">
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Classes="section" Text="Precedent" />
-                <Button Grid.Column="1" Classes="link" Content="Compare" Command="{Binding ShowPrecedentCommand}" CommandParameter="{x:Null}" />
-              </Grid>
-              <ItemsControl ItemsSource="{Binding CurrentPoint.PrecedentExamples, FallbackValue={x:Null}}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:PrecedentExampleViewModel">
-                    <Button Classes="row" Margin="-8,0" Padding="10,6"
-                            Command="{Binding $parent[views:PullRequestView].((vm:PullRequestViewModel)DataContext).OpenSourceCommand}"
-                            CommandParameter="{Binding}">
-                      <Grid ColumnDefinitions="Auto,*">
-                        <Path Data="{StaticResource Icon.File}" Stroke="{DynamicResource Accent}" Classes="stroke" Width="12" Height="12" Margin="0,2,10,0" VerticalAlignment="Top" />
-                        <StackPanel Grid.Column="1" Spacing="1">
-                          <TextBlock Text="{Binding FileName}" FontSize="12.5" FontWeight="Medium" />
-                          <TextBlock Classes="caption tertiary" Text="{Binding Directory}" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                      </Grid>
-                    </Button>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-
-            <StackPanel Spacing="8" IsVisible="{Binding Conventions.Count, Converter={x:Static views:Converters.IsPositive}}">
-              <StackPanel Spacing="2">
-                <TextBlock Classes="section" Text="Patterns in this repository" />
-                <TextBlock Classes="caption tertiary" Text="Observed in code near this change" />
-              </StackPanel>
-              <ItemsControl ItemsSource="{Binding Conventions}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:ConventionViewModel">
-                    <Grid ColumnDefinitions="*,Auto" Margin="0,5">
-                      <TextBlock Text="{Binding Statement}" FontSize="12" TextWrapping="Wrap" Classes="secondary" Margin="0,0,10,0" />
-                      <StackPanel Grid.Column="1" Spacing="3" HorizontalAlignment="Right">
-                        <TextBlock Classes="caption" Text="{Binding Support}" HorizontalAlignment="Right" />
-                        <Panel Width="56" Height="3" HorizontalAlignment="Right">
-                          <Border Background="{DynamicResource Border.Subtle}" CornerRadius="2" />
-                          <Border Background="{DynamicResource Marker.Verified}" CornerRadius="2" HorizontalAlignment="Left"
-                                  Width="{Binding Strength, Converter={x:Static views:Converters.StrengthToWidth}}" />
-                        </Panel>
-                      </StackPanel>
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-
-            <StackPanel Spacing="6" Margin="0,4,0,0">
-              <TextBlock Classes="section" Text="Keyboard" />
-              <WrapPanel>
-                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
-                  <Border Classes="kbd"><TextBlock Text="J" /></Border><Border Classes="kbd"><TextBlock Text="K" /></Border>
-                  <TextBlock Classes="caption" Text="next / previous" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
-                  <Border Classes="kbd"><TextBlock Text="↵" /></Border><TextBlock Classes="caption" Text="examine" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
-                  <Border Classes="kbd"><TextBlock Text="D" /></Border><TextBlock Classes="caption" Text="dismiss" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
-                  <Border Classes="kbd"><TextBlock Text="A" /></Border><TextBlock Classes="caption" Text="acknowledge group" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
-                  <Border Classes="kbd"><TextBlock Text="C" /></Border><TextBlock Classes="caption" Text="comment" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
-                  <Border Classes="kbd"><TextBlock Text="P" /></Border><TextBlock Classes="caption" Text="precedent" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
-                  <Border Classes="kbd"><TextBlock Text="X" /></Border><TextBlock Classes="caption" Text="full file" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
-                  <Border Classes="kbd"><TextBlock Text="N" /></Border><TextBlock Classes="caption" Text="next thread" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
-                  <Border Classes="kbd"><TextBlock Text="R" /></Border><TextBlock Classes="caption" Text="review" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,14,6">
-                  <Border Classes="kbd"><TextBlock Text="Ctrl K" /></Border><TextBlock Classes="caption" Text="commands" />
-                </StackPanel>
-              </WrapPanel>
-            </StackPanel>
-          </StackPanel>
-        </ScrollViewer>
-        <views:ReviewTrayView Grid.Row="1" Name="ReviewTray" />
+        <views:InspectorView Name="Inspector" />
+        <views:ReviewTrayView Grid.Row="1" Name="ReviewTray" IsVisible="{Binding CanPost}" />
         </Grid>
       </Border>
 
-      <!-- ===================== Examine mode: replaces center + right ===================== -->
       <GridSplitter Name="LeftSplitter" Grid.Column="1" Width="5" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Cursor="SizeWestEast" />
-      <GridSplitter Name="RightSplitter" Grid.Column="3" Width="5" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Cursor="SizeWestEast" IsVisible="{Binding !IsExamining}" />
-
-      <views:ExamineView Grid.Column="2" Grid.ColumnSpan="3" Name="Examine" IsVisible="{Binding IsExamining}" />
+      <GridSplitter Name="RightSplitter" Grid.Column="3" Width="5" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Cursor="SizeWestEast" IsVisible="{Binding IsRightPaneOpen}" />
     </Grid>
     </DockPanel>
-
-    <!-- Precedent source viewer -->
-    <Border Name="SourceScrim" Background="{DynamicResource Gauge.Scrim}" IsVisible="{Binding SourcePreview, Converter={x:Static ObjectConverters.IsNotNull}}"
-            PointerPressed="OnScrimPressed">
-      <Border Classes="card" Margin="120,48" MaxWidth="1100" BoxShadow="0 12 32 0 #88000000" Name="SourceSheet">
-        <Grid RowDefinitions="Auto,*">
-          <Grid ColumnDefinitions="Auto,*,Auto" Margin="18,14,12,12">
-            <Path Data="{StaticResource Icon.Book}" Stroke="{DynamicResource Compare.Precedent.Title}" Classes="stroke" Width="14" Height="14" Margin="0,0,12,0" />
-            <StackPanel Grid.Column="1" Spacing="1">
-              <TextBlock Classes="h3" Text="{Binding SourcePreview.FileName, FallbackValue=''}" />
-              <TextBlock Classes="caption tertiary" Text="{Binding SourcePreview.Directory, FallbackValue=''}" />
-            </StackPanel>
-            <Button Grid.Column="2" Classes="ghost" Padding="7" Command="{Binding CloseSourceCommand}" ToolTip.Tip="Close (Esc)">
-              <Path Data="{StaticResource Icon.Close}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="11" Height="11" />
-            </Button>
-          </Grid>
-          <Border Grid.Row="1" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0">
-            <ScrollViewer Name="SourceScroll">
-              <diff:CodeSnippet Name="SourceCode" Code="{Binding SourcePreview.Text, FallbackValue=''}" Path="{Binding SourcePreview.Path, FallbackValue=''}"
-                                StartLine="{Binding SourcePreview.StartLine, FallbackValue=1}"
-                                HighlightLines="{Binding SourcePreview.HighlightLines, FallbackValue={x:Null}}" HighlightBrushKey="Diff.Added.Bg" />
-            </ScrollViewer>
-          </Border>
-        </Grid>
-      </Border>
-    </Border>
 
     <!-- Quiet toast -->
     <Border Name="ToastHost" Classes="card" Padding="14,9" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,24"

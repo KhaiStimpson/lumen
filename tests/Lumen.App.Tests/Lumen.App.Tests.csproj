@@ -32,6 +32,8 @@
     <None Include="..\fixtures\andrew-crm-refactor\**" LinkBase="fixtures/andrew-crm-refactor" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\fixtures\andrew-crm-audit\**" LinkBase="fixtures/andrew-crm-audit" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\fixtures\inbox\**" LinkBase="fixtures/inbox" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\razor-pages-app-pr\**" LinkBase="fixtures/razor-pages-app-pr" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\razor-pages-app-local\**" LinkBase="fixtures/razor-pages-app-local" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

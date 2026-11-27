@@ -1,38 +1,8 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Lumen.Analysis;
-using Lumen.Domain;
 
 namespace Lumen.Engine;
-
-public sealed record JevSettings
-{
-    /// <summary>
-    /// Legacy (plan v2): JEV is kept but off by default, and only takes part in analysis when this is on at engine
-    /// start and an OpenRouter key is stored. The rule-based policy is the floor either way.
-    /// </summary>
-    public bool Enabled { get; init; }
-
-    public string Model { get; init; } = "typesafe/jev-1.13";
-
-    public bool RequireZeroDataRetention { get; init; } = true;
-
-    public double TimeoutSeconds { get; init; } = 12;
-}
-
-public sealed record AgentSettings
-{
-    /// <summary>Off until the user turns it on: investigations send repository code to the agent's provider.</summary>
-    public bool Enabled { get; init; }
-
-    public string Provider { get; init; } = "claude-code";
-
-    public int MaxInvestigationsPerPullRequest { get; init; } = 3;
-
-    public int MaxConcurrent { get; init; } = 1;
-
-    /// <summary>Never switch from subscription to metered billing without this explicit opt-in (TDD §37.5).</summary>
-    public bool AllowMeteredUsage { get; init; }
-}
 
 public sealed record InboxPreferences
 {
@@ -40,26 +10,6 @@ public sealed record InboxPreferences
     public IReadOnlyList<string> WatchedRepositories { get; init; } = [];
 
     public double PollSeconds { get; init; } = 120;
-}
-
-/// <summary>The fast model (plan v2 M7): GLM on Cloudflare Workers AI. Credentials live in the credential store.</summary>
-public sealed record FastModelSettings
-{
-    /// <summary>The Workers AI model id. GLM 5.3 Flash; confirm the exact name in the Workers AI catalog.</summary>
-    public string Model { get; init; } = "@cf/zai-org/glm-5.3-flash";
-
-    /// <summary>Optional AI Gateway id; empty calls Workers AI directly.</summary>
-    public string Gateway { get; init; } = "";
-
-    public double TimeoutSeconds { get; init; } = 30;
-
-    /// <summary>Largest diff sent per pull request, in KB. Larger files are cut and the rest summarised by path and size.</summary>
-    public int MaxDiffKb { get; init; } = 512;
-
-    public int DailyRequestCap { get; init; } = 500;
-
-    /// <summary>Files summarised at once.</summary>
-    public int MaxConcurrent { get; init; } = 6;
 }
 
 /// <summary>
@@ -76,20 +26,17 @@ public sealed record EngineSettings
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
-    public PrivacySettings Privacy { get; init; } = new();
-
-    public JevSettings Jev { get; init; } = new();
-
-    public AgentSettings Agents { get; init; } = new();
+    /// <summary>The keys this version understands, per section. Anything else (the removed AI sections) is dropped.</summary>
+    private static readonly Dictionary<string, string[]> KnownKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["inbox"] = ["watchedRepositories", "pollSeconds"],
+        ["review"] = ["mechanicalPaths", "skippedPaths"],
+    };
 
     public InboxPreferences Inbox { get; init; } = new();
 
-    public FastModelSettings FastModel { get; init; } = new();
-
     /// <summary>The global review defaults; repositories override them in their own files (see ReviewSettingsStore).</summary>
     public ReviewSettings Review { get; init; } = new();
-
-    public bool AgentsAllowed => Agents.Enabled && Privacy.AllowsAgents;
 
     public static string PathIn(string dataDirectory) => System.IO.Path.Combine(dataDirectory, "settings.json");
 
@@ -109,29 +56,62 @@ public sealed record EngineSettings
         }
     }
 
+    /// <summary>
+    /// Loads the settings and, when the file holds keys this version doesn't know (the removed Cloud AI, JEV, agents
+    /// and peer-pattern settings), writes it back without them. Returns the settings either way.
+    /// </summary>
+    public static EngineSettings LoadAndDropUnknownKeys(string dataDirectory)
+    {
+        var settings = Load(dataDirectory);
+        try
+        {
+            var path = PathIn(dataDirectory);
+            if (File.Exists(path) && HasUnknownKeys(File.ReadAllText(path)))
+            {
+                settings.Save(dataDirectory);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            // Best effort: unknown keys are ignored on load anyway.
+        }
+
+        return settings;
+    }
+
+    /// <summary>True when the JSON has a section or key outside <see cref="KnownKeys"/>.</summary>
+    public static bool HasUnknownKeys(string json)
+    {
+        if (JsonNode.Parse(json, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) is not JsonObject root)
+        {
+            return false;
+        }
+
+        foreach (var (section, value) in root)
+        {
+            if (!KnownKeys.TryGetValue(section, out var keys))
+            {
+                return true;
+            }
+
+            if (value is JsonObject obj && obj.Any(kv => !keys.Contains(kv.Key, StringComparer.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>Hand-edited JSON can contain null sections or values outside the ranges the settings UI permits.</summary>
     private EngineSettings Normalised()
     {
-        var jev = Jev ?? new JevSettings();
-        var agents = Agents ?? new AgentSettings();
         var review = Review ?? new ReviewSettings();
         return this with
         {
-            Privacy = Privacy ?? new PrivacySettings(),
-            Jev = jev with
-            {
-                Model = string.IsNullOrWhiteSpace(jev.Model) ? new JevSettings().Model : jev.Model.Trim(),
-                TimeoutSeconds = double.IsFinite(jev.TimeoutSeconds) ? Math.Clamp(jev.TimeoutSeconds, 2, 60) : new JevSettings().TimeoutSeconds,
-            },
-            Agents = agents with
-            {
-                MaxConcurrent = Math.Clamp(agents.MaxConcurrent, 1, 4),
-                MaxInvestigationsPerPullRequest = Math.Clamp(agents.MaxInvestigationsPerPullRequest, 0, 20),
-            },
+            Inbox = Inbox ?? new InboxPreferences(),
             Review = review with
             {
-                Sensitivity = (review.Sensitivity ?? ReviewSensitivity.Balanced).Clamped(),
-                IgnoredNames = Clean(review.IgnoredNames),
                 MechanicalPaths = Clean(review.MechanicalPaths),
                 SkippedPaths = Clean(review.SkippedPaths),
             },
@@ -149,8 +129,8 @@ public sealed record EngineSettings
 }
 
 /// <summary>
-/// The live settings. The Connections panel changes them while the engine runs; readers take <see cref="Current"/>
-/// at the moment they decide, so a change applies to the next JEV call or investigation without a restart.
+/// The live settings. Readers take <see cref="Current"/> at the moment they decide, so a change applies to the next
+/// analysis without a restart.
 /// </summary>
 public sealed class EngineSettingsStore(EngineSettings initial, string dataDirectory)
 {

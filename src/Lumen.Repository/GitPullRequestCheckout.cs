@@ -85,6 +85,14 @@ internal sealed class GitPullRequestCheckout : IPullRequestCheckout
         return result.Succeeded;
     }
 
+    public async Task<string?> MergeBaseOfAsync(string first, string second, CancellationToken cancellationToken)
+    {
+        ValidateSha(first);
+        ValidateSha(second);
+        var result = await git.RunAsync(gitDir, ["merge-base", first, second], cancellationToken, throwOnError: false).ConfigureAwait(false);
+        return result.Succeeded && result.StandardOutput.Trim() is { Length: > 0 } sha ? sha : null;
+    }
+
     public async Task<bool> EnsureCommitAsync(string sha, CancellationToken cancellationToken)
     {
         ValidateSha(sha);
@@ -141,6 +149,30 @@ internal sealed class GitPullRequestCheckout : IPullRequestCheckout
         var env = await environment(cancellationToken).ConfigureAwait(false);
         var blob = await git.RunAsync(gitDir, ["cat-file", "blob", entry.ObjectId], cancellationToken, env).ConfigureAwait(false);
         return blob.StandardOutput;
+    }
+
+    /// <summary>
+    /// Several head files at once, read in parallel: the slicer reads every code file in the repository, and one at a
+    /// time that is slow on a large repository (more so with a virus scanner inspecting each open). A file that can't
+    /// be read is left out.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, string>> ReadHeadFilesAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        var texts = new System.Collections.Concurrent.ConcurrentDictionary<string, string>(StringComparer.Ordinal);
+        await Parallel.ForEachAsync(paths, new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = cancellationToken }, async (path, ct) =>
+        {
+            try
+            {
+                if (await ReadHeadFileAsync(path, ct).ConfigureAwait(false) is { } text)
+                {
+                    texts[path] = text;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+            }
+        }).ConfigureAwait(false);
+        return new Dictionary<string, string>(texts, StringComparer.Ordinal);
     }
 
     public async Task<string?> ReadHeadFileAsync(string path, CancellationToken cancellationToken)

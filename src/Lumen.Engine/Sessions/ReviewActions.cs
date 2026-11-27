@@ -39,7 +39,7 @@ public sealed partial class ReviewActions(
             return (fromGitHub, false);
         }
 
-        var visit = await visits.GetVisitAsync(session.Key, ct).ConfigureAwait(false);
+        var visit = await visits.GetVisitAsync(session.Target, ct).ConfigureAwait(false);
         if (visit?.LastReviewedHead is { Length: > 0 } reviewed)
         {
             return (reviewed, false);
@@ -134,13 +134,12 @@ public sealed partial class ReviewActions(
     public async Task<(PostedComment? Posted, PendingReview? Pending)> PostNowAsync(
         PullRequestSession session,
         NewReviewComment comment,
-        string? reviewPointId,
         CancellationToken ct)
     {
         ValidateLines(session, comment);
         if (session.PendingReview is not null)
         {
-            return (null, await AddPendingAsync(session, comment, reviewPointId, null, ct).ConfigureAwait(false));
+            return (null, await AddPendingAsync(session, comment, null, ct).ConfigureAwait(false));
         }
 
         try
@@ -153,7 +152,7 @@ public sealed partial class ReviewActions(
         {
             // One started on github.com since we last looked.
             await sessions.RefreshReviewStateAsync(session, ct).ConfigureAwait(false);
-            return (null, await AddPendingAsync(session, comment, reviewPointId, null, ct).ConfigureAwait(false));
+            return (null, await AddPendingAsync(session, comment, null, ct).ConfigureAwait(false));
         }
     }
 
@@ -161,7 +160,6 @@ public sealed partial class ReviewActions(
     public async Task<PendingReview> AddPendingAsync(
         PullRequestSession session,
         NewReviewComment comment,
-        string? reviewPointId,
         string? replyToThreadId,
         CancellationToken ct)
     {
@@ -179,19 +177,13 @@ public sealed partial class ReviewActions(
         try
         {
             var reviewId = await EnsurePendingReviewAsync(session, ct).ConfigureAwait(false);
-            string commentId;
             if (replyToThreadId is not null)
             {
-                commentId = (await GitHubAsync(() => gitHub.ReplyToThreadAsync(replyToThreadId, comment.Body.Trim(), reviewId, ct)).ConfigureAwait(false)).Id;
+                _ = (await GitHubAsync(() => gitHub.ReplyToThreadAsync(replyToThreadId, comment.Body.Trim(), reviewId, ct)).ConfigureAwait(false)).Id;
             }
             else
             {
-                commentId = await GitHubAsync(() => gitHub.AddPendingThreadAsync(reviewId, comment with { Body = comment.Body.Trim() }, ct)).ConfigureAwait(false);
-            }
-
-            if (!string.IsNullOrEmpty(reviewPointId))
-            {
-                session.PendingPoints[commentId] = reviewPointId;
+                _ = await GitHubAsync(() => gitHub.AddPendingThreadAsync(reviewId, comment with { Body = comment.Body.Trim() }, ct)).ConfigureAwait(false);
             }
         }
         finally
@@ -248,7 +240,6 @@ public sealed partial class ReviewActions(
             await gitHub.DeletePendingCommentAsync(commentId, ct).ConfigureAwait(false);
             return true;
         }).ConfigureAwait(false);
-        session.PendingPoints.TryRemove(commentId, out _);
         await sessions.RefreshReviewStateAsync(session, ct).ConfigureAwait(false);
         return session.PendingReview;
     }
@@ -310,7 +301,6 @@ public sealed partial class ReviewActions(
         {
             var reviewId = await EnsurePendingReviewAsync(session, ct).ConfigureAwait(false);
             submitted = await GitHubAsync(() => gitHub.SubmitReviewAsync(reviewId, reviewEvent, body?.Trim() ?? "", ct)).ConfigureAwait(false);
-            session.PendingPoints.Clear();
         }
         finally
         {
@@ -319,7 +309,7 @@ public sealed partial class ReviewActions(
 
         try
         {
-            await visits.RecordReviewedAsync(session.Key, snapshot.HeadSha, time.GetUtcNow(), ct).ConfigureAwait(false);
+            await visits.RecordReviewedAsync(session.Target, snapshot.HeadSha, time.GetUtcNow(), ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

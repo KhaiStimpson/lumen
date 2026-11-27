@@ -1,0 +1,195 @@
+{
+  "oldHeadSha": "8664927bdc5f4505701929c866cda46926141e00",
+  "newHeadSha": "343c18bba6678710cabc76618557accb27494b3e",
+  "files": [
+    {
+      "path": "src/Shop.Web/Pages/Orders/Edit.cshtml.cs",
+      "hunks": [
+        {
+          "oldStart": 90,
+          "oldCount": 6,
+          "newStart": 90,
+          "newCount": 10,
+          "header": "@@ -90,6 +90,10 @@ public class EditModel : PageModel",
+          "lines": [
+            {
+              "oldNumber": 90,
+              "newNumber": 90,
+              "text": "            _logger.LogWarning(ex, \"Order {OrderId} was changed by someone else\", id);"
+            },
+            {
+              "oldNumber": 91,
+              "newNumber": 91,
+              "text": "            return AjaxResults.Fail(\"This order was changed by someone else. Reload and try again.\", StatusCodes.Status409Conflict);"
+            },
+            {
+              "oldNumber": 92,
+              "newNumber": 92,
+              "text": "        }"
+            },
+            {
+              "kind": "DIFF_LINE_KIND_ADDED",
+              "newNumber": 93,
+              "text": "        catch (InvalidOperationException)"
+            },
+            {
+              "kind": "DIFF_LINE_KIND_ADDED",
+              "newNumber": 94,
+              "text": "        {"
+            },
+            {
+              "kind": "DIFF_LINE_KIND_ADDED",
+              "newNumber": 95,
+              "text": "            return AjaxResults.Fail(\"The order could not be saved.\", StatusCodes.Status400BadRequest);"
+            },
+            {
+              "kind": "DIFF_LINE_KIND_ADDED",
+              "newNumber": 96,
+              "text": "        }"
+            },
+            {
+              "oldNumber": 93,
+              "newNumber": 97
+            },
+            {
+              "oldNumber": 94,
+              "newNumber": 98,
+              "text": "        return AjaxResults.Ok(new { total = order.Total.ToString(\"C\") }, \"Order saved\");"
+            },
+            {
+              "oldNumber": 95,
+              "newNumber": 99,
+              "text": "    }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/Shop.Web/Services/DashboardService.cs",
+      "hunks": [
+        {
+          "oldStart": 37,
+          "oldCount": 7,
+          "newStart": 37,
+          "newCount": 7,
+          "header": "@@ -37,7 +37,7 @@ public class DashboardService",
+          "lines": [
+            {
+              "oldNumber": 37,
+              "newNumber": 37,
+              "text": "            .ToListAsync(cancellationToken);"
+            },
+            {
+              "oldNumber": 38,
+              "newNumber": 38
+            },
+            {
+              "oldNumber": 39,
+              "newNumber": 39,
+              "text": "        var customerCount = await _db.Customers"
+            },
+            {
+              "kind": "DIFF_LINE_KIND_REMOVED",
+              "oldNumber": 40,
+              "text": "            .IgnoreQueryFilters()"
+            },
+            {
+              "kind": "DIFF_LINE_KIND_ADDED",
+              "newNumber": 40,
+              "text": "            "
+            },
+            {
+              "oldNumber": 41,
+              "newNumber": 41,
+              "text": "            .CountAsync(cancellationToken);"
+            },
+            {
+              "oldNumber": 42,
+              "newNumber": 42
+            },
+            {
+              "oldNumber": 43,
+              "newNumber": 43,
+              "text": "        var unpaid = await _db.Invoices"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/Shop.Web/Services/OrderService.cs",
+      "hunks": [
+        {
+          "oldStart": 29,
+          "oldCount": 6,
+          "newStart": 29,
+          "newCount": 8,
+          "header": "@@ -29,6 +29,8 @@ public class OrderService : IOrderService",
+          "lines": [
+            {
+              "oldNumber": 29,
+              "newNumber": 29
+            },
+            {
+              "oldNumber": 30,
+              "newNumber": 30,
+              "text": "    public async Task SaveAsync(Order order, CancellationToken cancellationToken = default)"
+            },
+            {
+              "oldNumber": 31,
+              "newNumber": 31,
+              "text": "    {"
+            },
+            {
+              "kind": "DIFF_LINE_KIND_ADDED",
+              "newNumber": 32,
+              "text": "        ArgumentNullException.ThrowIfNull(order);"
+            },
+            {
+              "kind": "DIFF_LINE_KIND_ADDED",
+              "newNumber": 33
+            },
+            {
+              "oldNumber": 32,
+              "newNumber": 34,
+              "text": "        order.Total = _pricing.CalculateOrderTotal(order);"
+            },
+            {
+              "oldNumber": 33,
+              "newNumber": 35,
+              "text": "        await _orders.SaveChangesAsync(cancellationToken);"
+            },
+            {
+              "oldNumber": 34,
+              "newNumber": 36,
+              "text": "        _logger.LogInformation(\"Saved order {OrderNumber} with total {Total}\", order.Number, order.Total);"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "newFlagIds": [
+    "f0b713134434e"
+  ],
+  "fixedFlags": [
+    {
+      "id": "f057ac4317d50",
+      "kind": "FLAG_KIND_QUERY_SAFETY",
+      "path": "src/Shop.Web/Services/DashboardService.cs",
+      "line": 40,
+      "message": "`IgnoreQueryFilters()` turns off the global query filters (soft delete, tenant) for this query.",
+      "member": "DashboardService.GetStatsAsync"
+    },
+    {
+      "id": "f4da01c1b64c4",
+      "kind": "FLAG_KIND_GUARD_REMOVED",
+      "path": "src/Shop.Web/Services/OrderService.cs",
+      "side": "DIFF_SIDE_LEFT",
+      "line": 31,
+      "message": "Null guard on `order` removed: `if (order is null)`.",
+      "member": "OrderService.SaveAsync"
+    }
+  ]
+}

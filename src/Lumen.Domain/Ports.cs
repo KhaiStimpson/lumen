@@ -121,6 +121,69 @@ public interface IPullRequestCheckout
     /// <summary>True when <paramref name="ancestor"/> is reachable from <paramref name="descendant"/>.</summary>
     Task<bool> IsAncestorAsync(string ancestor, string descendant, CancellationToken cancellationToken) => Task.FromResult(true);
 
+    /// <summary>Every file at head, repository-relative with '/' separators (the slicer's index reads the whole repository).</summary>
+    Task<IReadOnlyList<string>> ListHeadFilesAsync(CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(RootPath))
+        {
+            return Task.FromResult<IReadOnlyList<string>>([]);
+        }
+
+        var root = Path.GetFullPath(RootPath);
+        IReadOnlyList<string> files =
+        [
+            .. Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+                .Select(f => Path.GetRelativePath(root, f).Replace('\\', '/'))
+                .Where(f => !f.StartsWith(".git/", StringComparison.Ordinal) && f != ".git"),
+        ];
+        return Task.FromResult(files);
+    }
+
+    /// <summary>Several head files at once; a file that can't be read is left out.</summary>
+    async Task<IReadOnlyDictionary<string, string>> ReadHeadFilesAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        var texts = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var path in paths)
+        {
+            try
+            {
+                if (await ReadHeadFileAsync(path, cancellationToken).ConfigureAwait(false) is { } text)
+                {
+                    texts[path] = text;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+            }
+        }
+
+        return texts;
+    }
+
+    /// <summary>Several merge-base files at once; a file that can't be read (or didn't exist) is left out.</summary>
+    async Task<IReadOnlyDictionary<string, string>> ReadBaseFilesAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        var texts = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var path in paths)
+        {
+            try
+            {
+                if (await ReadBaseFileAsync(path, cancellationToken).ConfigureAwait(false) is { } text)
+                {
+                    texts[path] = text;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+            {
+            }
+        }
+
+        return texts;
+    }
+
+    /// <summary>The best common ancestor of two commits; null when they share no history.</summary>
+    Task<string?> MergeBaseOfAsync(string first, string second, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
+
     /// <summary>Makes sure a commit is available locally (fetching it by SHA if needed); false if GitHub no longer has it.</summary>
     Task<bool> EnsureCommitAsync(string sha, CancellationToken cancellationToken) => Task.FromResult(true);
 }
@@ -136,46 +199,9 @@ public interface IRepositoryWorkspace
         CancellationToken cancellationToken);
 }
 
-/// <summary>A throwaway worktree for an agent that may modify files (TDD §12). Removed on dispose.</summary>
-public interface IAgentWorktree : IAsyncDisposable
-{
-    string Path { get; }
-}
-
-public interface IAgentWorktreeFactory
-{
-    /// <summary>A detached worktree of <paramref name="checkout"/> at its head, never the user's working tree.</summary>
-    Task<IAgentWorktree> CreateAsync(IPullRequestCheckout checkout, string name, CancellationToken cancellationToken);
-}
-
-public enum ReviewAction
-{
-    Dismissed,
-    Commented,
-    Examined,
-    Restored,
-
-    /// <summary>A triage group the reviewer has cleared (recorded against <see cref="TriageAcknowledgement.InteractionId"/>).</summary>
-    Acknowledged,
-    Unacknowledged,
-    Resolved,
-}
-
-public sealed record ReviewInteraction(
-    PullRequestKey Key,
-    string HeadSha,
-    string ReviewPointId,
-    ReviewAction Action,
-    DateTimeOffset At,
-    string? Detail = null);
-
+/// <summary>Small JSON values cached between runs (the last copy of a pull request, for offline opening).</summary>
 public interface IReviewStore
 {
-    Task RecordInteractionAsync(ReviewInteraction interaction, CancellationToken cancellationToken);
-
-    /// <summary>Latest action per review point for a PR, across head SHAs (review point IDs are stable).</summary>
-    Task<IReadOnlyDictionary<string, ReviewAction>> GetLatestActionsAsync(PullRequestKey key, CancellationToken cancellationToken);
-
     Task<string?> GetCacheAsync(string key, CancellationToken cancellationToken);
 
     Task SetCacheAsync(string key, string value, CancellationToken cancellationToken);

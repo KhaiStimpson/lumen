@@ -16,6 +16,7 @@ public sealed partial class InboxService(
     IGitHubClient gitHub,
     IPullRequestVisitStore visits,
     EngineSettingsStore settings,
+    Overhaul.ReviewProgressReader progress,
     TimeProvider time,
     ILogger<InboxService> logger) : IDisposable
 {
@@ -173,8 +174,11 @@ public sealed partial class InboxService(
             try
             {
                 var result = await gitHub.SearchInboxAsync(QueriesFor(watched), cancellationToken).ConfigureAwait(false);
-                var opened = await visits.GetVisitsAsync(cancellationToken).ConfigureAwait(false);
+                var opened = (await visits.GetVisitsAsync(cancellationToken).ConfigureAwait(false)).Values
+                    .Where(v => v.Target is PullRequestTarget)
+                    .ToDictionary(v => ((PullRequestTarget)v.Target).PullRequest);
                 inbox = Build(result, opened, watched.Count > 0);
+                await AddProgressAsync(inbox, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is GitHubApiException or GitHubAuthenticationException or HttpRequestException)
             {
@@ -284,6 +288,25 @@ public sealed partial class InboxService(
         return section;
     }
 
+    /// <summary>"4,212 changed" alone until analysed; then the to-read figure (marked out of date if the head moved) and slices.</summary>
+    private async Task AddProgressAsync(Contracts.Inbox inbox, CancellationToken cancellationToken)
+    {
+        foreach (var item in inbox.Sections.SelectMany(s => s.Items))
+        {
+            try
+            {
+                var key = ProtoMapper.ToKey(item.PullRequest);
+                item.Progress = await progress.ReadAsync(new PullRequestTarget(key), item.HeadSha, item.Additions + item.Deletions, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Progress is a hint on the inbox row; the row stays without it.
+                LogProgressUnavailable(logger, ex);
+                item.Progress = new ReviewProgress { ChangedLines = item.Additions + item.Deletions };
+            }
+        }
+    }
+
     public void Dispose()
     {
         _lifetime.Cancel();
@@ -293,6 +316,9 @@ public sealed partial class InboxService(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Inbox: couldn't reach GitHub")]
     private static partial void LogFetchFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Inbox: couldn't read a row's review progress")]
+    private static partial void LogProgressUnavailable(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Inbox: poll failed")]
     private static partial void LogPollFailed(ILogger logger, Exception exception);

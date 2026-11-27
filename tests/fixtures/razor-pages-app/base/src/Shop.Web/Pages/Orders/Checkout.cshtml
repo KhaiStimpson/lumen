@@ -1,0 +1,47 @@
+@page
+@model Shop.Web.Pages.Orders.CheckoutModel
+@{
+    ViewData["Title"] = "Checkout";
+}
+
+<h1>Checkout</h1>
+
+@if (Model.Cart.Items.Count == 0)
+{
+    <p>Your cart is empty.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th class="text-end">Qty</th>
+                <th class="text-end">Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model.Cart.Items)
+            {
+                <tr>
+                    <td>@item.Name</td>
+                    <td class="text-end">@item.Quantity</td>
+                    <td class="text-end">@((item.UnitPrice * item.Quantity).ToString("C"))</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <p class="fs-5">Subtotal: @Model.Cart.Subtotal.ToString("C")</p>
+    <p class="text-muted">Paying by @Model.PaymentMethodName</p>
+
+    <form method="post" asp-page-handler="Place">
+        <input type="hidden" asp-for="CustomerId" />
+        <button type="submit" class="btn btn-success">Place order</button>
+    </form>
+}
+
+@if (Model.Error is not null)
+{
+    <div class="alert alert-danger mt-3">@Model.Error</div>
+}

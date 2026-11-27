@@ -23,4 +23,7 @@
     <ProjectReference Include="..\..\src\Lumen.Domain\Lumen.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" LinkBase="Shared" />
+  </ItemGroup>
 </Project>

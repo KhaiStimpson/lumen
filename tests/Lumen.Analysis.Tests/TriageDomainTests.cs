@@ -5,7 +5,7 @@ namespace Lumen.Analysis.Tests;
 
 public class TriageDomainTests
 {
-    private static HunkTriage Hunk(string path, ChangeClass cls, TriageTier tier, string? group = null) => new()
+    private static HunkTriage Hunk(string path, ChangeClass cls, FoldKind tier, string? group = null) => new()
     {
         Path = path,
         OldStart = 10,
@@ -13,7 +13,7 @@ public class TriageDomainTests
         NewStart = 12,
         NewEnd = 18,
         Class = cls,
-        Tier = tier,
+        Fold = tier,
         Reasons = ["pure rename `Foo`→`Bar`"],
         ChangedLines = 9,
         GroupId = group,
@@ -22,7 +22,7 @@ public class TriageDomainTests
     [Fact]
     public void HunkTriageRoundTripsThroughJson()
     {
-        var original = Hunk("src/A.cs", ChangeClass.Rename, TriageTier.Skip, "g1");
+        var original = Hunk("src/A.cs", ChangeClass.Rename, FoldKind.Mechanical, "g1");
 
         var json = JsonSerializer.Serialize(original);
         var back = JsonSerializer.Deserialize<HunkTriage>(json)!;
@@ -33,7 +33,7 @@ public class TriageDomainTests
         Assert.Equal(original.NewStart, back.NewStart);
         Assert.Equal(original.NewEnd, back.NewEnd);
         Assert.Equal(original.Class, back.Class);
-        Assert.Equal(original.Tier, back.Tier);
+        Assert.Equal(original.Fold, back.Fold);
         Assert.Equal(original.Reasons, back.Reasons);
         Assert.Equal(9, back.ChangedLines);
         Assert.Equal("g1", back.GroupId);
@@ -42,10 +42,10 @@ public class TriageDomainTests
     [Fact]
     public void EnumsSerialiseAsNames()
     {
-        var json = JsonSerializer.Serialize(Hunk("a.cs", ChangeClass.BehaviourChange, TriageTier.WorthALook));
+        var json = JsonSerializer.Serialize(Hunk("a.cs", ChangeClass.BehaviourChange, FoldKind.Open));
 
         Assert.Contains("\"BehaviourChange\"", json);
-        Assert.Contains("\"WorthALook\"", json);
+        Assert.Contains("\"Open\"", json);
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class TriageDomainTests
             NewStart = 1,
             NewEnd = 30,
             Class = ChangeClass.NewCode,
-            Tier = TriageTier.Skim,
+            Fold = FoldKind.Open,
             Reasons = ["new file"],
         };
 
@@ -80,8 +80,8 @@ public class TriageDomainTests
             Title = "Renamed `Foo`→`Bar`",
             Members =
             [
-                Hunk("src/A.cs", ChangeClass.Rename, TriageTier.Skip, "g1"),
-                Hunk("src/B.cs", ChangeClass.Rename, TriageTier.Skip, "g1"),
+                Hunk("src/A.cs", ChangeClass.Rename, FoldKind.Mechanical, "g1"),
+                Hunk("src/B.cs", ChangeClass.Rename, FoldKind.Mechanical, "g1"),
             ],
         };
 

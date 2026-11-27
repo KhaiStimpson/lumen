@@ -33,10 +33,15 @@ public sealed class LocalFixtureRecorder
         }
 
         var head = (await Git(repo, "rev-parse", commit))!.Trim();
-        var parent = (await Git(repo, "rev-parse", head + "~1"))!.Trim();
         var title = Environment.GetEnvironmentVariable("LUMEN_LOCAL_TITLE") ?? (await Git(repo, "log", "-1", "--format=%s", head))!.Trim();
         Assert.True(PullRequestKey.TryParse(Environment.GetEnvironmentVariable("LUMEN_LOCAL_PR") ?? "local/fixture#1", out var key));
+        await RecordAsync(output, repo, head, key, title, "refactor");
+    }
 
+    /// <summary>Records <paramref name="head"/> (against its parent) as pull request <paramref name="key"/>: events.jsonl and diffs.jsonl.</summary>
+    internal static async Task RecordAsync(string output, string repo, string head, PullRequestKey key, string title, string headRef)
+    {
+        var parent = (await Git(repo, "rev-parse", head + "~1"))!.Trim();
         var work = Path.Combine(Path.GetTempPath(), $"lumen-local-{Guid.NewGuid():N}");
         var tree = Path.Combine(work, "tree");
         Directory.CreateDirectory(tree);
@@ -48,11 +53,11 @@ public sealed class LocalFixtureRecorder
             services =>
             {
                 services.RemoveAll<IGitHubClient>();
-                services.AddSingleton<IGitHubClient>(new LocalGitHub(key, title, parent, head));
+                services.AddSingleton<IGitHubClient>(new LocalGitHub(key, title, parent, head, headRef));
                 services.RemoveAll<IRepositoryWorkspace>();
                 services.AddSingleton<IRepositoryWorkspace>(new FakeWorkspace(new ArchiveCheckout(repo, tree, parent, head)));
-                services.RemoveAll<ISecretStore>();
-                services.AddSingleton<ISecretStore>(new Lumen.Storage.UnavailableSecretStore());
+                services.RemoveAll<Lumen.Storage.ISecretStore>();
+                services.AddSingleton<Lumen.Storage.ISecretStore>(new Lumen.Storage.UnavailableSecretStore());
             });
         await engine.StartAsync();
 
@@ -65,10 +70,7 @@ public sealed class LocalFixtureRecorder
         {
             await foreach (var evt in call.ResponseStream.ReadAllAsync(cts.Token))
             {
-                if (evt.EventCase is not PullRequestEvent.EventOneofCase.InvestigationStatus)
-                {
-                    events.Add(evt);
-                }
+                events.Add(evt);
 
                 if (evt.Complete is not null || evt.Failed is not null)
                 {
@@ -103,7 +105,7 @@ public sealed class LocalFixtureRecorder
         Assert.Equal(0, process.ExitCode);
     }
 
-    private static async Task<string?> Git(string repo, params string[] args)
+    internal static async Task<string?> Git(string repo, params string[] args)
     {
         var psi = new ProcessStartInfo("git", ["-C", repo, .. args]) { RedirectStandardOutput = true, RedirectStandardError = true };
         using var process = Process.Start(psi)!;
@@ -112,14 +114,14 @@ public sealed class LocalFixtureRecorder
         return process.ExitCode == 0 ? text : null;
     }
 
-    private sealed class LocalGitHub(PullRequestKey key, string title, string baseSha, string headSha) : IGitHubClient
+    private sealed class LocalGitHub(PullRequestKey key, string title, string baseSha, string headSha, string headRef) : IGitHubClient
     {
         public Task<string> GetViewerLoginAsync(CancellationToken cancellationToken) => Task.FromResult("reviewer");
 
         public Task<PullRequestInfo> GetPullRequestAsync(PullRequestKey k, CancellationToken cancellationToken) =>
             Task.FromResult(new PullRequestInfo(
                 key,
-                new PullRequestMetadata(title, "author", "open", false, "main", "refactor", $"https://github.com/{key.Repository.Owner}/{key.Repository.Name}/pull/{key.Number}", null, DateTimeOffset.UnixEpoch),
+                new PullRequestMetadata(title, "author", "open", false, "main", headRef, $"https://github.com/{key.Repository.Owner}/{key.Repository.Name}/pull/{key.Number}", null, DateTimeOffset.UnixEpoch),
                 baseSha,
                 headSha));
 

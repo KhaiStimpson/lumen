@@ -48,7 +48,7 @@ public sealed class RippleClassifier : IHunkClassifier
             }
         }
 
-        return reasons.Count == 0 ? null : new(ChangeClass.BehaviourChange, TriageTier.WorthALook, reasons.Distinct().ToList());
+        return reasons.Count == 0 ? null : new(ChangeClass.BehaviourChange, FoldKind.Open, reasons.Distinct().ToList());
     }
 
     private static HunkVerdict? RenamedCallSites(HunkContext context, CSharpHunkProof proof, SignatureIndex index)
@@ -71,7 +71,7 @@ public sealed class RippleClassifier : IHunkClassifier
 
         var names = string.Join(", ", map.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"`{p.Key}`→`{p.Value}`"));
         var key = "ripple:rename:" + string.Join("|", map.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key}>{p.Value}"));
-        return new(ChangeClass.Ripple, TriageTier.Skim, [$"only follows the rename {names}"], new GroupClaim(key, $"Call sites follow the rename {names}"));
+        return new(ChangeClass.Ripple, FoldKind.Open, [$"only follows the rename {names}"], new GroupClaim(key, $"Call sites follow the rename {names}"));
     }
 
     private static HunkVerdict? ParameterCallSites(CSharpHunkProof proof, SignatureIndex index)
@@ -100,7 +100,7 @@ public sealed class RippleClassifier : IHunkClassifier
 
             return new(
                 ChangeClass.Ripple,
-                TriageTier.Skim,
+                FoldKind.Open,
                 [$"only follows the new signature of `{change.Name}` ({change.Description})"],
                 new GroupClaim("ripple:signature:" + change.Name, $"Call sites follow the new signature of `{change.Name}`"));
         }

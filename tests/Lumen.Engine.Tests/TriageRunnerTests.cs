@@ -24,10 +24,10 @@ public class TriageRunnerTests
 
         public Exception? FailWith { get; init; }
 
-        public Task<TriageResult?> FindTriageAsync(PullRequestKey key, string headSha, string version, CancellationToken cancellationToken) =>
+        public Task<TriageResult?> FindTriageAsync(ReviewTarget key, string headSha, string version, CancellationToken cancellationToken) =>
             FailWith is not null ? throw FailWith : Task.FromResult(Saved.GetValueOrDefault($"{headSha}|{version}"));
 
-        public Task SaveTriageAsync(PullRequestKey key, string headSha, string version, TriageResult result, CancellationToken cancellationToken)
+        public Task SaveTriageAsync(ReviewTarget key, string headSha, string version, TriageResult result, CancellationToken cancellationToken)
         {
             Saved[$"{headSha}|{version}"] = result;
             return Task.CompletedTask;

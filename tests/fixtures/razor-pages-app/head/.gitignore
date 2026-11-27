@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+*.user
+*.db
+src/Shop.Web/wwwroot/lib/jquery/
+src/Shop.Web/wwwroot/lib/jquery-validation/
+src/Shop.Web/wwwroot/lib/jquery-validation-unobtrusive/
+src/Shop.Web/wwwroot/lib/bootstrap/

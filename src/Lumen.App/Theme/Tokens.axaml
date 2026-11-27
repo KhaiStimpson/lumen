@@ -34,6 +34,31 @@
       <SolidColorBrush x:Key="Gauge.Ok" Color="#1D7A3A" />
       <SolidColorBrush x:Key="Gauge.Code" Color="#7A3FC4" />
       <SolidColorBrush x:Key="Gauge.Scrim" Color="#40000000" />
+      <SolidColorBrush x:Key="Gauge.AccentDim" Color="#1A0A64C8" />
+      <SolidColorBrush x:Key="Gauge.CritDim" Color="#14B42318" />
+      <SolidColorBrush x:Key="Gauge.WarnDim" Color="#148A5700" />
+      <SolidColorBrush x:Key="Gauge.Info" Color="#0A64C8" />
+      <SolidColorBrush x:Key="Gauge.InfoDim" Color="#140A64C8" />
+      <SolidColorBrush x:Key="Gauge.OkDim" Color="#141D7A3A" />
+      <SolidColorBrush x:Key="Gauge.SelCrit" Color="#B42318" />
+      <SolidColorBrush x:Key="Gauge.SelWarn" Color="#8A5700" />
+      <SolidColorBrush x:Key="Gauge.ValStr" Color="#11703A" />
+      <SolidColorBrush x:Key="Gauge.ValNum" Color="#9A4A00" />
+      <SolidColorBrush x:Key="Gauge.TmFg" Color="#1B1B1B" />
+      <SolidColorBrush x:Key="Gauge.Tm1" Color="#A9C8EA" />
+      <SolidColorBrush x:Key="Gauge.Tm2" Color="#BCD0E4" />
+      <SolidColorBrush x:Key="Gauge.Tm3" Color="#C8D5E2" />
+      <SolidColorBrush x:Key="Gauge.Tm4" Color="#D2D9E0" />
+      <SolidColorBrush x:Key="Gauge.Tm5" Color="#D8DCE1" />
+      <SolidColorBrush x:Key="Gauge.Tm6" Color="#DCDFE3" />
+      <SolidColorBrush x:Key="Gauge.Tm7" Color="#DFE1E4" />
+      <SolidColorBrush x:Key="Gauge.Tm8" Color="#E2E3E6" />
+      <SolidColorBrush x:Key="Gauge.Tm9" Color="#E4E5E7" />
+      <SolidColorBrush x:Key="Gauge.Shadow" Color="#26000000" />
+      <!-- Overhaul: the to-read / boilerplate / mechanical bar. Each segment is 3:1 against its neighbours. -->
+      <SolidColorBrush x:Key="Bar.ToRead" Color="#1B1B1B" />
+      <SolidColorBrush x:Key="Bar.Boilerplate" Color="#6B6B6B" />
+      <SolidColorBrush x:Key="Bar.Mechanical" Color="#C6C6C6" />
 
       <SolidColorBrush x:Key="Surface.Window" Color="#FFFFFF" />
       <SolidColorBrush x:Key="Surface.Pane" Color="#FAFAFA" />
@@ -136,6 +161,31 @@
       <SolidColorBrush x:Key="Gauge.Ok" Color="#6FCF97" />
       <SolidColorBrush x:Key="Gauge.Code" Color="#D6B4FF" />
       <SolidColorBrush x:Key="Gauge.Scrim" Color="#99050709" />
+      <SolidColorBrush x:Key="Gauge.AccentDim" Color="#227CC0FF" />
+      <SolidColorBrush x:Key="Gauge.CritDim" Color="#1FFF7B72" />
+      <SolidColorBrush x:Key="Gauge.WarnDim" Color="#1FE9B44C" />
+      <SolidColorBrush x:Key="Gauge.Info" Color="#7CC0FF" />
+      <SolidColorBrush x:Key="Gauge.InfoDim" Color="#1F7CC0FF" />
+      <SolidColorBrush x:Key="Gauge.OkDim" Color="#1F6FCF97" />
+      <SolidColorBrush x:Key="Gauge.SelCrit" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="Gauge.SelWarn" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="Gauge.ValStr" Color="#A7F3D0" />
+      <SolidColorBrush x:Key="Gauge.ValNum" Color="#FCD34D" />
+      <SolidColorBrush x:Key="Gauge.TmFg" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="Gauge.Tm1" Color="#2F5D8A" />
+      <SolidColorBrush x:Key="Gauge.Tm2" Color="#34526F" />
+      <SolidColorBrush x:Key="Gauge.Tm3" Color="#37495C" />
+      <SolidColorBrush x:Key="Gauge.Tm4" Color="#383F4A" />
+      <SolidColorBrush x:Key="Gauge.Tm5" Color="#363B42" />
+      <SolidColorBrush x:Key="Gauge.Tm6" Color="#34383D" />
+      <SolidColorBrush x:Key="Gauge.Tm7" Color="#33363A" />
+      <SolidColorBrush x:Key="Gauge.Tm8" Color="#323437" />
+      <SolidColorBrush x:Key="Gauge.Tm9" Color="#313335" />
+      <SolidColorBrush x:Key="Gauge.Shadow" Color="#88000000" />
+      <!-- Overhaul: the to-read / boilerplate / mechanical bar. Each segment is 3:1 against its neighbours. -->
+      <SolidColorBrush x:Key="Bar.ToRead" Color="#F2F2F2" />
+      <SolidColorBrush x:Key="Bar.Boilerplate" Color="#8A8A8A" />
+      <SolidColorBrush x:Key="Bar.Mechanical" Color="#3C3C3C" />
 
       <SolidColorBrush x:Key="Surface.Window" Color="#1E1E1E" />
       <SolidColorBrush x:Key="Surface.Pane" Color="#252525" />

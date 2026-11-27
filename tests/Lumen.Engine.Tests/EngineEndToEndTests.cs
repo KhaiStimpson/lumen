@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 namespace Lumen.Engine.Tests;
 
 /// <summary>Drives the real engine over a real named pipe, with GitHub and git replaced by in-memory fakes.</summary>
-public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifetime
+public sealed class EngineEndToEndTests : IAsyncLifetime
 {
     private static readonly PullRequestRef Pr = new() { Owner = "acme", Name = "billing", Number = 42 };
 
@@ -28,8 +28,8 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
                 services.AddSingleton<IGitHubClient>(_gitHub);
                 services.RemoveAll<IRepositoryWorkspace>();
                 services.AddSingleton<IRepositoryWorkspace>(new FakeWorkspace(checkout));
-                services.RemoveAll<ISecretStore>();
-                services.AddSingleton<ISecretStore>(new Lumen.Storage.UnavailableSecretStore());
+                services.RemoveAll<Lumen.Storage.ISecretStore>();
+                services.AddSingleton<Lumen.Storage.ISecretStore>(new Lumen.Storage.UnavailableSecretStore());
             });
         await _engine.StartAsync();
     }
@@ -78,7 +78,7 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
     }
 
     [Fact]
-    public async Task StreamsSnapshotReviewPointAndCompletion()
+    public async Task StreamsSnapshotTriageAndCompletionWithoutReviewPoints()
     {
         using var channel = EngineEndpoint.CreateChannel(_pipe);
         var client = new ReviewEngine.ReviewEngineClient(channel);
@@ -88,77 +88,36 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
         var snapshot = Assert.Single(events, e => e.EventCase == PullRequestEvent.EventOneofCase.Snapshot).Snapshot;
         Assert.Equal("Add invoice retrying", snapshot.Title);
         Assert.Equal("reviewer", snapshot.ViewerLogin);
+        Assert.Equal("pr:acme/billing#42", snapshot.TargetKey);
+        Assert.Null(snapshot.Local);
         Assert.Contains(snapshot.Files, f => f.Path == WorkerScenario.NewWorkerPath && f.Kind == Contracts.FileChangeKind.Added);
-
-        var point = Assert.Single(events, e => e.EventCase == PullRequestEvent.EventOneofCase.ReviewPointAdded).ReviewPointAdded;
-        output.WriteLine($"{point.Title}: {point.Summary}");
-        Assert.Contains("QueueClaimService", point.Title, StringComparison.Ordinal);
-        Assert.Equal(Contracts.ReviewPointState.Visible, point.State);
-        Assert.Equal(WorkerScenario.NewWorkerPath, point.Anchor.Path);
-        Assert.NotNull(point.Comparison);
-        Assert.Contains(point.Evidence, e => e.Producer == "peer-pattern/v1" && e.Supporting == 4);
+        Assert.Single(events, e => e.EventCase == PullRequestEvent.EventOneofCase.TriageReady);
+        Assert.Single(events, e => e.EventCase == PullRequestEvent.EventOneofCase.Complete);
 
         var diff = await client.GetFileDiffAsync(new GetFileDiffRequest { PullRequest = Pr, Path = WorkerScenario.NewWorkerPath });
         Assert.Contains(diff.Hunks.SelectMany(h => h.Lines), l => l.Text.Contains("AppDbContext", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task DismissalIsPersistedAndReplayedToNewSubscribers()
+    public async Task PostsCommentOnTheHeadSide()
     {
         using var channel = EngineEndpoint.CreateChannel(_pipe);
         var client = new ReviewEngine.ReviewEngineClient(channel);
-        var point = (await CollectUntilCompleteAsync(client)).First(e => e.ReviewPointAdded is not null).ReviewPointAdded;
-
-        await client.SetReviewPointStateAsync(new SetReviewPointStateRequest
-        {
-            PullRequest = Pr,
-            ReviewPointId = point.Id,
-            State = Contracts.ReviewPointState.Dismissed,
-        });
-
-        // A second client attaching later sees the dismissal in its replay.
-        var replay = await CollectUntilAsync(client, e => e.ReviewPointStateChanged is not null, refresh: false);
-        Assert.Equal(Contracts.ReviewPointState.Dismissed, replay.Last().ReviewPointStateChanged.State);
-
-        // After a full refresh (new analysis), the stored dismissal is applied to the regenerated point.
-        var refreshed = await CollectUntilCompleteAsync(client, refresh: true);
-        Assert.Equal(Contracts.ReviewPointState.Dismissed, refreshed.First(e => e.ReviewPointAdded is not null).ReviewPointAdded.State);
-    }
-
-    [Fact]
-    public async Task ResolvedStateSurvivesReanalysis()
-    {
-        using var channel = EngineEndpoint.CreateChannel(_pipe);
-        var client = new ReviewEngine.ReviewEngineClient(channel);
-        var point = (await CollectUntilCompleteAsync(client)).First(e => e.ReviewPointAdded is not null).ReviewPointAdded;
-        await client.SetReviewPointStateAsync(new SetReviewPointStateRequest
-        {
-            PullRequest = Pr, ReviewPointId = point.Id, State = Contracts.ReviewPointState.Resolved,
-        });
-
-        var refreshed = await CollectUntilCompleteAsync(client, refresh: true);
-        Assert.Equal(Contracts.ReviewPointState.Resolved, refreshed.First(e => e.ReviewPointAdded is not null).ReviewPointAdded.State);
-    }
-
-    [Fact]
-    public async Task PostsCommentOnHeadSideAndMarksPointCommented()
-    {
-        using var channel = EngineEndpoint.CreateChannel(_pipe);
-        var client = new ReviewEngine.ReviewEngineClient(channel);
-        var point = (await CollectUntilCompleteAsync(client)).First(e => e.ReviewPointAdded is not null).ReviewPointAdded;
+        await CollectUntilCompleteAsync(client);
+        var diff = await client.GetFileDiffAsync(new GetFileDiffRequest { PullRequest = Pr, Path = WorkerScenario.NewWorkerPath });
+        var line = diff.Hunks.SelectMany(h => h.Lines).First(l => l.Kind == Contracts.DiffLineKind.Added).NewNumber;
 
         var reply = await client.PostReviewCommentAsync(new PostReviewCommentRequest
         {
             PullRequest = Pr,
-            ReviewPointId = point.Id,
-            Path = point.Anchor.Path,
-            Line = point.Anchor.StartLine,
+            Path = WorkerScenario.NewWorkerPath,
+            Line = line,
             Body = "Should this use QueueClaimService?",
         });
 
         var posted = Assert.Single(_gitHub.Posted);
         Assert.Equal(WorkerScenario.HeadSha, posted.CommitSha);
-        Assert.Equal(point.Anchor.StartLine, posted.Line);
+        Assert.Equal(line, posted.Line);
         Assert.Equal("Should this use QueueClaimService?", posted.Body);
         Assert.Equal(1001, reply.CommentId);
     }
@@ -178,26 +137,6 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
             Body = "hi",
         }));
         Assert.Equal(StatusCode.InvalidArgument, ex.StatusCode);
-        Assert.Empty(_gitHub.Posted);
-    }
-
-    [Fact]
-    public async Task RejectsAnUnknownReviewPointBeforePostingAnything()
-    {
-        using var channel = EngineEndpoint.CreateChannel(_pipe);
-        var client = new ReviewEngine.ReviewEngineClient(channel);
-        var point = (await CollectUntilCompleteAsync(client)).First(e => e.ReviewPointAdded is not null).ReviewPointAdded;
-
-        var ex = await Assert.ThrowsAsync<RpcException>(async () => await client.PostReviewCommentAsync(new PostReviewCommentRequest
-        {
-            PullRequest = Pr,
-            ReviewPointId = "outdated-point",
-            Path = point.Anchor.Path,
-            Line = point.Anchor.StartLine,
-            Body = "Should this use QueueClaimService?",
-        }));
-
-        Assert.Equal(StatusCode.NotFound, ex.StatusCode);
         Assert.Empty(_gitHub.Posted);
     }
 
@@ -302,12 +241,12 @@ public sealed class EngineEndToEndTests(ITestOutputHelper output) : IAsyncLifeti
         var kinds = events.Select(e => e.EventCase).ToList();
         var ready = Assert.Single(events, e => e.EventCase == PullRequestEvent.EventOneofCase.TriageReady).TriageReady;
         Assert.True(kinds.IndexOf(PullRequestEvent.EventOneofCase.Snapshot) < kinds.IndexOf(PullRequestEvent.EventOneofCase.TriageReady));
-        Assert.True(kinds.IndexOf(PullRequestEvent.EventOneofCase.TriageReady) < kinds.IndexOf(PullRequestEvent.EventOneofCase.ReviewPointAdded));
+        Assert.True(kinds.IndexOf(PullRequestEvent.EventOneofCase.TriageReady) < kinds.IndexOf(PullRequestEvent.EventOneofCase.Complete));
         Assert.Equal(triage.Hunks.Count, ready.Hunks.Count);
-        Assert.True(ready.Files.Single(f => f.Path == WorkerScenario.NewWorkerPath).TierLines.Skim > 0);
+        Assert.True(ready.Files.Single(f => f.Path == WorkerScenario.NewWorkerPath).FoldLines.Open > 0);
 
         var cached = await _engine.Services.GetRequiredService<ITriageStore>()
-            .FindTriageAsync(key, WorkerScenario.HeadSha, Sessions.TriageRunner.VersionFor(Analysis.ReviewSettings.Default, session.Snapshot!.MergeBaseSha), CancellationToken.None);
+            .FindTriageAsync(new PullRequestTarget(key), WorkerScenario.HeadSha, Sessions.TriageRunner.VersionFor(Analysis.ReviewSettings.Default, session.Snapshot!.MergeBaseSha), CancellationToken.None);
         Assert.Equal(triage.Hunks.Count, cached!.Hunks.Count);
     }
 

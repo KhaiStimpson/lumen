@@ -9,19 +9,28 @@ using Avalonia.Styling;
 
 namespace Lumen.App.Motion;
 
+/// <summary>The Gauge motion roles (gauge-design-kit COMPONENTS.md, Motion), with the kit's timings.</summary>
 public enum MotionPreset
 {
-    NavigateReviewPoint,
-    ExpandFinding,
-    CollapseFinding,
-    RevealEvidence,
-    SwitchInvestigationSurface,
-    OpenPrecedent,
+    /// <summary>Hover, pressed, selected, toggled: colour only, motion-fast.</summary>
+    State,
+
+    /// <summary>Menus, popovers, toasts: motion-fast, ease-enter.</summary>
+    Reveal,
+
+    /// <summary>Sheets and the docked inspector: motion-base in.</summary>
+    Panel,
+
+    /// <summary>Moving between peers or levels: motion-base, a motion-shift slide plus a fade.</summary>
+    Navigate,
+
+    /// <summary>Rows added, removed or reordered: motion-base.</summary>
+    Layout,
 }
 
 /// <summary>
-/// Motion is part of the product: it keeps spatial context when the reviewer moves between review points
-/// (TDD §25–26). Every preset has a reduced-motion equivalent: short opacity-only fades and instant scrolls.
+/// Motion explains a change (Gauge DESIGN.md, Motion): where something came from or went. Every role has a
+/// reduced-motion equivalent: a fast crossfade or an instant change, and instant scrolls.
 /// </summary>
 public interface IMotionService
 {
@@ -47,15 +56,17 @@ public sealed class MotionService(Func<bool> reducedMotion) : IMotionService
 
     public bool ReducedMotion => reducedMotion();
 
+    /// <summary>tokens.json: motion-fast 120ms, motion-base 180ms, motion-slow 240ms.</summary>
+    public static readonly TimeSpan Fast = TimeSpan.FromMilliseconds(120);
+
+    public static readonly TimeSpan Base = TimeSpan.FromMilliseconds(180);
+
+    public static readonly TimeSpan Slow = TimeSpan.FromMilliseconds(240);
+
     public static TimeSpan DurationFor(MotionPreset preset) => preset switch
     {
-        MotionPreset.NavigateReviewPoint => TimeSpan.FromMilliseconds(260),
-        MotionPreset.ExpandFinding => TimeSpan.FromMilliseconds(320),
-        MotionPreset.CollapseFinding => TimeSpan.FromMilliseconds(220),
-        MotionPreset.RevealEvidence => TimeSpan.FromMilliseconds(420),
-        MotionPreset.SwitchInvestigationSurface => TimeSpan.FromMilliseconds(200),
-        MotionPreset.OpenPrecedent => TimeSpan.FromMilliseconds(240),
-        _ => TimeSpan.FromMilliseconds(240),
+        MotionPreset.State or MotionPreset.Reveal => Fast,
+        _ => Base,
     };
 
     public async Task TransitionAsync(Visual source, Visual destination, MotionPreset preset, CancellationToken cancellationToken)
@@ -90,12 +101,13 @@ public sealed class MotionService(Func<bool> reducedMotion) : IMotionService
     {
         if (ReducedMotion)
         {
-            await SafeAsync(target, () => FadeAsync(target, 0, 1, TimeSpan.FromMilliseconds(100), cancellationToken)).ConfigureAwait(true);
+            await SafeAsync(target, () => FadeAsync(target, 0, 1, Fast, cancellationToken)).ConfigureAwait(true);
             return;
         }
 
         var duration = DurationFor(preset);
-        var lift = preset == MotionPreset.SwitchInvestigationSurface ? 6 : 10;
+        // motion-shift is 24px for panels and navigation; a reveal grows in place, so it only lifts a little.
+        var lift = preset is MotionPreset.Panel or MotionPreset.Navigate ? 24 : 6;
         await SafeAsync(target, () => Task.WhenAll(
             TransformAsync(target, Invariant($"translate(0px, {lift}px)"), "translate(0px, 0px)", duration, Decelerate, cancellationToken),
             FadeAsync(target, 0, 1, duration, cancellationToken))).ConfigureAwait(true);

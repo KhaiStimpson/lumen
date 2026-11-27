@@ -1,0 +1,90 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Lumen.App.ViewModels"
+             xmlns:views="using:Lumen.App.Views"
+             x:Class="Lumen.App.Views.SliceListView"
+             x:DataType="vm:PullRequestViewModel">
+  <!-- The left pane (docs/overhaul.md, UI): slices with what's left to read, flags and reviewed marks. One slice at a time
+       opens in the centre; the file tree is one toggle away (T). -->
+  <UserControl.Styles>
+    <Style Selector="TextBlock.state.reviewed">
+      <Setter Property="Foreground" Value="{DynamicResource Gauge.Ok}" />
+    </Style>
+    <Style Selector="TextBlock.state.changed">
+      <Setter Property="Foreground" Value="{DynamicResource Gauge.Warn}" />
+    </Style>
+    <Style Selector="TextBlock.state.open">
+      <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+    </Style>
+    <Style Selector="Button.slice:pointerover TextBlock.state.reviewed, Button.slice.current TextBlock.state.reviewed">
+      <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*">
+    <!-- Pane header: title, then All / Since last look -->
+    <Border BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1" Padding="14,8">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <TextBlock Classes="h3" FontSize="14" Text="Slices" VerticalAlignment="Center" />
+        <Border Grid.Column="1" Classes="segmented" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="2">
+            <RadioButton Name="SlicesAll" Classes="segment" GroupName="SliceMode" Content="All"
+                         IsChecked="{Binding IsAllSlices, Mode=OneWay}" Command="{Binding ShowAllSlicesCommand}" />
+            <RadioButton Name="SlicesSince" Classes="segment" GroupName="SliceMode" Content="Since last look"
+                         IsChecked="{Binding ShowSinceLastLook}" ToolTip.Tip="Only what changed since your last look (U)" />
+          </StackPanel>
+        </Border>
+      </Grid>
+    </Border>
+
+    <!-- Progress, or the since-my-last-look summary -->
+    <StackPanel Grid.Row="1" Margin="14,10,14,4" Spacing="4">
+      <TextBlock Name="SliceProgress" Classes="caption" Text="{Binding SliceProgressLabel}" TextWrapping="Wrap" IsVisible="{Binding IsAllSlices}" />
+      <StackPanel Spacing="3" IsVisible="{Binding ShowSinceLastLook}">
+        <TextBlock Name="SinceSummary" Classes="caption" Text="{Binding SinceLookSummary}" TextWrapping="Wrap" />
+        <Border Name="RewrittenHistory" Classes="callout warn" IsVisible="{Binding IsHistoryRewritten}" Padding="8,6">
+          <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding SinceLookNote}" />
+        </Border>
+      </StackPanel>
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="2">
+      <ItemsControl Name="SliceGroups" ItemsSource="{Binding SliceGroups}" Margin="0,4,0,12">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:SliceGroupViewModel">
+            <StackPanel Spacing="1" Margin="0,6,0,0">
+              <TextBlock Classes="section" Text="{Binding Title}" Margin="14,4,14,4" />
+              <ItemsControl ItemsSource="{Binding Slices}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SliceViewModel">
+                    <Button Classes="row slice" Classes.current="{Binding IsCurrent}" Padding="14,7" HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Stretch"
+                            Command="{Binding $parent[views:SliceListView].((vm:PullRequestViewModel)DataContext).SelectSliceCommand}"
+                            CommandParameter="{Binding}" ToolTip.Tip="{Binding Caption}">
+                      <StackPanel Spacing="2">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                          <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="1" Classes="caption" FontWeight="SemiBold" Foreground="{DynamicResource Gauge.Crit}"
+                                     Text="{Binding FlagLabel}" IsVisible="{Binding HasFlags}" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+                          <TextBlock Classes="caption state" Classes.reviewed="{Binding IsReviewed}" Classes.changed="{Binding ChangedSinceMark}"
+                                     Classes.open="{Binding !IsReviewed}" Text="{Binding StateLabel}" IsVisible="{Binding !IsMechanicalOnly}" />
+                          <TextBlock Grid.Column="1" Classes="caption tertiary" Text="{Binding FilesLabel}" />
+                          <TextBlock Grid.Column="2" Classes="caption tertiary" HorizontalAlignment="Right" Text="{Binding LinesLabel}"
+                                     TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                        <TextBlock Classes="caption tertiary" Text="{Binding Caption}" TextTrimming="CharacterEllipsis"
+                                   IsVisible="{Binding !IsFeature}" />
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

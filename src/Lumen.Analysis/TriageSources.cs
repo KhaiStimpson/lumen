@@ -20,33 +20,27 @@ public sealed class TriageSources(IReadOnlyDictionary<string, string> baseTexts,
     /// <summary>Reads both sides of every changed, non-binary, non-mechanical file (and migrations). A file that cannot be read is left out.</summary>
     public static async Task<TriageSources> LoadAsync(PullRequestSnapshot snapshot, IPullRequestCheckout checkout, CancellationToken cancellationToken)
     {
-        var baseTexts = new Dictionary<string, string>(StringComparer.Ordinal);
-        var headTexts = new Dictionary<string, string>(StringComparer.Ordinal);
         // Migrations are mechanical files, but their dangerous operations are pulled out, so they are read too.
-        foreach (var file in snapshot.Files.Where(f => !f.IsBinary && (!f.Mechanical.IsMechanical || f.Mechanical.Reason == "Database migration")))
+        var files = snapshot.Files.Where(f => !f.IsBinary && (!f.Mechanical.IsMechanical || f.Mechanical.Reason == "Database migration")).ToList();
+        var baseFiles = files.Where(f => f.Kind != FileChangeKind.Added).ToList();
+        var headFiles = files.Where(f => f.Kind != FileChangeKind.Deleted).ToList();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                if (file.Kind != FileChangeKind.Added &&
-                    await checkout.ReadBaseFileAsync(file.OldPath ?? file.Path, cancellationToken) is { Length: <= MaxFileChars } b)
-                {
-                    baseTexts[file.Path] = b;
-                }
-
-                if (file.Kind != FileChangeKind.Deleted &&
-                    await checkout.ReadHeadFileAsync(file.Path, cancellationToken) is { Length: <= MaxFileChars } h)
-                {
-                    headTexts[file.Path] = h;
-                }
-            }
-            catch (Exception e) when (e is IOException or InvalidOperationException or UnauthorizedAccessException)
-            {
-                // Unreadable sources only cost proofs; the hunk falls back to "not mechanical".
-            }
+            var baseRead = await checkout.ReadBaseFilesAsync([.. baseFiles.Select(f => f.OldPath ?? f.Path)], cancellationToken).ConfigureAwait(false);
+            var headRead = await checkout.ReadHeadFilesAsync([.. headFiles.Select(f => f.Path)], cancellationToken).ConfigureAwait(false);
+            var baseTexts = baseFiles
+                .Where(f => baseRead.TryGetValue(f.OldPath ?? f.Path, out var t) && t.Length <= MaxFileChars)
+                .ToDictionary(f => f.Path, f => baseRead[f.OldPath ?? f.Path], StringComparer.Ordinal);
+            var headTexts = headFiles
+                .Where(f => headRead.TryGetValue(f.Path, out var t) && t.Length <= MaxFileChars)
+                .ToDictionary(f => f.Path, f => headRead[f.Path], StringComparer.Ordinal);
+            return new TriageSources(baseTexts, headTexts);
         }
-
-        return new TriageSources(baseTexts, headTexts);
+        catch (Exception e) when (e is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            // Unreadable sources only cost proofs; hunks fall back to "not mechanical".
+            return None;
+        }
     }
 }
 

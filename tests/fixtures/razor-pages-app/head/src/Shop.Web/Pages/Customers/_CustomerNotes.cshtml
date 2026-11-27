@@ -1,0 +1,23 @@
+@using Shop.Web.Models.Customers
+@model IReadOnlyList<CustomerNoteDto>
+
+<ul id="customer-notes-list" class="list-group">
+    @if (Model.Count == 0)
+    {
+        <li class="list-group-item text-muted">No notes yet.</li>
+    }
+    @foreach (var note in Model)
+    {
+        <li class="list-group-item customer-note @(note.IsPinned ? "pinned" : null)" data-note-id="@note.Id">
+            <div class="note-body">@Html.Raw(note.Body)</div>
+            <div class="small text-muted">
+                @note.Author · @note.CreatedOn.ToString("g")
+                <button type="button" class="btn btn-link btn-sm p-0 ms-2 note-pin" data-pinned="@(note.IsPinned ? "true" : "false")">
+                    @(note.IsPinned ? "Unpin" : "Pin")
+                </button>
+            </div>
+        </li>
+    }
+</ul>
+
+<script src="~/js/partials/customer-notes.js" asp-append-version="true"></script>

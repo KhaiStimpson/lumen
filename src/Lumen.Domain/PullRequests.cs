@@ -86,6 +86,13 @@ public sealed record PullRequestSnapshot(
     IReadOnlyList<ChangedFile> Files,
     IReadOnlyList<ReviewThread> Threads)
 {
+    /// <summary>What is being reviewed; a pull request unless a local session set it.</summary>
+    public ReviewTarget Target
+    {
+        get => field ??= new PullRequestTarget(Key);
+        init;
+    }
+
     public ChangedFile? FindFile(string path) =>
         Files.FirstOrDefault(f => string.Equals(f.Path, path, StringComparison.Ordinal));
 }

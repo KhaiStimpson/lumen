@@ -1,0 +1,68 @@
+@page
+@model Shop.Web.Pages.Invoices.ExportModel
+@{
+    ViewData["Title"] = "Export invoices";
+}
+
+<h1>Export invoices</h1>
+
+<form id="invoice-export-form" method="post" asp-page-handler="Download">
+    <div asp-validation-summary="All" class="text-danger"></div>
+
+    <div class="row g-3">
+        <div class="col-md-3">
+            <label asp-for="Input.From" class="form-label"></label>
+            <input asp-for="Input.From" class="form-control" />
+            <span asp-validation-for="Input.From" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="Input.To" class="form-label"></label>
+            <input asp-for="Input.To" class="form-control" />
+            <span asp-validation-for="Input.To" class="text-danger"></span>
+        </div>
+        <div class="col-md-2">
+            <label asp-for="Input.Delimiter" class="form-label">Delimiter</label>
+            <select asp-for="Input.Delimiter" class="form-select">
+                <option value=",">Comma</option>
+                <option value=";">Semicolon</option>
+                <option value="|">Pipe</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-check mt-3">
+        <input asp-for="Input.UnpaidOnly" class="form-check-input" />
+        <label asp-for="Input.UnpaidOnly" class="form-check-label"></label>
+    </div>
+    <div class="form-check">
+        <input asp-for="Input.IncludeHeader" class="form-check-input" />
+        <label asp-for="Input.IncludeHeader" class="form-check-label"></label>
+    </div>
+
+    <div class="mt-3">
+        <button type="button" id="invoice-export-preview" class="btn btn-outline-secondary">Preview</button>
+        <button type="submit" class="btn btn-primary">Download CSV</button>
+    </div>
+</form>
+
+<div id="invoice-export-result" class="mt-4 d-none">
+    <h2 class="h5">Preview <small id="invoice-export-count" class="text-muted"></small></h2>
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>Invoice</th>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Issued</th>
+                <th>Due</th>
+                <th class="text-end">Amount</th>
+                <th class="text-end">Overdue</th>
+            </tr>
+        </thead>
+        <tbody id="invoice-export-rows"></tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script src="~/js/pages/invoices-export.js" asp-append-version="true"></script>
+}

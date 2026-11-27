@@ -1,0 +1,32 @@
+@page "{id:int}"
+@model Shop.Web.Pages.Customers.EditModel
+@{
+    ViewData["Title"] = $"Edit {Model.DisplayName}";
+}
+
+<h1>Edit customer</h1>
+<p class="text-muted">@Model.DisplayName</p>
+
+<form id="customer-edit-form" method="post" asp-route-id="@Model.Input.Id">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <input type="hidden" asp-for="Input.Id" />
+
+    <div class="mb-3">
+        <label asp-for="Input.Name" class="form-label"></label>
+        <input asp-for="Input.Name" class="form-control" />
+        <span asp-validation-for="Input.Name" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Input.Email" class="form-label"></label>
+        <input asp-for="Input.Email" class="form-control" />
+        <span asp-validation-for="Input.Email" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Input.Bio" class="form-label"></label>
+        <textarea asp-for="Input.Bio" class="form-control" rows="4"></textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>

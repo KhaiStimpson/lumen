@@ -16,13 +16,15 @@ public sealed partial class InboxViewModel : ObservableObject, IDisposable
 {
     private readonly IReviewSource _source;
     private readonly Func<string, Task> _open;
+    private readonly Func<LocalBranchRef, Task>? _openLocal;
     private readonly TimeProvider _time;
     private CancellationTokenSource? _watch;
 
-    public InboxViewModel(IReviewSource source, IEnumerable<string> recent, Func<string, Task> open, TimeProvider? time = null)
+    public InboxViewModel(IReviewSource source, IEnumerable<string> recent, Func<string, Task> open, TimeProvider? time = null, Func<LocalBranchRef, Task>? openLocal = null)
     {
         _source = source;
         _open = open;
+        _openLocal = openLocal;
         _time = time ?? TimeProvider.System;
         SetRecent(recent);
         Reference = "";
@@ -57,6 +59,72 @@ public sealed partial class InboxViewModel : ObservableObject, IDisposable
         return _open(reference);
     }
 
+    // Local branches -------------------------------------------------------------------------------
+
+    /// <summary>Local clones reviewed before, newest first (docs/overhaul.md: the inbox's Local branches section).</summary>
+    public ObservableCollection<LocalBranchItemViewModel> LocalBranches { get; } = [];
+
+    public bool HasLocalBranches => LocalBranches.Count > 0;
+
+    public string LocalCountLabel => LocalBranches.Count == 0 ? "" : LocalBranches.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>The "Open local branch…" form.</summary>
+    [ObservableProperty]
+    public partial bool IsLocalFormOpen { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(OpenLocalCommand))]
+    public partial string LocalPath { get; set; } = "";
+
+    /// <summary>Empty: the clone's default base (origin/HEAD, main, master or develop).</summary>
+    [ObservableProperty]
+    public partial string LocalBase { get; set; } = "";
+
+    /// <summary>Empty: the working tree, uncommitted changes included. Otherwise a branch.</summary>
+    [ObservableProperty]
+    public partial string LocalHead { get; set; } = "";
+
+    [RelayCommand]
+    private void ToggleLocalForm() => IsLocalFormOpen = !IsLocalFormOpen;
+
+    [RelayCommand(CanExecute = nameof(CanOpenLocal))]
+    private Task OpenLocalAsync() =>
+        _openLocal?.Invoke(LocalRef(LocalPath, LocalHead, LocalBase)) ?? Task.CompletedTask;
+
+    private bool CanOpenLocal() => LocalPath.Trim().Length > 0;
+
+    [RelayCommand]
+    private static Task OpenLocalItemAsync(LocalBranchItemViewModel? item) => item?.OpenAsync() ?? Task.CompletedTask;
+
+    public static LocalBranchRef LocalRef(string path, string head, string baseRef) => new()
+    {
+        ClonePath = path.Trim(),
+        WorkingTree = head.Trim().Length == 0,
+        HeadRef = head.Trim(),
+        BaseRef = baseRef.Trim(),
+    };
+
+    public async Task LoadLocalBranchesAsync()
+    {
+        try
+        {
+            var reply = await _source.ListLocalBranchesAsync(CancellationToken.None).ConfigureAwait(true);
+            var now = _time.GetUtcNow();
+            LocalBranches.ReplaceWith(reply.Items.Select(i => new LocalBranchItemViewModel(i, r => _openLocal?.Invoke(r) ?? Task.CompletedTask, now)));
+        }
+        catch (RpcException)
+        {
+            // The section stays empty; the inbox itself still works.
+        }
+        catch (EngineUnavailableException)
+        {
+        }
+
+        OnPropertyChanged(nameof(HasLocalBranches));
+        OnPropertyChanged(nameof(LocalCountLabel));
+        OnPropertyChanged(nameof(IsEmpty));
+    }
+
     // Inbox ----------------------------------------------------------------------------------------
 
     public ObservableCollection<InboxSectionViewModel> Sections { get; } = [];
@@ -81,7 +149,7 @@ public sealed partial class InboxViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial bool IsRefreshing { get; private set; }
 
-    public bool IsEmpty => !IsLoading && Sections.All(s => s.Items.Count == 0);
+    public bool IsEmpty => !IsLoading && Sections.All(s => s.Items.Count == 0) && LocalBranches.Count == 0;
 
     public IEnumerable<InboxItemViewModel> AllItems => Sections.SelectMany(s => s.Items);
 
@@ -97,6 +165,7 @@ public sealed partial class InboxViewModel : ObservableObject, IDisposable
 
         _watch = new CancellationTokenSource();
         _ = WatchAsync(_watch.Token);
+        _ = LoadLocalBranchesAsync();
     }
 
     public void Stop()
@@ -144,6 +213,7 @@ public sealed partial class InboxViewModel : ObservableObject, IDisposable
         try
         {
             Apply(await _source.ListInboxAsync(refresh: true, CancellationToken.None).ConfigureAwait(true));
+            await LoadLocalBranchesAsync().ConfigureAwait(true);
         }
         catch (RpcException ex)
         {
@@ -228,6 +298,19 @@ public sealed class InboxItemViewModel(InboxItem item, DateTimeOffset now)
 
     public string AgeLabel => Age(Model.UpdatedAt?.ToDateTimeOffset() ?? now, now);
 
+    public ReviewProgress Progress => Model.Progress ?? new ReviewProgress { ChangedLines = Model.Additions + Model.Deletions };
+
+    /// <summary>"4,212 changed" alone until the change has been analysed, then "4,212 changed → 1,180 to read".</summary>
+    public string ShrinkLabel => ProgressText.Shrink(Progress);
+
+    /// <summary>The head moved since the analysis, so the to-read figure is out of date.</summary>
+    public bool IsOutOfDate => Progress is { Analysed: true, OutOfDate: true };
+
+    /// <summary>"3 of 8 slices reviewed"; empty until analysed.</summary>
+    public string SlicesLabel => ProgressText.Slices(Progress);
+
+    public bool HasSlices => SlicesLabel.Length > 0;
+
     public string SizeLabel => string.Create(
         CultureInfo.InvariantCulture,
         $"+{Model.Additions:N0} −{Model.Deletions:N0} · {Model.ChangedFiles} file{(Model.ChangedFiles == 1 ? "" : "s")}");
@@ -286,4 +369,16 @@ public sealed class InboxItemViewModel(InboxItem item, DateTimeOffset now)
             : age.TotalDays < 30 ? string.Create(CultureInfo.InvariantCulture, $"{(int)age.TotalDays}d ago")
             : at.ToLocalTime().ToString("MMM d", CultureInfo.InvariantCulture);
     }
+}
+
+/// <summary>The inbox's progress figures in words, shared by pull requests and local branches.</summary>
+public static class ProgressText
+{
+    public static string Shrink(ReviewProgress progress) => progress.Analysed
+        ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{progress.ChangedLines:N0} changed → {progress.ToReadLines:N0} to read")
+        : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{progress.ChangedLines:N0} changed");
+
+    public static string Slices(ReviewProgress progress) => progress is { Analysed: true, SlicesTotal: > 0 }
+        ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{(progress.SlicesReviewed == progress.SlicesTotal ? "✓ " : "")}{progress.SlicesReviewed} of {progress.SlicesTotal} slices reviewed")
+        : "";
 }

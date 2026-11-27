@@ -51,6 +51,22 @@ internal sealed class GrpcLikeReviewSource(FixtureReviewSource inner) : IReviewS
         }
     }
 
+    public IAsyncEnumerable<PullRequestEvent> WatchAsync(WatchPullRequestRequest request, CancellationToken cancellationToken)
+    {
+        WatchRequests.Add(request.Clone());
+        return WatchAsync(request.PullRequest ?? new PullRequestRef(), request.Refresh, cancellationToken);
+    }
+
+    /// <summary>Every watch request, so tests can see a local branch was asked for.</summary>
+    public List<WatchPullRequestRequest> WatchRequests { get; } = [];
+
+    public Task<LocalBranches> ListLocalBranchesAsync(CancellationToken cancellationToken) => inner.ListLocalBranchesAsync(cancellationToken);
+
+    public Task<MarksUpdated> SetMarkedAsync(SetMarkedRequest request, CancellationToken cancellationToken) => inner.SetMarkedAsync(request, cancellationToken);
+
+    public Task<SinceLastLook> GetSinceLastLookAsync(PullRequestRef pullRequest, CancellationToken cancellationToken) =>
+        inner.GetSinceLastLookAsync(pullRequest, cancellationToken);
+
     public IReadOnlyList<PullRequestEvent>? RefreshEvents { get; set; }
 
     public string? FailDiffPath { get; set; }
@@ -68,14 +84,8 @@ internal sealed class GrpcLikeReviewSource(FixtureReviewSource inner) : IReviewS
         return inner.GetSourceFileAsync(pullRequest, path, cancellationToken, fromBase);
     }
 
-    public Task SetReviewPointStateAsync(PullRequestRef pullRequest, string reviewPointId, ReviewPointState state, CancellationToken cancellationToken) =>
-        inner.SetReviewPointStateAsync(pullRequest, reviewPointId, state, cancellationToken);
-
     public Task<PostReviewCommentReply> PostCommentAsync(PostReviewCommentRequest request, CancellationToken cancellationToken) =>
         inner.PostCommentAsync(request, cancellationToken);
-
-    public Task SetTriageGroupAcknowledgedAsync(PullRequestRef pullRequest, string groupId, bool acknowledged, CancellationToken cancellationToken) =>
-        inner.SetTriageGroupAcknowledgedAsync(pullRequest, groupId, acknowledged, cancellationToken);
 
     /// <summary>When set, saving a "Viewed" tick fails the way the engine reports a GitHub refusal.</summary>
     public string? FailViewedWith { get; set; }
@@ -84,15 +94,6 @@ internal sealed class GrpcLikeReviewSource(FixtureReviewSource inner) : IReviewS
         FailViewedWith is null
             ? inner.SetFileViewedAsync(pullRequest, path, viewed, cancellationToken)
             : Task.FromException(new RpcException(new Status(StatusCode.Unavailable, FailViewedWith)));
-
-    public Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken) => inner.GetConnectionsAsync(cancellationToken);
-
-    public Task<Connections> SetOpenRouterKeyAsync(string key, CancellationToken cancellationToken) => inner.SetOpenRouterKeyAsync(key, cancellationToken);
-
-    public Task<Connections> RemoveOpenRouterKeyAsync(CancellationToken cancellationToken) => inner.RemoveOpenRouterKeyAsync(cancellationToken);
-
-    public Task<Connections> UpdateConnectionSettingsAsync(ConnectionSettings settings, CancellationToken cancellationToken) =>
-        inner.UpdateConnectionSettingsAsync(settings, cancellationToken);
 
     public Task<ReviewSettingsReply> GetReviewSettingsAsync(ReviewSettingsRequest request, CancellationToken cancellationToken) =>
         inner.GetReviewSettingsAsync(request, cancellationToken);
@@ -137,14 +138,6 @@ internal sealed class GrpcLikeReviewSource(FixtureReviewSource inner) : IReviewS
 
     public Task<SubmitReviewReply> SubmitReviewAsync(SubmitReviewRequest request, CancellationToken cancellationToken) =>
         inner.SubmitReviewAsync(request, cancellationToken);
-
-    public Task<Connections> SetCloudflareCredentialsAsync(string accountId, string apiToken, CancellationToken cancellationToken) =>
-        inner.SetCloudflareCredentialsAsync(accountId, apiToken, cancellationToken);
-
-    public Task<Connections> RemoveCloudflareCredentialsAsync(CancellationToken cancellationToken) => inner.RemoveCloudflareCredentialsAsync(cancellationToken);
-
-    public Task StartWalkthroughAsync(StartWalkthroughRequest request, CancellationToken cancellationToken) =>
-        inner.StartWalkthroughAsync(request, cancellationToken);
 
     public ValueTask DisposeAsync() => inner.DisposeAsync();
 }

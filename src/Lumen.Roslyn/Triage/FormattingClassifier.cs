@@ -8,6 +8,6 @@ public sealed class FormattingClassifier : IHunkClassifier
 {
     public HunkVerdict? Classify(HunkContext context) =>
         CSharpHunkProof.For(context) is { SameTokens: true, SameComments: true, SameStructure: true }
-            ? new(ChangeClass.Formatting, TriageTier.Skip, ["formatting only"])
+            ? new(ChangeClass.Formatting, FoldKind.Mechanical, ["formatting only"])
             : null;
 }

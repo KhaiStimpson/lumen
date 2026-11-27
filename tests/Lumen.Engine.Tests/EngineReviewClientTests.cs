@@ -30,8 +30,8 @@ public sealed class EngineReviewClientTests : IAsyncLifetime, IDisposable
                 services.AddSingleton<IGitHubClient>(_gitHub);
                 services.RemoveAll<IRepositoryWorkspace>();
                 services.AddSingleton<IRepositoryWorkspace>(new FakeWorkspace(checkout));
-                services.RemoveAll<ISecretStore>();
-                services.AddSingleton<ISecretStore>(new Lumen.Storage.UnavailableSecretStore());
+                services.RemoveAll<Lumen.Storage.ISecretStore>();
+                services.AddSingleton<Lumen.Storage.ISecretStore>(new Lumen.Storage.UnavailableSecretStore());
             });
         await _engine.StartAsync();
         _channel = new GrpcChannelHolder(_pipe);
@@ -209,7 +209,7 @@ public sealed class EngineReviewClientTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task PendingCommentsStartOneReviewAndSubmitApproves()
     {
-        var point = (await CollectUntilAsync(e => e.Complete is not null)).First(e => e.ReviewPointAdded is not null).ReviewPointAdded;
+        await CollectUntilAsync(e => e.Complete is not null);
 
         var pending = await Client.AddPendingCommentAsync(new AddPendingCommentRequest
         {
@@ -222,15 +222,14 @@ public sealed class EngineReviewClientTests : IAsyncLifetime, IDisposable
         pending = await Client.AddPendingCommentAsync(new AddPendingCommentRequest
         {
             PullRequest = Pr,
-            Path = point.Anchor.Path,
-            Line = point.Anchor.StartLine,
-            Body = point.SuggestedComment,
-            ReviewPointId = point.Id,
+            Path = WorkerScenario.NewWorkerPath,
+            Line = 9,
+            Body = "Single-line comment",
         });
 
         Assert.Equal(2, pending.Comments.Count);
         Assert.Equal(5, pending.Comments[0].StartLine);
-        Assert.Equal(point.Id, pending.Comments[1].ReviewPointId);
+        Assert.Equal(9, pending.Comments[1].Line);
         Assert.Empty(_gitHub.Posted);
 
         var edited = await Client.UpdatePendingCommentAsync(new UpdatePendingCommentRequest { PullRequest = Pr, CommentId = pending.Comments[0].Id, Body = "Edited" });
@@ -245,9 +244,7 @@ public sealed class EngineReviewClientTests : IAsyncLifetime, IDisposable
         Assert.Equal((Domain.ReviewEvent.Approve, "LGTM"), (submitted.Event, submitted.Body));
         Assert.Equal("", (await Client.GetPendingReviewAsync(new GetPendingReviewRequest { PullRequest = Pr })).Id);
 
-        // The point it answered is marked commented, and the review becomes the "since last review" baseline.
-        var replay = await CollectUntilAsync(e => e.ReviewPointStateChanged?.ReviewPointId == point.Id, refresh: false);
-        Assert.Equal(Contracts.ReviewPointState.Commented, replay.Last().ReviewPointStateChanged.State);
+        // The review becomes the "since last review" baseline.
         var details = await Client.GetPullRequestDetailsAsync(new GetPullRequestDetailsRequest { PullRequest = Pr });
         Assert.Equal((WorkerScenario.HeadSha, false), (details.LastReviewedSha, details.LastReviewedIsOpen));
     }

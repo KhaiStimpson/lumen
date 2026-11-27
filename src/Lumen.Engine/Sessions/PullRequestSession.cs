@@ -14,13 +14,26 @@ public sealed class PullRequestSession : IDisposable
     private readonly Lock _gate = new();
     private readonly List<PullRequestEvent> _log = [];
     private readonly List<Channel<PullRequestEvent>> _subscribers = [];
-    private readonly Dictionary<string, Domain.ReviewPoint> _points = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _cts = new();
 
-    public PullRequestSession(PullRequestKey key)
+    public PullRequestSession(ReviewTarget target)
     {
-        Key = key;
+        Target = target;
+        Key = target switch
+        {
+            PullRequestTarget pr => pr.PullRequest,
+            LocalBranchTarget local => local.SyntheticKey,
+            _ => throw new ArgumentException("Unknown review target.", nameof(target)),
+        };
     }
+
+    public PullRequestSession(PullRequestKey key)
+        : this(new PullRequestTarget(key))
+    {
+    }
+
+    /// <summary>What is being reviewed. Local sessions carry a synthetic <see cref="Key"/> (owner "local").</summary>
+    public ReviewTarget Target { get; }
 
     public PullRequestKey Key { get; }
 
@@ -30,6 +43,18 @@ public sealed class PullRequestSession : IDisposable
 
     /// <summary>The head commit's triage; null until computed, or when it could not be.</summary>
     public TriageResult? Triage { get; private set; }
+
+    /// <summary>Feature slices; null until computed (or when slicing fell back).</summary>
+    public SliceResult? Slices { get; internal set; }
+
+    /// <summary>Fingerprints of each unit's normalised changed lines, by unit.</summary>
+    public IReadOnlyDictionary<string, Domain.UnitFingerprint> Units { get; internal set; } = new Dictionary<string, Domain.UnitFingerprint>(StringComparer.Ordinal);
+
+    /// <summary>The head's repository index (for unit fingerprints and flags); null when it couldn't be built.</summary>
+    internal Lumen.Roslyn.Slicing.RepositoryIndex? Index { get; set; }
+
+    /// <summary>Red flags at this head.</summary>
+    public IReadOnlyList<Domain.RedFlag> Flags { get; internal set; } = [];
 
     public bool IsFinished { get; private set; }
 
@@ -55,9 +80,6 @@ public sealed class PullRequestSession : IDisposable
 
     /// <summary>Serialises pending-review changes, so two comments can't each start a review.</summary>
     internal SemaphoreSlim ReviewGate { get; } = new(1, 1);
-
-    /// <summary>Pending comment id → the review point it answers, so the tray can say which.</summary>
-    internal ConcurrentDictionary<string, string> PendingPoints { get; } = new(StringComparer.Ordinal);
 
     internal ConcurrentDictionary<(string From, string To, bool IgnoreWhitespace), DiffRangeResult> Ranges { get; } = new();
 
@@ -126,7 +148,7 @@ public sealed class PullRequestSession : IDisposable
 
         if (pendingChanged)
         {
-            Publish(new PullRequestEvent { PendingReviewUpdated = Mapping.ProtoMapper.ToProto(state.PendingReview, PendingPoints) });
+            Publish(new PullRequestEvent { PendingReviewUpdated = Mapping.ProtoMapper.ToProto(state.PendingReview) });
         }
     }
 
@@ -139,14 +161,6 @@ public sealed class PullRequestSession : IDisposable
         (a is null && b is null) || (a is not null && b is not null && a.Id == b.Id && a.Body == b.Body
             && a.Comments.Select(c => (c.Id, c.Body)).SequenceEqual(b.Comments.Select(c => (c.Id, c.Body))));
 
-    public Domain.ReviewPoint? FindReviewPoint(string id)
-    {
-        lock (_gate)
-        {
-            return _points.GetValueOrDefault(id);
-        }
-    }
-
     internal void SetSnapshot(Domain.PullRequestSnapshot snapshot, IPullRequestCheckout checkout)
     {
         Snapshot = snapshot;
@@ -154,38 +168,6 @@ public sealed class PullRequestSession : IDisposable
     }
 
     internal void SetTriage(TriageResult? triage) => Triage = triage;
-
-    internal void AddReviewPoint(Domain.ReviewPoint point)
-    {
-        lock (_gate)
-        {
-            _points[point.Id] = point;
-        }
-    }
-
-    /// <summary>Changes the latest point and publishes it under the same lock, preserving concurrent reviewer decisions.</summary>
-    internal void UpdateReviewPoint(
-        string id,
-        Func<Domain.ReviewPoint, Domain.ReviewPoint> update,
-        Func<Domain.ReviewPoint, PullRequestEvent> notification)
-    {
-        lock (_gate)
-        {
-            if (!_points.TryGetValue(id, out var current))
-            {
-                return;
-            }
-
-            var updated = update(current);
-            if (ReferenceEquals(current, updated))
-            {
-                return;
-            }
-
-            _points[id] = updated;
-            Publish(notification(updated));
-        }
-    }
 
     internal void MarkFinished(bool failed)
     {

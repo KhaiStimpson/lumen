@@ -30,7 +30,7 @@ public class FormattingClassifierTests
         var hunk = TriageHarness.Single(Base, head);
 
         Assert.Equal(ChangeClass.Formatting, hunk.Class);
-        Assert.Equal(TriageTier.Skip, hunk.Tier);
+        Assert.Equal(FoldKind.Mechanical, hunk.Fold);
         Assert.Equal(["formatting only"], hunk.Reasons);
     }
 
@@ -52,7 +52,7 @@ public class FormattingClassifierTests
         var hunk = TriageHarness.Single(Base, head);
 
         Assert.Equal(ChangeClass.BehaviourChange, hunk.Class);
-        Assert.NotEqual(TriageTier.Skip, hunk.Tier);
+        Assert.NotEqual(FoldKind.Mechanical, hunk.Fold);
     }
 
     [Fact]

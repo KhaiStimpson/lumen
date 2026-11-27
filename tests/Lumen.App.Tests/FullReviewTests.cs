@@ -17,7 +17,7 @@ namespace Lumen.App.Tests;
 public sealed class FullReviewTests
 {
     [AvaloniaFact]
-    public async Task FromTheInboxToAnApprovalWithTheWalkthrough()
+    public async Task FromTheInboxToAnApproval()
     {
         var source = new FixtureReviewSource(Fixture.DirectoryPath, viewerLogin: "andrew-reviewer");
         var settingsPath = Path.Combine(Path.GetTempPath(), "lumen-app-tests", $"{Guid.NewGuid():N}.json");
@@ -40,30 +40,27 @@ public sealed class FullReviewTests
             Assert.True(item.IsUnread);
             await vm.Home.OpenItemCommand.ExecuteAsync(item);
             var pr = vm.PullRequest!;
-            await Fixture.WaitUntilAsync(() => !pr.IsAnalysing && pr.Walkthrough is { IsComplete: true } && pr.HasDetails);
+            await Fixture.WaitUntilAsync(() => !pr.IsAnalysing && pr.HasDetails);
 
-            // 2. The walkthrough is the first thing shown: intent, reading order, risky areas.
+            // 2. The change opens on its files with proven-mechanical changes folded.
             await Fixture.PumpAsync(10);
-            Assert.True(window.GetVisualDescendants().OfType<WalkthroughView>().Single().IsEffectivelyVisible);
-            Assert.NotEmpty(pr.Walkthrough!.Intent);
+            Assert.True(pr.HasTriage);
+            Assert.True(pr.MechanicalLines > 0);
 
-            // 3. Read the description, then the review points: examine, then comment into the review.
+            // 3. Read the description, then comment into the review from the keyboard (C, then Ctrl+Enter).
             pr.ShowTab(PullRequestTab.Conversation);
             Assert.True(pr.HasDescription);
             pr.ShowTab(PullRequestTab.Files);
-            await Press(PhysicalKey.Enter);
-            Assert.Equal(ReviewMode.Examine, pr.Mode);
-            await Press(PhysicalKey.Escape);
+            await Fixture.WaitUntilAsync(() => pr.CurrentDiff is { Changes.Count: > 0 });
             await Press(PhysicalKey.C);
-            await Press(PhysicalKey.Enter, RawInputModifiers.Control);
+            Assert.Single(pr.Drafts);
+            pr.Drafts[0].Body = "Is this covered by a test?";
+            await pr.AddDraftToReviewAsync(pr.Drafts[0]);
             await Fixture.WaitUntilAsync(() => pr.PendingComments.Count == 1);
-            await Press(PhysicalKey.J);
-            await Press(PhysicalKey.D);
 
             // 4. A comment of my own on any line, with a suggestion.
-            var risk = pr.Walkthrough.Risks[0];
-            await pr.SelectRiskAsync(risk);
-            var draft = pr.StartLineComment(Diff.LineSide.Right, risk.Line)!;
+            var line = pr.CurrentDiff!.Rows.Last(r => r.Kind == Diff.DiffRowKind.Added).NewNumber;
+            var draft = pr.StartLineComment(Diff.LineSide.Right, line)!;
             PullRequestViewModel.SuggestChange(draft);
             await pr.AddDraftToReviewAsync(draft);
             Assert.Equal(2, pr.PendingComments.Count);

@@ -58,20 +58,20 @@ public sealed class MoveClassifier : IHunkClassifier
 
         var parts = runs.Select(r => Part(r.Label, r.Lines, context.File)).ToList();
         return parts.Count == 1
-            ? new(parts[0].Class, parts[0].Tier, parts[0].Reasons, parts[0].Group)
-            : new(ChangeClass.Move, parts.Min(p => p.Tier), ["moved code"]) { Parts = parts };
+            ? new(parts[0].Class, parts[0].Fold, parts[0].Reasons, parts[0].Group)
+            : new(ChangeClass.Move, parts.Min(p => p.Fold), ["moved code"]) { Parts = parts };
     }
 
     private static HunkPart Part(MoveLabel? label, List<DiffLine> lines, ChangedFile file) => label switch
     {
-        { Edited: false } l => new(ChangeClass.Move, l.Pair.Tier, l.Pair.Reasons, new GroupClaim(l.Pair.Key, l.Pair.Title), lines),
-        { Edited: true } l => new(ChangeClass.BehaviourChange, TriageTier.WorthALook, [$"edited while moving `{l.Pair.Name}`"], null, lines),
-        null when file.Kind == FileChangeKind.Added => new(ChangeClass.NewCode, TriageTier.Skim, ["new file"], null, lines),
-        null => new(ChangeClass.BehaviourChange, TriageTier.WorthALook, ["changes existing code"], null, lines),
+        { Edited: false } l => new(ChangeClass.Move, l.Pair.Fold, l.Pair.Reasons, new GroupClaim(l.Pair.Key, l.Pair.Title), lines),
+        { Edited: true } l => new(ChangeClass.BehaviourChange, FoldKind.Open, [$"edited while moving `{l.Pair.Name}`"], null, lines),
+        null when file.Kind == FileChangeKind.Added => new(ChangeClass.NewCode, FoldKind.Open, ["new file"], null, lines),
+        null => new(ChangeClass.BehaviourChange, FoldKind.Open, ["changes existing code"], null, lines),
     };
 }
 
-internal sealed record MovePair(string Key, string Name, string Title, TriageTier Tier, IReadOnlyList<string> Reasons);
+internal sealed record MovePair(string Key, string Name, string Title, FoldKind Fold, IReadOnlyList<string> Reasons);
 
 internal sealed record MoveLabel(MovePair Pair, bool Edited);
 
@@ -155,10 +155,10 @@ internal sealed class MoveIndex
 
         var (tier, caveat) = (r, d) switch
         {
-            _ when r.Container != d.Container => (TriageTier.Skim, $"moved into `{d.Container}`: names in its body may bind differently"),
-            _ when !sameFile && !r.Usings.SequenceEqual(d.Usings) => (TriageTier.Skim, "the destination file imports different namespaces: names may bind differently"),
-            _ when r.OrderSensitive => (TriageTier.Skim, "member order decides initialisation order and struct layout"),
-            _ => (TriageTier.Skip, null),
+            _ when r.Container != d.Container => (FoldKind.Open, $"moved into `{d.Container}`: names in its body may bind differently"),
+            _ when !sameFile && !r.Usings.SequenceEqual(d.Usings) => (FoldKind.Open, "the destination file imports different namespaces: names may bind differently"),
+            _ when r.OrderSensitive => (FoldKind.Open, "member order decides initialisation order and struct layout"),
+            _ => (FoldKind.Mechanical, null),
         };
         var reason = sameFile ? $"moved `{r.Name}` within the file" : $"moved `{r.Name}` from {r.Path} to {d.Path}";
         var pair = new MovePair(

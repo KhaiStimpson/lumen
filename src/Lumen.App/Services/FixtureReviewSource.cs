@@ -103,35 +103,17 @@ public sealed partial class FixtureReviewSource : IReviewSource
         return Task.FromResult(new SourceFile { Path = path, Exists = false });
     }
 
-    public Task SetReviewPointStateAsync(PullRequestRef pullRequest, string reviewPointId, ReviewPointState state, CancellationToken cancellationToken)
-    {
-        Broadcast(new PullRequestEvent
-        {
-            ReviewPointStateChanged = new ReviewPointStateChanged { ReviewPointId = reviewPointId, State = state },
-        });
-        return Task.CompletedTask;
-    }
-
     public Task<PostReviewCommentReply> PostCommentAsync(PostReviewCommentRequest request, CancellationToken cancellationToken)
     {
         // Like GitHub: no single comments while a pending review exists, so it joins the review instead.
         if (_pending.Id.Length > 0)
         {
-            var pending = AddPending(request.Path, request.Side, request.Line, request.StartLine, request.Body, request.ReviewPointId, null);
-            MarkCommented(request.ReviewPointId);
+            var pending = AddPending(request.Path, request.Side, request.Line, request.StartLine, request.Body, null);
             return Task.FromResult(new PostReviewCommentReply { AddedToPendingReview = true, PendingReview = pending });
         }
 
         PostedComments.Add(request);
         AddThread(request.Path, request.Side, request.Line, request.StartLine, request.Body, pending: false);
-        if (!string.IsNullOrEmpty(request.ReviewPointId))
-        {
-            Broadcast(new PullRequestEvent
-            {
-                ReviewPointStateChanged = new ReviewPointStateChanged { ReviewPointId = request.ReviewPointId, State = ReviewPointState.Commented },
-            });
-        }
-
         return Task.FromResult(new PostReviewCommentReply { CommentId = PostedComments.Count, Url = "https://example.invalid/fixture-comment" });
     }
 
@@ -141,112 +123,8 @@ public sealed partial class FixtureReviewSource : IReviewSource
         return Task.CompletedTask;
     }
 
-    public Task SetTriageGroupAcknowledgedAsync(PullRequestRef pullRequest, string groupId, bool acknowledged, CancellationToken cancellationToken)
-    {
-        Broadcast(new PullRequestEvent { TriageGroupAcknowledged = new TriageGroupAcknowledged { GroupId = groupId, Acknowledged = acknowledged } });
-        return Task.CompletedTask;
-    }
-
-    /// <summary>Whether a key has been "stored"; the fixture keeps only this flag, never the key.</summary>
-    public bool OpenRouterKeyStored { get; set; }
-
-    public ConnectionSettings ConnectionSettings { get; private set; } = new()
-    {
-        AllowCloudReasoning = true,
-        JevEnabled = true,
-        JevModel = "typesafe/jev-1.13",
-        JevTimeoutSeconds = 12,
-        JevRequireZeroDataRetention = true,
-        MaxInvestigationsPerPullRequest = 3,
-        MaxConcurrentInvestigations = 1,
-        AllowMeteredUsage = false,
-        AllowCodeToFastModel = true,
-        FastModelId = "@cf/zai-org/glm-5.3-flash",
-        FastModelTimeoutSeconds = 30,
-        FastModelMaxDiffKb = 512,
-        FastModelDailyRequestCap = 500,
-        FastModelGateway = "",
-    };
-
-    public Task<Connections> GetConnectionsAsync(CancellationToken cancellationToken) => Task.FromResult(FixtureConnections());
-
-    /// <summary>Like the engine, a limit left unset keeps its current value.</summary>
-    public Task<Connections> UpdateConnectionSettingsAsync(ConnectionSettings settings, CancellationToken cancellationToken)
-    {
-        var next = ConnectionSettings.Clone();
-        next.AllowCloudReasoning = settings.AllowCloudReasoning;
-        next.JevEnabled = settings.JevEnabled;
-        next.AllowCodeSnippetsToJev = settings.AllowCodeSnippetsToJev;
-        next.InvestigationsEnabled = settings.InvestigationsEnabled;
-        if (settings.HasJevModel)
-        {
-            next.JevModel = settings.JevModel;
-        }
-
-        if (settings.HasJevTimeoutSeconds)
-        {
-            next.JevTimeoutSeconds = settings.JevTimeoutSeconds;
-        }
-
-        if (settings.HasJevRequireZeroDataRetention)
-        {
-            next.JevRequireZeroDataRetention = settings.JevRequireZeroDataRetention;
-        }
-
-        if (settings.HasMaxInvestigationsPerPullRequest)
-        {
-            next.MaxInvestigationsPerPullRequest = settings.MaxInvestigationsPerPullRequest;
-        }
-
-        if (settings.HasMaxConcurrentInvestigations)
-        {
-            next.MaxConcurrentInvestigations = settings.MaxConcurrentInvestigations;
-        }
-
-        if (settings.HasAllowMeteredUsage)
-        {
-            next.AllowMeteredUsage = settings.AllowMeteredUsage;
-        }
-
-        if (settings.HasAllowCodeToFastModel)
-        {
-            next.AllowCodeToFastModel = settings.AllowCodeToFastModel;
-        }
-
-        if (settings.HasFastModelId)
-        {
-            next.FastModelId = settings.FastModelId;
-        }
-
-        if (settings.HasFastModelTimeoutSeconds)
-        {
-            next.FastModelTimeoutSeconds = settings.FastModelTimeoutSeconds;
-        }
-
-        if (settings.HasFastModelMaxDiffKb)
-        {
-            next.FastModelMaxDiffKb = settings.FastModelMaxDiffKb;
-        }
-
-        if (settings.HasFastModelDailyRequestCap)
-        {
-            next.FastModelDailyRequestCap = settings.FastModelDailyRequestCap;
-        }
-
-        if (settings.HasFastModelGateway)
-        {
-            next.FastModelGateway = settings.FastModelGateway;
-        }
-
-        ConnectionSettings = next;
-        return Task.FromResult(FixtureConnections());
-    }
-
-    /// <summary>The global review layer; starts at Balanced with nothing added.</summary>
-    public ReviewRules GlobalReviewRules { get; private set; } = new()
-    {
-        Sensitivity = new ReviewSensitivity { MinimumPeers = 3, MinimumSupport = 0.75, MinimumLift = 1.5, MaxPointsPerType = 2, MaxExamples = 4 },
-    };
+    /// <summary>The global review layer; starts with nothing added.</summary>
+    public ReviewRules GlobalReviewRules { get; private set; } = new();
 
     /// <summary>Repository layers by "owner/name". Missing means the repository inherits everything.</summary>
     public Dictionary<string, ReviewRules> RepositoryReviewRules { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -259,7 +137,6 @@ public sealed partial class FixtureReviewSource : IReviewSource
         var rules = request.Rules?.Clone() ?? new ReviewRules();
         if (request.Owner.Length == 0)
         {
-            rules.Sensitivity ??= GlobalReviewRules.Sensitivity;
             GlobalReviewRules = rules;
         }
         else
@@ -276,11 +153,7 @@ public sealed partial class FixtureReviewSource : IReviewSource
         {
             Global = GlobalReviewRules.Clone(),
             SettingsPath = @"%LOCALAPPDATA%\Lumen\settings.json",
-            Quiet = new ReviewSensitivity { MinimumPeers = 5, MinimumSupport = 0.85, MinimumLift = 2.0, MaxPointsPerType = 1, MaxExamples = 3 },
-            Balanced = new ReviewSensitivity { MinimumPeers = 3, MinimumSupport = 0.75, MinimumLift = 1.5, MaxPointsPerType = 2, MaxExamples = 4 },
-            Thorough = new ReviewSensitivity { MinimumPeers = 3, MinimumSupport = 0.65, MinimumLift = 1.2, MaxPointsPerType = 3, MaxExamples = 6 },
         };
-        reply.BuiltInIgnoredNames.AddRange(["CancellationToken", "Guid", "ILogger<T>", "string.IsNullOrEmpty", "Task.WhenAll", "TimeProvider"]);
         reply.BuiltInMechanicalPaths.AddRange(["*.Designer.cs", "*.g.cs", "*.generated.cs", "*ModelSnapshot.cs", "Migrations/*.cs", "lock files", "<auto-generated> headers"]);
         if (owner.Length > 0)
         {
@@ -290,63 +163,6 @@ public sealed partial class FixtureReviewSource : IReviewSource
 
         return reply;
     }
-
-    public Task<Connections> SetOpenRouterKeyAsync(string key, CancellationToken cancellationToken)
-    {
-        OpenRouterKeyStored = !string.IsNullOrWhiteSpace(key);
-        return Task.FromResult(FixtureConnections());
-    }
-
-    public Task<Connections> RemoveOpenRouterKeyAsync(CancellationToken cancellationToken)
-    {
-        OpenRouterKeyStored = false;
-        return Task.FromResult(FixtureConnections());
-    }
-
-    private Connections FixtureConnections() => new()
-    {
-        FastModel = new FastModelConnection
-        {
-            State = !ConnectionSettings.AllowCloudReasoning ? ConnectionState.Off
-                : !CloudflareStored ? ConnectionState.NotConnected
-                : ConnectionSettings.AllowCodeToFastModel ? ConnectionState.Connected : ConnectionState.Off,
-            Detail = !ConnectionSettings.AllowCloudReasoning ? "Off: cloud AI is turned off"
-                : !CloudflareStored ? "No Cloudflare account id and API token"
-                : ConnectionSettings.AllowCodeToFastModel ? "Token active · @cf/zai-org/glm-5.3-flash" : "Connected · walkthrough off until you allow the diff to be sent",
-            Model = ConnectionSettings.FastModelId,
-            CredentialsStored = CloudflareStored,
-            CanStoreCredentials = true,
-            Sends = "The pull request's diff, title, description and commit messages (generated files by path and size only)",
-            RequestsToday = 42,
-        },
-        Settings = ConnectionSettings.Clone(),
-        Jev = new JevConnection
-        {
-            State = !ConnectionSettings.AllowCloudReasoning || !ConnectionSettings.JevEnabled ? ConnectionState.Off
-                : OpenRouterKeyStored ? ConnectionState.Connected : ConnectionState.NotConnected,
-            Detail = !ConnectionSettings.AllowCloudReasoning ? "Off: cloud AI is turned off"
-                : !ConnectionSettings.JevEnabled ? "Turned off"
-                : OpenRouterKeyStored ? "Key valid · 4.82 credit remaining" : "No OpenRouter key",
-            Model = "typesafe/jev-1.13",
-            KeyStored = OpenRouterKeyStored,
-            CanStoreKey = true,
-            Sends = ConnectionSettings.AllowCodeSnippetsToJev
-                ? "Counts, categories and convention wording"
-                : "Counts and categories only — no code, paths or names",
-        },
-        Claude = new AgentConnection
-        {
-            State = ConnectionState.Connected,
-            Detail = "Claude Pro via Claude Code",
-            Version = "2.1.0",
-            Billing = ConnectionBilling.Subscription,
-            InvestigationsEnabled = ConnectionSettings.AllowCloudReasoning && ConnectionSettings.InvestigationsEnabled,
-            InvestigationsDetail = ConnectionSettings.AllowCloudReasoning && ConnectionSettings.InvestigationsEnabled
-                ? "On · up to 3 per pull request · subscription only"
-                : "Off",
-        },
-        SettingsPath = @"%LOCALAPPDATA%\Lumen\settings.json",
-    };
 
     private void Broadcast(PullRequestEvent evt)
     {

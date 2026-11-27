@@ -13,30 +13,6 @@ namespace Lumen.App.Tests;
 public sealed class PullRequestViewModelTests
 {
     [AvaloniaFact]
-    public async Task PrecedentSourceUsesBaseWhileFullFileUsesHead()
-    {
-        var source = new GrpcLikeReviewSource(Fixture.CreateSource());
-        var pr = await Fixture.LoadAsync(source);
-        try
-        {
-            pr.ShowFullFile = true;
-            await Fixture.WaitUntilAsync(() => source.SourceRequests.Count > 0);
-            Assert.False(source.SourceRequests[^1].FromBase);
-            var example = pr.CurrentPoint!.PrecedentExamples[0];
-
-            await pr.OpenSourceAsync(example);
-
-            Assert.Equal((example.Path, true), source.SourceRequests[^1]);
-            Assert.Equal(example.Snippet, pr.SourcePreview!.Text);
-            Assert.Equal(example.StartLine, pr.SourcePreview.StartLine);
-        }
-        finally
-        {
-            await pr.DisposeAsync();
-        }
-    }
-
-    [AvaloniaFact]
     public async Task FailedFileSelectionClearsThePreviousFilesCode()
     {
         var source = new GrpcLikeReviewSource(Fixture.CreateSource());
@@ -63,7 +39,7 @@ public sealed class PullRequestViewModelTests
     }
 
     [AvaloniaFact]
-    public async Task RefreshWithNoReviewPointsReplacesSelectionAndClearsOldTriage()
+    public async Task RefreshReplacesSelectionAndClearsOldTriage()
     {
         var source = new GrpcLikeReviewSource(Fixture.CreateSource());
         var pr = await Fixture.LoadAsync(source);
@@ -80,12 +56,10 @@ public sealed class PullRequestViewModelTests
             await pr.ReanalyseCommand.ExecuteAsync(null);
             await Fixture.WaitUntilAsync(() => !pr.IsAnalysing);
 
-            Assert.Empty(pr.ReviewPoints);
             Assert.Null(pr.Triage);
-            Assert.Empty(pr.ReviewPlan.Groups);
-            Assert.Empty(pr.ReviewPlan.Sections);
-            Assert.Equal(0, pr.CoverageFraction);
-            Assert.Equal("", pr.CoverageLabel);
+            Assert.False(pr.HasSlices);
+            Assert.Empty(pr.Flags);
+            Assert.Equal("", pr.SliceProgressLabel);
             Assert.Equal(remaining.Path, pr.SelectedFile?.Path);
             Assert.Same(Assert.Single(pr.Files), pr.SelectedFile);
             Assert.Equal(remaining.Path, pr.CurrentDiff?.Path);
@@ -127,11 +101,12 @@ public sealed class PullRequestViewModelTests
         {
             var triage = pr.Triage;
             Assert.NotNull(triage);
-            Assert.StartsWith("19,743 lines changed: 15,864 proven mechanical", triage.Summary.Text, StringComparison.Ordinal);
+            Assert.Equal((19_743, 15_864), (triage.Summary.TotalLines, triage.Summary.MechanicalLines));
             Assert.Equal(60, triage.Files.Count);
-            Assert.Contains(triage.Hunks, h => h.ChangeClass == ChangeClass.Generated && h.Tier == TriageTier.Skip);
-            Assert.Contains(triage.Hunks, h => h.ChangeClass == ChangeClass.ImportsOnly && h.Tier == TriageTier.Skip);
-            Assert.Equal(triage.Summary.TotalLines, triage.Files.Sum(f => f.TierLines.Critical + f.TierLines.WorthALook + f.TierLines.Skim + f.TierLines.Skip));
+            Assert.Contains(triage.Hunks, h => h.ChangeClass == ChangeClass.Generated && h.Fold == FoldKind.Mechanical);
+            Assert.Contains(triage.Hunks, h => h.ChangeClass == ChangeClass.ImportsOnly && h.Fold == FoldKind.Mechanical);
+            Assert.Equal(triage.Summary.TotalLines, triage.Files.Sum(f => f.FoldLines.Open + f.FoldLines.Mechanical + f.FoldLines.Boilerplate));
+            Assert.Equal("3,879 lines to read of 19,743 changed", pr.ShrinkLabel);
         }
         finally
         {
@@ -175,15 +150,13 @@ public sealed class PullRequestViewModelTests
         var pr = await Fixture.LoadAsync(source);
         try
         {
-            var path = pr.Triage!.Hunks.First(h => h.Tier == TriageTier.WorthALook && h.Path != pr.SelectedFile!.Path).Path;
+            var path = pr.Triage!.Hunks.First(h => h.Fold == FoldKind.Open && h.Path != pr.SelectedFile!.Path).Path;
             var file = pr.Files.Single(f => f.Path == path);
-            var coverage = pr.CoverageFraction;
 
             await pr.ToggleViewedCommand.ExecuteAsync(file);
 
             Assert.False(file.IsViewed);
             Assert.Equal("0 / 60 viewed", pr.ViewedSummary);
-            Assert.Equal(coverage, pr.CoverageFraction);
             Assert.Contains("Resource not accessible", pr.Toast, StringComparison.Ordinal);
         }
         finally
@@ -226,71 +199,7 @@ public sealed class PullRequestViewModelTests
 
             Assert.Null(pr.Error);
             Assert.False(pr.NeedsReanalysis);
-            Assert.NotEmpty(pr.ReviewPoints);
-        }
-        finally
-        {
-            await pr.DisposeAsync();
-        }
-    }
-
-    [AvaloniaFact]
-    public async Task RanksReviewPointsAndTagsThemInOrder()
-    {
-        var pr = await Fixture.LoadAsync(Fixture.CreateSource());
-        try
-        {
-            Assert.Equal(3, pr.ReviewPoints.Count);
-
-            var top = pr.ReviewPoints[0];
-            Assert.Equal(Fixture.TopPointTitle, top.Title);
-            Assert.Equal("Medium", top.Severity);
-            Assert.Equal(Fixture.TopPointPath, top.Path);
-            Assert.Equal(Fixture.TopPointLine, top.Line);
-            Assert.Equal(5, top.Locations.Count);
-
-            Assert.Equal(["R1", "R2", "R3"], pr.ReviewPoints.Select(p => p.Tag));
-            Assert.Equal([1, 2, 3], pr.ReviewPoints.Select(p => p.Ordinal));
-
-            // Severity first, then the engine's priority.
-            var ranked = pr.ReviewPoints
-                .OrderByDescending(p => p.Model.Severity)
-                .ThenByDescending(p => p.Model.Priority)
-                .ToList();
-            Assert.Equal(ranked, pr.ReviewPoints);
-        }
-        finally
-        {
-            await pr.DisposeAsync();
-        }
-    }
-
-    [AvaloniaFact]
-    public async Task ArrivesAtTopPointWithInlineCardUnderAnchorLine()
-    {
-        var pr = await Fixture.LoadAsync(Fixture.CreateSource());
-        try
-        {
-            var point = pr.ReviewPoints[0];
-            Assert.Same(point, pr.CurrentPoint);
-            Assert.True(point.IsCurrent);
-            Assert.Equal(Fixture.TopPointPath, pr.SelectedFile?.Path);
-            Assert.Equal("1 of 3", pr.PositionLabel);
-
-            var diff = pr.CurrentDiff;
-            Assert.NotNull(diff);
-            Assert.Equal(Fixture.TopPointPath, diff.Path);
-
-            var cardLine = diff.CardLine(point.Id);
-            Assert.NotNull(cardLine);
-            Assert.Equal(diff.DocumentLineForNewLine(point.Line) + 1, cardLine);
-            var row = diff.RowAt(cardLine.Value);
-            Assert.NotNull(row);
-            Assert.Equal(DiffRowKind.Card, row.Kind);
-            Assert.Equal(point.Id, row.CardId);
-            Assert.Equal(point.Line, diff.RowAt(cardLine.Value - 1)!.NewNumber);
-
-            Assert.Contains(pr.Markers, m => m.Id == point.Id);
+            Assert.NotNull(pr.Triage);
         }
         finally
         {
@@ -304,8 +213,11 @@ public sealed class PullRequestViewModelTests
         var pr = await Fixture.LoadAsync(Fixture.CreateSource());
         try
         {
-            var point = pr.ReviewPoints[0];
+            await pr.SelectFileAsync(pr.Files.Single(f => f.Path == Fixture.TopPointPath));
             var hunks = pr.CurrentDiff!;
+            var line = hunks.Rows.First(r => r.Kind == DiffRowKind.Added).NewNumber;
+            var draft = pr.StartLineComment(LineSide.Right, line)!;
+            hunks = pr.CurrentDiff!;
             Assert.Contains(hunks.Rows, r => r.Kind == DiffRowKind.HunkHeader);
 
             pr.ShowFullFile = true;
@@ -318,240 +230,10 @@ public sealed class PullRequestViewModelTests
             Assert.Equal(Enumerable.Range(1, shown.Count), shown);
             Assert.Equal(hunks.Additions, full.Additions);
             Assert.Equal(hunks.Deletions, full.Deletions);
-            Assert.Equal(full.DocumentLineForNewLine(point.Line) + 1, full.CardLine(point.Id));
+            Assert.Equal(full.DocumentLineForNewLine(line) + 1, full.CardLine(draft.Id));
 
             pr.ShowFullFile = false;
             Assert.Equal(hunks.Text, pr.CurrentDiff!.Text);
-        }
-        finally
-        {
-            await pr.DisposeAsync();
-        }
-    }
-
-    [AvaloniaFact]
-    public async Task OtherLocationsGetCompactReferenceCards()
-    {
-        var pr = await Fixture.LoadAsync(Fixture.CreateSource());
-        try
-        {
-            var point = pr.ReviewPoints[0];
-            var others = point.Locations.Where(l => !l.IsPrimary).ToList();
-            Assert.Equal(4, others.Count);
-
-            foreach (var location in others)
-            {
-                var file = pr.Files.Single(f => f.Path == location.Path);
-                await pr.SelectFileAsync(file);
-
-                var diff = pr.CurrentDiff;
-                Assert.NotNull(diff);
-                Assert.Equal(location.Path, diff.Path);
-
-                var id = $"{point.Id}@{location.Path}:{location.Line}";
-                Assert.Equal(id, PullRequestViewModel.CardId(point, location));
-                var cardLine = diff.CardLine(id);
-                Assert.True(cardLine is not null, $"No reference card for {id}");
-                Assert.Equal(DiffRowKind.Card, diff.RowAt(cardLine.Value)!.Kind);
-                Assert.Equal(location.Line, CodeRowAbove(diff, cardLine.Value).NewNumber);
-
-                var resolved = pr.ResolveCard(id);
-                Assert.NotNull(resolved);
-                Assert.Same(point, resolved.Value.Point);
-                Assert.False(resolved.Value.IsPrimary);
-            }
-        }
-        finally
-        {
-            await pr.DisposeAsync();
-        }
-    }
-
-    [AvaloniaFact]
-    public async Task NextAndPreviousCycleThroughOpenPointsWithWrapAround()
-    {
-        var pr = await Fixture.LoadAsync(Fixture.CreateSource());
-        try
-        {
-            var points = pr.ReviewPoints.ToList();
-
-            await pr.NextPointAsync();
-            Assert.Same(points[1], pr.CurrentPoint);
-            Assert.Equal("2 of 3", pr.PositionLabel);
-            Assert.Equal(points[1].Path, pr.SelectedFile?.Path);
-            Assert.False(points[0].IsCurrent);
-            Assert.True(points[1].IsCurrent);
-
-            await pr.NextPointAsync();
-            Assert.Same(points[2], pr.CurrentPoint);
-            Assert.Equal("3 of 3", pr.PositionLabel);
-
-            await pr.NextPointAsync();
-            Assert.Same(points[0], pr.CurrentPoint);
-            Assert.Equal("1 of 3", pr.PositionLabel);
-
-            await pr.PreviousPointAsync();
-            Assert.Same(points[2], pr.CurrentPoint);
-            Assert.Equal("3 of 3", pr.PositionLabel);
-
-            await pr.PreviousPointAsync();
-            Assert.Same(points[1], pr.CurrentPoint);
-            Assert.Equal("2 of 3", pr.PositionLabel);
-        }
-        finally
-        {
-            await pr.DisposeAsync();
-        }
-    }
-
-    [AvaloniaFact]
-    public async Task DismissMovesOnAndRestoreBringsThePointBack()
-    {
-        var pr = await Fixture.LoadAsync(Fixture.CreateSource());
-        try
-        {
-            var points = pr.ReviewPoints.ToList();
-
-            await pr.DismissAsync(null);
-            Assert.Equal(ReviewPointState.Dismissed, points[0].State);
-            Assert.True(points[0].IsDismissed);
-            Assert.Same(points[1], pr.CurrentPoint);
-            Assert.Equal(2, pr.OpenPoints.Count());
-            Assert.DoesNotContain(points[0], pr.OpenPoints);
-            Assert.Equal("1 of 2", pr.PositionLabel);
-            Assert.DoesNotContain(pr.Markers, m => m.Id == points[0].Id);
-
-            // The fixture echoes the state change back through the event stream; it must stay dismissed.
-            await Fixture.PumpAsync();
-            Assert.True(points[0].IsDismissed);
-
-            // Dismissed points are skipped by navigation.
-            await pr.NextPointAsync();
-            Assert.Same(points[2], pr.CurrentPoint);
-            await pr.NextPointAsync();
-            Assert.Same(points[1], pr.CurrentPoint);
-
-            await pr.RestoreAsync(points[0]);
-            Assert.Equal(ReviewPointState.Visible, points[0].State);
-            Assert.Equal(3, pr.OpenPoints.Count());
-            Assert.Contains(points[0], pr.OpenPoints);
-            Assert.Equal("2 of 3", pr.PositionLabel);
-
-            await Fixture.PumpAsync();
-            Assert.Equal(ReviewPointState.Visible, points[0].State);
-        }
-        finally
-        {
-            await pr.DisposeAsync();
-        }
-    }
-
-    [AvaloniaFact]
-    public async Task PostingACommentSendsOneRequestForTheAnchor()
-    {
-        var source = Fixture.CreateSource();
-        var pr = await Fixture.LoadAsync(source);
-        try
-        {
-            var point = pr.CurrentPoint!;
-            Assert.False(string.IsNullOrWhiteSpace(point.SuggestedComment));
-
-            point.CommentDraft = "";
-            pr.StartComment(null);
-            Assert.True(point.IsComposing);
-            Assert.Equal(point.SuggestedComment, point.CommentDraft);
-
-            point.CommentDraft = "  " + point.SuggestedComment + "\n\n";
-            await pr.PostCommentAsync(null);
-
-            var request = Assert.Single(source.PostedComments);
-            Assert.Equal(Fixture.TopPointPath, request.Path);
-            Assert.Equal(Fixture.TopPointLine, request.Line);
-            Assert.Equal(point.SuggestedComment.Trim(), request.Body);
-            Assert.Equal(point.Id, request.ReviewPointId);
-            Assert.Equal(Fixture.PullRequest, request.PullRequest);
-
-            Assert.Equal(ReviewPointState.Commented, point.State);
-            Assert.True(point.IsCommented);
-            Assert.False(point.IsComposing);
-            Assert.False(point.IsPosting);
-            Assert.NotNull(point.PostedUrl);
-
-            await Fixture.PumpAsync();
-            Assert.Equal(ReviewPointState.Commented, point.State);
-            Assert.Single(source.PostedComments);
-        }
-        finally
-        {
-            await pr.DisposeAsync();
-        }
-    }
-
-    [AvaloniaFact]
-    public async Task ExamineShowsEvidenceAndClosesBackToDiff()
-    {
-        var pr = await Fixture.LoadAsync(Fixture.CreateSource());
-        try
-        {
-            Assert.Equal(ReviewMode.Diff, pr.Mode);
-
-            await pr.ExamineAsync(null);
-            Assert.Equal(ReviewMode.Examine, pr.Mode);
-            Assert.True(pr.IsExamining);
-
-            await pr.ShowEvidenceAsync(null);
-            Assert.Equal("evidence", pr.ExamineTab);
-            Assert.True(pr.IsEvidenceTab);
-            Assert.Equal(ReviewMode.Examine, pr.Mode);
-
-            await Fixture.PumpAsync();
-            Assert.Equal(ReviewPointState.Examined, pr.CurrentPoint!.State);
-
-            pr.CloseExamine();
-            Assert.Equal(ReviewMode.Diff, pr.Mode);
-            Assert.False(pr.IsExamining);
-        }
-        finally
-        {
-            await pr.DisposeAsync();
-        }
-    }
-
-    [AvaloniaFact]
-    public async Task InvestigationProgressAndEvidenceArriveWithoutDisturbingTheReview()
-    {
-        var pr = await Fixture.LoadAsync(Fixture.CreateSource());
-        try
-        {
-            var point = pr.CurrentPoint!;
-            var completeStatus = pr.Status;
-
-            await pr.ApplyAsync(new PullRequestEvent { InvestigationStatus = new InvestigationStatus { Active = 2 } });
-            Assert.Equal("Analysing 2 areas…", pr.Status);
-
-            var updated = point.Model.Clone();
-            updated.EvidenceState = EvidenceState.Strong;
-            updated.Evidence.Add(new Evidence
-            {
-                Id = "inv-1-0",
-                Source = "AgentInvestigation",
-                Producer = "claude-code · pattern-investigator/v1 · claude-sonnet-5",
-                Summary = "ChargeWorker claims before charging (src/ChargeWorker.cs:9)",
-                Location = new CodeLocation { Path = "src/ChargeWorker.cs", StartLine = 9, EndLine = 9 },
-            });
-            await pr.ApplyAsync(new PullRequestEvent { ReviewPointUpdated = updated });
-
-            Assert.Same(point, pr.CurrentPoint);
-            Assert.Equal(3, pr.ReviewPoints.Count);
-            Assert.Equal("Strong repository precedent", point.EvidenceLabel);
-            var agent = point.Evidence[^1];
-            Assert.Equal("Agent investigation · claude-code · pattern-investigator/v1 · claude-sonnet-5", agent.Provenance);
-
-            await pr.ApplyAsync(new PullRequestEvent { InvestigationStatus = new InvestigationStatus { Active = 0 } });
-            Assert.Equal(completeStatus, pr.Status);
-
-            await pr.ApplyAsync(new PullRequestEvent { InvestigationStatus = new InvestigationStatus { Active = 0, Detail = "Not signed in" } });
-            Assert.Equal($"{completeStatus} · Not signed in", pr.Status);
         }
         finally
         {

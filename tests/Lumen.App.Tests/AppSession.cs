@@ -45,8 +45,15 @@ internal sealed class AppSession : IAsyncDisposable
 
         await viewModel.OpenAsync(Fixture.Reference);
         var pr = viewModel.PullRequest!;
-        await Fixture.WaitUntilAsync(() => !pr.IsAnalysing && pr.HasDetails && pr.Walkthrough is not null);
+        await Fixture.WaitUntilAsync(() => !pr.IsAnalysing && pr.HasDetails);
         Assert.Null(pr.Error);
+
+        // The recording has no slices, so start where the review-point era did: the file the tests are written around.
+        if (pr.Files.FirstOrDefault(f => f.Path == Fixture.TopPointPath) is { } top && fixtureDirectory is null)
+        {
+            await pr.SelectFileAsync(top);
+        }
+
         await Fixture.PumpAsync(10);
         return new AppSession(window, viewModel, pr, source, settingsPath);
     }

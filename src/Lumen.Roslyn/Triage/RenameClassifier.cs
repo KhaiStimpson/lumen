@@ -36,7 +36,7 @@ public sealed class RenameClassifier : IHunkClassifier
 
         var title = string.Join(", ", map.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"`{p.Key}`→`{p.Value}`"));
         var key = "rename:" + string.Join("|", map.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key}>{p.Value}"));
-        return new(ChangeClass.Rename, TriageTier.Skip, ["pure rename " + title], new GroupClaim(key, "Renamed " + title));
+        return new(ChangeClass.Rename, FoldKind.Mechanical, ["pure rename " + title], new GroupClaim(key, "Renamed " + title));
     }
 
     /// <summary>Comments may change only by the same renames (a <c>cref</c> or a mention of the old name).</summary>

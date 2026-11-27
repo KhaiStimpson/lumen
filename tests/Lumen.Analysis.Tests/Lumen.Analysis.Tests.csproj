@@ -29,4 +29,7 @@
     <ProjectReference Include="..\..\src\Lumen.Roslyn\Lumen.Roslyn.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" LinkBase="Shared" />
+  </ItemGroup>
 </Project>

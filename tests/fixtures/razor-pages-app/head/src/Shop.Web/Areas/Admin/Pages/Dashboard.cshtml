@@ -1,0 +1,78 @@
+@page
+@model Shop.Web.Areas.Admin.Pages.DashboardModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<h1>Dashboard</h1>
+<p class="text-muted">@Model.Stats.From.ToString("d") – @Model.Stats.To.ToString("d")</p>
+
+<div id="dashboard-cards" class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card"><div class="card-body">
+            <div class="text-muted small">Orders</div>
+            <div class="fs-3" data-stat="orderCount">@Model.Stats.OrderCount</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body">
+            <div class="text-muted small">Revenue</div>
+            <div class="fs-3" data-stat="revenue">@Model.Stats.Revenue.ToString("C")</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body">
+            <div class="text-muted small">Average order</div>
+            <div class="fs-3" data-stat="averageOrderValue">@Model.Stats.AverageOrderValue.ToString("C")</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body">
+            <div class="text-muted small">Unpaid invoices</div>
+            <div class="fs-3" data-stat="unpaidInvoiceTotal">@Model.Stats.UnpaidInvoiceTotal.ToString("C")</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <h2 class="h5">Orders by status</h2>
+        <canvas id="dashboard-status-chart" height="220"></canvas>
+        <ul class="list-inline small mt-2">
+            @if (Model.Stats.OrdersByStatus is not null)
+            {
+                foreach (var entry in Model.Stats.OrdersByStatus)
+                {
+                    <li class="list-inline-item">
+                        <a href="@Url.Page(Model.DrilldownPage, new { area = "", status = entry.Key })">@entry.Key (@entry.Value)</a>
+                    </li>
+                }
+            }
+        </ul>
+    </div>
+    <div class="col-lg-6">
+        <h2 class="h5">Top products</h2>
+        <ol id="dashboard-top-products" class="small"></ol>
+        <h2 class="h5 mt-4">Recently placed</h2>
+        <table class="table table-sm">
+            <tbody>
+                @foreach (var order in Model.RecentOrders)
+                {
+                    <tr>
+                        <td><a asp-area="" asp-page="/Orders/Edit" asp-route-id="@order.Id">@order.Number</a></td>
+                        <td>@order.CustomerName</td>
+                        <td class="text-end">@order.Total.ToString("C")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="mt-3">
+    <button type="button" id="dashboard-refresh" class="btn btn-outline-secondary btn-sm">Refresh</button>
+</div>
+
+@section Scripts {
+    <script asp-src-include="~/js/pages/admin-dashboard*.js" asp-append-version="true"></script>
+}

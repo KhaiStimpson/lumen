@@ -5,6 +5,15 @@ using Lumen.Domain;
 
 namespace Lumen.Analysis;
 
+/// <summary>How a human labelled a span: where a reviewer should (not) look. Labels only; the app has no tiers.</summary>
+public enum LabelTier
+{
+    Critical,
+    WorthALook,
+    Skim,
+    Skip,
+}
+
 /// <summary>
 /// One human judgement about a span of a pull request: "this is where a reviewer should (not) look".
 /// Lines are 1-based and inclusive, on the head side unless <see cref="Side"/> is "old" (pure deletions have no head lines).
@@ -17,7 +26,7 @@ public sealed record TriageLabel
 
     public required int EndLine { get; init; }
 
-    public required TriageTier Tier { get; init; }
+    public required LabelTier Tier { get; init; }
 
     public string Note { get; init; } = "";
 
@@ -45,7 +54,7 @@ public sealed record TriageLabelSet(IReadOnlyList<TriageLabel> Labels, string? P
     public string ToJson() => JsonSerializer.Serialize(this, Json);
 }
 
-/// <summary>A label that expects real behaviour, overlapping a hunk triage called mechanical and Skip. The worst bug triage can ship.</summary>
+/// <summary>A label that expects real behaviour, overlapping a hunk triage folded. The worst bug folding can ship. The worst bug triage can ship.</summary>
 public sealed record MechanicalFalsePositive(TriageLabel Label, HunkTriage Hunk);
 
 public sealed record TriageEvaluationReport(
@@ -53,16 +62,16 @@ public sealed record TriageEvaluationReport(
     IReadOnlyList<TriageLabel> MissedCritical,
     IReadOnlyList<MechanicalFalsePositive> MechanicalFalsePositives,
     IReadOnlyList<TriageLabel> UnmatchedLabels,
-    IReadOnlyDictionary<TriageTier, int> LinesPerTier,
+    IReadOnlyDictionary<FoldKind, int> LinesPerFold,
     IReadOnlyDictionary<ChangeClass, int> LinesPerClass,
     int DraftLabels)
 {
     public int CriticalRecalled => CriticalLabels - MissedCritical.Count;
 
-    /// <summary>Share of Critical labels that landed in Critical or Worth a look; 1 when there are none.</summary>
+    /// <summary>Share of Critical labels left open (not folded); 1 when there are none.</summary>
     public double CriticalRecall => CriticalLabels == 0 ? 1 : (double)CriticalRecalled / CriticalLabels;
 
-    public int TotalLines => LinesPerTier.Values.Sum();
+    public int TotalLines => LinesPerFold.Values.Sum();
 
     public string Describe()
     {
@@ -78,7 +87,7 @@ public sealed record TriageEvaluationReport(
         foreach (var fp in MechanicalFalsePositives)
         {
             sb.Append("  ").Append(Where(fp.Label)).Append(" labelled ").Append(fp.Label.Tier)
-                .Append(" but triaged ").Append(fp.Hunk.Class).Append('/').Append(fp.Hunk.Tier).AppendLine();
+                .Append(" but triaged ").Append(fp.Hunk.Class).Append('/').Append(fp.Hunk.Fold).AppendLine();
         }
 
         if (UnmatchedLabels.Count > 0)
@@ -91,10 +100,10 @@ public sealed record TriageEvaluationReport(
             sb.Append("Draft labels (not yet confirmed by a human): ").Append(DraftLabels).AppendLine();
         }
 
-        sb.Append("Lines per tier (").Append(TotalLines).AppendLine(" changed):");
-        foreach (var tier in Enum.GetValues<TriageTier>())
+        sb.Append("Lines per fold (").Append(TotalLines).AppendLine(" changed):");
+        foreach (var tier in Enum.GetValues<FoldKind>())
         {
-            sb.Append("  ").Append(tier).Append(": ").AppendLine(LinesPerTier.GetValueOrDefault(tier).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            sb.Append("  ").Append(tier).Append(": ").AppendLine(LinesPerFold.GetValueOrDefault(tier).ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
         sb.AppendLine("Lines per class:");
@@ -127,19 +136,19 @@ public static class TriageEvaluation
                 unmatched.Add(label);
             }
 
-            if (label.Tier == TriageTier.Critical)
+            if (label.Tier == LabelTier.Critical)
             {
                 critical++;
-                if (!overlapping.Any(h => h.Tier is TriageTier.Critical or TriageTier.WorthALook))
+                if (!overlapping.Any(h => h.Fold == FoldKind.Open))
                 {
                     missed.Add(label);
                 }
             }
 
-            if (label.Tier is TriageTier.Critical or TriageTier.WorthALook)
+            if (label.Tier is LabelTier.Critical or LabelTier.WorthALook)
             {
                 falsePositives.AddRange(overlapping
-                    .Where(h => h.Tier == TriageTier.Skip && h.Class.IsMechanical())
+                    .Where(h => h.Fold != FoldKind.Open)
                     .Select(h => new MechanicalFalsePositive(label, h)));
             }
         }
@@ -149,7 +158,7 @@ public static class TriageEvaluation
             missed,
             falsePositives,
             unmatched,
-            SumBy(triage.Hunks, h => h.Tier),
+            SumBy(triage.Hunks, h => h.Fold),
             SumBy(triage.Hunks, h => h.Class),
             labels.Labels.Count(l => l.Draft));
     }

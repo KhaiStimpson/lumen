@@ -290,9 +290,9 @@ public sealed record PullRequestDetails
     public string? ViewerLastReviewedSha { get; init; }
 }
 
-/// <summary>When the viewer last opened and last reviewed a pull request in Lumen (TDD §32; plan v2 M1, M2, M5).</summary>
+/// <summary>When the viewer last opened and last reviewed a review target in Lumen (TDD §32; plan v2 M1, M2, M5).</summary>
 public sealed record PullRequestVisit(
-    PullRequestKey Key,
+    ReviewTarget Target,
     DateTimeOffset? LastOpenedAt,
     string? LastOpenedHead,
     DateTimeOffset? LastReviewedAt,
@@ -300,25 +300,31 @@ public sealed record PullRequestVisit(
 
 public interface IPullRequestVisitStore
 {
-    Task RecordOpenedAsync(PullRequestKey key, string headSha, DateTimeOffset at, CancellationToken cancellationToken);
+    Task RecordOpenedAsync(ReviewTarget target, string headSha, DateTimeOffset at, CancellationToken cancellationToken);
 
-    Task RecordReviewedAsync(PullRequestKey key, string headSha, DateTimeOffset at, CancellationToken cancellationToken);
+    Task RecordReviewedAsync(ReviewTarget target, string headSha, DateTimeOffset at, CancellationToken cancellationToken);
 
-    Task<PullRequestVisit?> GetVisitAsync(PullRequestKey key, CancellationToken cancellationToken);
+    Task<PullRequestVisit?> GetVisitAsync(ReviewTarget target, CancellationToken cancellationToken);
 
-    Task<IReadOnlyDictionary<PullRequestKey, PullRequestVisit>> GetVisitsAsync(CancellationToken cancellationToken);
+    /// <summary>Every recorded visit, keyed by <see cref="ReviewTarget.Key"/>.</summary>
+    Task<IReadOnlyDictionary<string, PullRequestVisit>> GetVisitsAsync(CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// A reviewed mark on one unit (a file path, or "path::Type.Member" in a large file): the fingerprint of the unit's
+/// normalised changed lines when it was marked. A push that changes the unit changes its fingerprint, so the mark
+/// stops matching without anyone clearing it.
+/// </summary>
+public sealed record ReviewMark(string Unit, string Fingerprint, DateTimeOffset At);
+
+public interface IReviewMarkStore
+{
+    Task<IReadOnlyList<ReviewMark>> GetMarksAsync(ReviewTarget target, CancellationToken cancellationToken);
+
+    Task SetMarkAsync(ReviewTarget target, ReviewMark mark, CancellationToken cancellationToken);
+
+    Task RemoveMarkAsync(ReviewTarget target, string unit, CancellationToken cancellationToken);
 }
 
 /// <summary>A changed file between two commits of a pull request, plus whether history was rewritten in between.</summary>
 public sealed record DiffRangeResult(IReadOnlyList<ChangedFile> Files, bool IsForcePush, string? Note);
-
-/// <summary>
-/// Walkthroughs cached per head commit, scope ("full" or "since:{sha}") and settings hash, so reopening a pull request
-/// costs nothing (plan v2 M8). The result is stored as the engine serialised it.
-/// </summary>
-public interface IWalkthroughStore
-{
-    Task<string?> FindWalkthroughAsync(PullRequestKey key, string headSha, string scope, string settingsHash, CancellationToken cancellationToken);
-
-    Task SaveWalkthroughAsync(PullRequestKey key, string headSha, string scope, string settingsHash, string result, CancellationToken cancellationToken);
-}

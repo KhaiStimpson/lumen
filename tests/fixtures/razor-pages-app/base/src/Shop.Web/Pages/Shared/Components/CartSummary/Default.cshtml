@@ -1,0 +1,9 @@
+@model Cart
+
+<div id="cart-summary" class="navbar-text text-light" data-count="@Model.Count">
+    <a class="link-light" asp-area="" asp-page="/Orders/Checkout">
+        Cart (<span class="cart-count">@Model.Count</span>) · <span class="cart-subtotal">@Model.Subtotal.ToString("C")</span>
+    </a>
+</div>
+
+<script src="~/js/components/cart-summary.js" asp-append-version="true"></script>

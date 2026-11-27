@@ -6,20 +6,15 @@ using Lumen.Domain;
 namespace Lumen.Engine;
 
 /// <summary>
-/// One repository's own review settings. A null <see cref="Sensitivity"/> inherits the global one; the lists add to
-/// the global lists rather than replacing them.
+/// One repository's own review settings. The lists add to the global lists rather than replacing them.
 /// </summary>
 public sealed record RepositoryReviewSettings
 {
-    public ReviewSensitivity? Sensitivity { get; init; }
-
-    public IReadOnlyList<string> IgnoredNames { get; init; } = [];
-
     public IReadOnlyList<string> MechanicalPaths { get; init; } = [];
 
     public IReadOnlyList<string> SkippedPaths { get; init; } = [];
 
-    public bool IsEmpty => Sensitivity is null && IgnoredNames.Count == 0 && MechanicalPaths.Count == 0 && SkippedPaths.Count == 0;
+    public bool IsEmpty => MechanicalPaths.Count == 0 && SkippedPaths.Count == 0;
 }
 
 /// <summary>
@@ -74,11 +69,19 @@ public sealed partial class ReviewSettingsStore(EngineSettingsStore engine, stri
     public ReviewSettings Resolve(RepositoryRef repository)
     {
         var global = Normalise(Global);
-        var own = Get(repository);
+        // Local clones have no GitHub owner/name and so no repository file: they run with the global settings.
+        RepositoryReviewSettings own;
+        try
+        {
+            own = repository.Owner == "local" ? new() : Get(repository);
+        }
+        catch (ArgumentException)
+        {
+            own = new();
+        }
+
         return global with
         {
-            Sensitivity = own.Sensitivity ?? global.Sensitivity,
-            IgnoredNames = Clean([.. global.IgnoredNames, .. own.IgnoredNames]),
             MechanicalPaths = Clean([.. global.MechanicalPaths, .. own.MechanicalPaths]),
             SkippedPaths = Clean([.. global.SkippedPaths, .. own.SkippedPaths]),
         };
@@ -111,16 +114,12 @@ public sealed partial class ReviewSettingsStore(EngineSettingsStore engine, stri
 
     private static ReviewSettings Normalise(ReviewSettings settings) => settings with
     {
-        Sensitivity = (settings.Sensitivity ?? ReviewSensitivity.Balanced).Clamped(),
-        IgnoredNames = Clean(settings.IgnoredNames),
         MechanicalPaths = Clean(settings.MechanicalPaths),
         SkippedPaths = Clean(settings.SkippedPaths),
     };
 
     private static RepositoryReviewSettings Normalise(RepositoryReviewSettings settings) => settings with
     {
-        Sensitivity = settings.Sensitivity?.Clamped(),
-        IgnoredNames = Clean(settings.IgnoredNames),
         MechanicalPaths = Clean(settings.MechanicalPaths),
         SkippedPaths = Clean(settings.SkippedPaths),
     };

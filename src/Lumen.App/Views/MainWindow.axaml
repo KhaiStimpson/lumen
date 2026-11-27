@@ -12,13 +12,16 @@
         FontFamily="{StaticResource UiFont}"
         FontSize="13"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaTitleBarHeightHint="38">
+        ExtendClientAreaTitleBarHeightHint="38"
+        WindowDecorationsTheme="{StaticResource KelpieWindowDecorations}">
 
   <Grid RowDefinitions="38,*">
     <!-- Title bar (Gauge window chrome: bg-2 with a line border): the Kelpie icon, where you are, and the go-to box.
-         Drag area is the empty space. -->
-    <Border Grid.ColumnSpan="8" Classes="chrome" BorderThickness="0,0,0,1" />
-    <Grid Name="TitleBar" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto,150">
+         The whole bar is the system drag area (move, double-click to maximise, snap, the window menu); the controls
+         on it opt out with the User role. The last column leaves room for the caption buttons (Theme/WindowChrome.axaml). -->
+    <Border Grid.ColumnSpan="7" Classes="chrome" BorderThickness="0,0,0,1" />
+    <Grid Name="TitleBar" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,138" Background="Transparent"
+          WindowDecorationProperties.ElementRole="TitleBar">
       <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0,16,0" VerticalAlignment="Center">
         <Image Source="/Assets/kelpie-icon-64.png" Width="18" Height="18" RenderOptions.BitmapInterpolationMode="HighQuality" />
         <TextBlock Text="Kelpie Review" Classes="h3" FontSize="13" VerticalAlignment="Center" />
@@ -26,7 +29,8 @@
 
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
                   IsVisible="{Binding IsPullRequestOpen}">
-        <Button Classes="ghost" Padding="6,3" Command="{Binding GoHomeCommand}" ToolTip.Tip="Open another pull request">
+        <Button Classes="ghost" Padding="6,3" Command="{Binding GoHomeCommand}" ToolTip.Tip="Open another pull request"
+                WindowDecorationProperties.ElementRole="User">
           <TextBlock Text="{Binding PullRequest.RepositoryLabel, FallbackValue=''}" Classes="secondary" FontSize="12.5" />
         </Button>
         <TextBlock Text="/" Classes="tertiary" VerticalAlignment="Center" />
@@ -36,7 +40,8 @@
       </StackPanel>
 
       <!-- Command palette (Ctrl+K, TDD §30): go to file, go to pull request, actions with their shortcuts -->
-      <Panel Name="PalettePanel" Grid.Column="3" Width="340" Margin="0,0,12,0" VerticalAlignment="Center">
+      <Panel Name="PalettePanel" Grid.Column="3" Width="340" Margin="0,0,12,0" VerticalAlignment="Center"
+             WindowDecorationProperties.ElementRole="User">
         <TextBox Name="GoToFile" Classes="search" PlaceholderText="Go to file, pull request or command…" Text="{Binding Palette.Query}" />
         <Path Data="{StaticResource Icon.Search}" Stroke="{DynamicResource Text.Tertiary}" Classes="stroke"
               Width="12" Height="12" HorizontalAlignment="Left" Margin="11,0,0,0" IsHitTestVisible="False" />
@@ -77,17 +82,13 @@
         </Popup>
       </Panel>
 
-      <Button Name="SettingsButton" Grid.Column="4" Classes="ghost" Padding="7" Margin="0,0,2,0"
-              Command="{Binding OpenReviewSettingsCommand}" ToolTip.Tip="Review settings">
+      <Button Name="SettingsButton" Grid.Column="4" Classes="ghost" Padding="7" Margin="0,0,2,0" WindowDecorationProperties.ElementRole="User"
+              Command="{Binding OpenReviewSettingsCommand}" ToolTip.Tip="Settings">
         <Path Data="{StaticResource Icon.Sliders}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="14" Height="14" />
       </Button>
 
-      <Button Name="ConnectionsButton" Grid.Column="5" Classes="ghost" Padding="7" Margin="0,0,2,0"
-              Command="{Binding OpenConnectionsCommand}" ToolTip.Tip="Connections">
-        <Path Data="{StaticResource Icon.Plug}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="14" Height="14" />
-      </Button>
-
-      <Button Grid.Column="6" Classes="ghost" Padding="7" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="Toggle light / dark">
+      <Button Name="ThemeButton" Grid.Column="5" Classes="ghost" Padding="7" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="Toggle light / dark"
+              WindowDecorationProperties.ElementRole="User">
         <Panel>
           <Path Data="{StaticResource Icon.Moon}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="14" Height="14" />
         </Panel>

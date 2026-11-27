@@ -22,7 +22,7 @@
         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
           <Path Data="{StaticResource Icon.Comment}" Stroke="{DynamicResource Text.Secondary}" Classes="stroke" Width="13" Height="13" VerticalAlignment="Center" />
           <TextBlock Grid.Column="1" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
-            <Run Text="{Binding Thread.FirstAuthor}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Thread.Summary}" Foreground="{DynamicResource Text.Secondary}" />
+            <Run Text="{Binding Thread.FirstAuthor, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Thread.Summary, Mode=OneWay}" Foreground="{DynamicResource Text.Secondary}" />
           </TextBlock>
           <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
             <TextBlock Classes="caption tertiary" Text="{Binding Thread.ReplyCountLabel}" VerticalAlignment="Center" />

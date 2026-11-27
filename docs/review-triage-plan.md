@@ -1,5 +1,7 @@
 # Review triage — plan
 
+> **Superseded** (2026-11-27) by [overhaul.md](overhaul.md). Phases 1–4 shipped; tiers, the plan pane and Phases 5–7 were cut. The "mechanical must be proven" invariant still holds.
+
 Status: not started · Branch: `integration/review-triage` · Written: 2026-09-30
 
 ## Goal

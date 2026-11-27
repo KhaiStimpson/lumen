@@ -3,14 +3,13 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
-using Avalonia.VisualTree;
 using Lumen.App.ViewModels;
 
 namespace Lumen.App;
 
 /// <summary>
-/// Development aid (<c>--capture dir --capture-script diff,next,examine</c>): drives the real app through a few
-/// states and renders each to a PNG, so UI changes can be reviewed without a human at the keyboard.
+/// Development aid (<c>--capture dir --capture-script slice,fold,flag</c>): drives the real app through a few states
+/// and renders each to a PNG, so UI changes can be reviewed without a human at the keyboard.
 /// </summary>
 internal static class DevCapture
 {
@@ -25,40 +24,17 @@ internal static class DevCapture
         }
 
         await Task.Delay(900).ConfigureAwait(true);
-        var steps = (script ?? "diff").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var steps = (script ?? "files").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         for (var i = 0; i < steps.Length; i++)
         {
-            // morph:terrain / morph:blueprint switch the Map's layout and save frames while it animates.
-            if (steps[i].StartsWith("morph:", StringComparison.Ordinal) && viewModel.PullRequest is { } morphing)
-            {
-                // Saving a frame takes longer than the whole morph, so it runs slowed down while it is recorded.
-                var duration = Map.MapCanvas.MorphDuration;
-                Map.MapCanvas.MorphDuration = TimeSpan.FromSeconds(4);
-                var terrain = steps[i] == "morph:terrain";
-                if (terrain)
-                {
-                    morphing.Map.ShowTerrain();
-                }
-                else
-                {
-                    morphing.Map.ShowBlueprint();
-                }
-
-                var canvas = window.GetVisualDescendants().OfType<Map.MapCanvas>().FirstOrDefault();
-                for (var frame = 0; frame < 80 && (frame == 0 || canvas?.IsMorphing == true); frame++)
-                {
-                    Save(window, Path.Combine(directory, $"{i + 1:00}-{steps[i].Replace(':', '-')}-{frame:00}.png"));
-                    await Task.Delay(30).ConfigureAwait(true);
-                }
-
-                Save(window, Path.Combine(directory, $"{i + 1:00}-{steps[i].Replace(':', '-')}-end.png"));
-                Map.MapCanvas.MorphDuration = duration;
-                continue;
-            }
-
             await ApplyAsync(viewModel, steps[i]).ConfigureAwait(true);
             await Task.Delay(900).ConfigureAwait(true);
-            Save(window, Path.Combine(directory, $"{i + 1:00}-{steps[i].Replace(':', '-')}.png"));
+
+            // "size:" and theme steps only set things up; everything else is a state worth a picture.
+            if (!steps[i].StartsWith("size:", StringComparison.Ordinal) && steps[i] is not ("dark" or "light" or "nocapture"))
+            {
+                Save(window, Path.Combine(directory, $"{i + 1:00}-{Sanitise(steps[i])}.png"));
+            }
         }
 
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -67,53 +43,101 @@ internal static class DevCapture
         }
     }
 
+    private static string Sanitise(string step) =>
+        string.Concat(step.Select(c => char.IsLetterOrDigit(c) || c is '-' or '.' ? c : '-'));
+
+    /// <summary>
+    /// Capture steps. Overhaul: <c>slice</c>, <c>slice:N</c> (the Nth slice), <c>slicefile:name</c>, <c>nextslice</c>,
+    /// <c>files</c> (the file tree), <c>fold</c> (open the current file's folds), <c>slicefolds</c>, <c>flag</c> (the
+    /// next flag), <c>mark</c> (press Mark reviewed), <c>since</c> (since my last look), <c>all</c>, <c>pane</c> (toggle
+    /// the right pane), <c>unlinked</c>, <c>shared</c>, <c>mechanical</c>. Review client: <c>inbox</c>,
+    /// <c>open</c>, <c>local</c> (open the first local branch), <c>conversation</c>, <c>commits</c>, <c>checks</c>, <c>thread</c>, <c>draft</c>, <c>tray</c>,
+    /// <c>split</c>, <c>find</c>, <c>palette</c>, <c>file:name</c>. Setup: <c>dark</c>, <c>light</c>, <c>size:WxH</c>.
+    /// </summary>
     private static async Task ApplyAsync(MainWindowViewModel viewModel, string step)
     {
         var pr = viewModel.PullRequest;
         switch (step)
         {
-            case "next" when pr is not null:
-                await pr.NextPointAsync().ConfigureAwait(true);
-                break;
-            case "prev" when pr is not null:
-                await pr.PreviousPointAsync().ConfigureAwait(true);
-                break;
-            case "examine" when pr is not null:
-                await pr.ExamineAsync(null).ConfigureAwait(true);
-                break;
-            case "evidence" when pr is not null:
-                pr.ExamineTab = "evidence";
-                break;
-            case "precedent" when pr is not null:
-                pr.ExamineTab = "precedent";
-                break;
-            case "comment" when pr is not null:
-                pr.StartComment(null);
-                break;
-            case "close" when pr is not null:
-                pr.CloseExamine();
-                break;
-            case "dismiss" when pr is not null:
-                await pr.DismissAsync(null).ConfigureAwait(true);
-                break;
-            case "source" when pr?.CurrentPoint?.PrecedentExamples is [var example, ..]:
-                await pr.OpenSourceAsync(example).ConfigureAwait(true);
-                break;
-            case "home":
-                await viewModel.GoHomeCommand.ExecuteAsync(null).ConfigureAwait(true);
-                break;
-            case "generated" when pr is not null:
-                pr.ToggleGenerated();
-                break;
-
-            // Plan v2 states.
-            case "inbox":
+            case "home" or "inbox":
                 await viewModel.GoHomeCommand.ExecuteAsync(null).ConfigureAwait(true);
                 break;
             case "open" when viewModel.Home.AllItems.FirstOrDefault() is { } item:
                 await viewModel.OpenAsync(item.Reference).ConfigureAwait(true);
                 await Task.Delay(1500).ConfigureAwait(true);
                 break;
+            case "local" when viewModel.Home.LocalBranches.FirstOrDefault() is { } branch:
+                await viewModel.Home.OpenLocalItemCommand.ExecuteAsync(branch).ConfigureAwait(true);
+                await Task.Delay(1500).ConfigureAwait(true);
+                break;
+            case "generated" when pr is not null:
+                pr.ToggleGenerated();
+                break;
+
+            // Slices, folds, flags and marks.
+            case "slice" when pr is { HasSlices: true }:
+                pr.ShowSlices();
+                break;
+            case var s when s.StartsWith("slice:", StringComparison.Ordinal) && pr is not null
+                            && int.TryParse(s["slice:".Length..], out var n) && n >= 1 && n <= pr.Slices.Count:
+                await pr.SelectSliceAsync(pr.Slices[n - 1]).ConfigureAwait(true);
+                break;
+            case var s when s.StartsWith("slicefile:", StringComparison.Ordinal) && pr?.CurrentSlice is { } current:
+                await pr.SelectSliceFileAsync(current.Files.FirstOrDefault(f => f.Name == s["slicefile:".Length..])).ConfigureAwait(true);
+                break;
+            case "nextslice" when pr is not null:
+                await pr.NextSliceAsync().ConfigureAwait(true);
+                break;
+            case "nextfile" when pr is not null:
+                await pr.NextFileAsync().ConfigureAwait(true);
+                break;
+            case "shared" when pr?.Slices.FirstOrDefault(x => x.IsShared) is { } shared:
+                await pr.SelectSliceAsync(shared).ConfigureAwait(true);
+                break;
+            case "unlinked" when pr?.Slices.FirstOrDefault(x => x.IsUnlinked) is { } unlinked:
+                await pr.SelectSliceAsync(unlinked).ConfigureAwait(true);
+                break;
+            case "mechanical" when pr?.Slices.FirstOrDefault(x => x.IsMechanicalOnly) is { } mechanical:
+                await pr.SelectSliceAsync(mechanical).ConfigureAwait(true);
+                break;
+            case "fold" when pr is not null:
+                pr.ToggleFileFolds();
+                break;
+            case "slicefolds" when pr is not null:
+                pr.OpenSliceFolds();
+                break;
+            case "flag" when pr is not null:
+                await pr.NextFlagAsync().ConfigureAwait(true);
+                break;
+            case "mark" when pr is not null:
+                await pr.MarkSliceReviewedAsync().ConfigureAwait(true);
+                break;
+            case "since" when pr is not null:
+                pr.ShowSinceLastLook = true;
+                await Task.Delay(800).ConfigureAwait(true);
+                break;
+            case "all" when pr is not null:
+                pr.ShowSinceLastLook = false;
+                await pr.ClearScopeAsync().ConfigureAwait(true);
+                break;
+            case "pane" when pr is not null:
+                pr.ToggleRightPane();
+                break;
+            case "slicing" when pr is not null:
+                // What a big change shows before its slices arrive: the file list, with slicing under way.
+                if (!pr.ShowsFileTree)
+                {
+                    pr.ToggleFileList();
+                }
+
+                await pr.ApplyAsync(new Contracts.PullRequestEvent
+                {
+                    Progress = new Contracts.AnalysisProgress { Stage = PullRequestViewModel.SlicesStage, Message = "Building feature slices: linking files…" },
+                }).ConfigureAwait(true);
+                await Task.Delay(2200).ConfigureAwait(true);
+                break;
+
+            // Review client states.
             case "conversation" when pr is not null:
                 pr.ShowTab(PullRequestTab.Conversation);
                 break;
@@ -124,14 +148,7 @@ internal static class DevCapture
                 pr.ShowTab(PullRequestTab.Checks);
                 break;
             case "files" when pr is not null:
-                pr.ShowTab(PullRequestTab.Files);
-                break;
-            case "since" when pr is { CanShowSinceLastReview: true }:
-                pr.ShowSinceLastReview = true;
-                await Task.Delay(500).ConfigureAwait(true);
-                break;
-            case "all" when pr is not null:
-                await pr.ClearScopeAsync().ConfigureAwait(true);
+                pr.ShowFiles();
                 break;
             case "thread" when pr is not null:
                 await pr.NextThreadAsync().ConfigureAwait(true);
@@ -147,46 +164,10 @@ internal static class DevCapture
                 break;
             case "find" when pr is not null:
                 pr.OpenFind();
-                pr.FindQuery = "Enrichment";
+                pr.FindQuery = "Order";
                 break;
             case "palette":
                 viewModel.Palette.Open();
-                break;
-            case "risk" when pr?.Walkthrough?.Risks is [var risk, ..]:
-                await pr.SelectRiskAsync(risk).ConfigureAwait(true);
-                break;
-            case "group" when pr is not null:
-                await pr.NextGroupAsync().ConfigureAwait(true);
-                break;
-            case "order" when pr is not null:
-                pr.GroupOrder = !pr.GroupOrder;
-                break;
-            // Plan v3: the Map.
-            case "map" when pr is not null:
-                pr.ShowTab(PullRequestTab.Map);
-                break;
-            case "blueprint" when pr is not null:
-                pr.Map.ShowBlueprint();
-                break;
-            case "terrain" when pr is not null:
-                pr.Map.ShowTerrain();
-                break;
-            case "lens:attention" when pr is not null:
-                pr.Map.SetLens(MapLens.Attention);
-                break;
-            case "lens:since" when pr is not null:
-                pr.Map.SetLens(MapLens.SinceReview);
-                await Task.Delay(800).ConfigureAwait(true);
-                break;
-            case "lens:tests" when pr is not null:
-                pr.Map.SetLens(MapLens.Tests);
-                break;
-            case var s when s.StartsWith("mapselect:", StringComparison.Ordinal) && pr is not null:
-                var mapName = s["mapselect:".Length..];
-                pr.Map.Select(pr.Map.Components.SelectMany(c => c.Files).FirstOrDefault(f => f.Name == mapName)?.Path);
-                break;
-            case "mapopen" when pr is not null:
-                await pr.OpenMapSelectionAsync().ConfigureAwait(true);
                 break;
             case "dark" when Application.Current is { } app:
                 app.RequestedThemeVariant = ThemeVariant.Dark;
@@ -199,13 +180,6 @@ internal static class DevCapture
                 var parts = s["size:".Length..].Split('x');
                 main.Width = double.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
                 main.Height = double.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
-                break;
-            case var s when s.StartsWith("expand:", StringComparison.Ordinal) && pr is not null:
-                if (pr.ReviewPlan.Sections.FirstOrDefault(x => x.Key == s["expand:".Length..]) is { } section)
-                {
-                    section.IsExpanded = true;
-                }
-
                 break;
             case var s when s.StartsWith("file:", StringComparison.Ordinal) && pr is not null:
                 var name = s["file:".Length..];

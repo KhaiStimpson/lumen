@@ -1,0 +1,67 @@
+@page "{status?}"
+@model Shop.Web.Pages.Orders.BulkEditModel
+@{
+    ViewData["Title"] = "Bulk edit orders";
+}
+
+<h1>Bulk edit orders</h1>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <select asp-for="Status" class="form-select" asp-items="Html.GetEnumSelectList<OrderStatus>()">
+            <option value="">All statuses</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-secondary">Filter</button>
+    </div>
+</form>
+
+<div id="bulk-summary" class="mb-3 small text-muted"></div>
+
+<table id="bulk-edit-table" class="table table-sm table-hover">
+    <thead>
+        <tr>
+            <th><input type="checkbox" id="bulk-select-all" aria-label="Select all orders" /></th>
+            <th>Order</th>
+            <th>Customer</th>
+            <th>Placed</th>
+            <th>Status</th>
+            <th class="text-end">Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var order in Model.Orders)
+        {
+            <tr data-order-id="@order.Id">
+                <td><input type="checkbox" class="bulk-select" value="@order.Id" aria-label="Select @order.Number" /></td>
+                <td><a asp-page="./Edit" asp-route-id="@order.Id">@order.Number</a></td>
+                <td>@order.CustomerName</td>
+                <td>@order.PlacedOn.ToString("d")</td>
+                <td class="order-status">@order.Status</td>
+                <td class="text-end">@order.Total.ToString("C")</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<div class="row g-2 align-items-end">
+    <div class="col-auto">
+        <label asp-for="Input.NewStatus" class="form-label"></label>
+        <select asp-for="Input.NewStatus" id="bulk-new-status" class="form-select" asp-items="Html.GetEnumSelectList<OrderStatus>()"></select>
+    </div>
+    <div class="col-auto">
+        <label asp-for="Input.DiscountPercent" class="form-label"></label>
+        <input asp-for="Input.DiscountPercent" id="bulk-discount" class="form-control" />
+    </div>
+    <div class="col-auto">
+        <button type="button" id="bulk-apply" class="btn btn-primary" disabled>Apply to selected</button>
+    </div>
+</div>
+
+<p class="mt-3"><a href="@Url.Page(Model.ReturnPage, new { status = Model.Status })">Back to orders</a></p>
+
+@section Scripts {
+    <script src="~/lib/jquery-bulkselect/jquery.bulkselect.min.js"></script>
+    <script src="~/js/pages/orders-bulk-edit.js" asp-append-version="true"></script>
+}

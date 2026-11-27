@@ -47,11 +47,14 @@ public sealed class LivePullRequestTests(ITestOutputHelper output)
                 case PullRequestEvent.EventOneofCase.Snapshot:
                     output.WriteLine($"{t,7:0} ms  snapshot: {evt.Snapshot.Title} ({evt.Snapshot.Files.Count} files, viewer {evt.Snapshot.ViewerLogin})");
                     break;
-                case PullRequestEvent.EventOneofCase.ReviewPointAdded:
-                    output.WriteLine($"{t,7:0} ms  point: [{evt.ReviewPointAdded.Severity}] {evt.ReviewPointAdded.Title} @ {evt.ReviewPointAdded.Anchor.Path}:{evt.ReviewPointAdded.Anchor.StartLine}");
+                case PullRequestEvent.EventOneofCase.SlicesReady:
+                    output.WriteLine($"{t,7:0} ms  slices: {evt.SlicesReady.Slices.Count}{(evt.SlicesReady.FellBack ? " (fell back: " + evt.SlicesReady.FallbackReason + ")" : "")}");
+                    break;
+                case PullRequestEvent.EventOneofCase.FlagsReady:
+                    output.WriteLine($"{t,7:0} ms  flags: {evt.FlagsReady.Flags.Count}");
                     break;
                 case PullRequestEvent.EventOneofCase.Complete:
-                    output.WriteLine($"{t,7:0} ms  complete: {evt.Complete.ReviewPointCount} points");
+                    output.WriteLine($"{t,7:0} ms  complete");
                     return;
                 case PullRequestEvent.EventOneofCase.Failed:
                     Assert.Fail(evt.Failed.Message);

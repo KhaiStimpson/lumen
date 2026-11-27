@@ -22,7 +22,7 @@ public class TriagePipelineTests
 
         var hunk = Assert.Single(result.Hunks);
         Assert.Equal(ChangeClass.BehaviourChange, hunk.Class);
-        Assert.Equal(TriageTier.WorthALook, hunk.Tier);
+        Assert.Equal(FoldKind.Open, hunk.Fold);
         Assert.NotEmpty(hunk.Reasons);
         Assert.Empty(result.Groups);
     }
@@ -35,7 +35,7 @@ public class TriagePipelineTests
         var hunk = Assert.Single(TriagePipeline.Default.Run(snapshot).Hunks);
 
         Assert.Equal(ChangeClass.NewCode, hunk.Class);
-        Assert.Equal(TriageTier.Skim, hunk.Tier);
+        Assert.Equal(FoldKind.Open, hunk.Fold);
         Assert.Null(hunk.OldStart);
         Assert.Equal(1, hunk.NewStart);
         Assert.Equal(2, hunk.NewEnd);
@@ -52,7 +52,7 @@ public class TriagePipelineTests
         var hunk = Assert.Single(TriagePipeline.Default.Run(snapshot).Hunks);
 
         Assert.Equal(ChangeClass.Generated, hunk.Class);
-        Assert.Equal(TriageTier.Skip, hunk.Tier);
+        Assert.Equal(FoldKind.Mechanical, hunk.Fold);
         Assert.Equal(snapshot.Files[0].Mechanical.Reason, Assert.Single(hunk.Reasons));
     }
 
@@ -60,8 +60,8 @@ public class TriagePipelineTests
     public void FirstProofWins()
     {
         var snapshot = Snapshot(TestDiffs.RewrittenFile("src/A.cs", "a", "b"));
-        var first = new Fixed(_ => new(ChangeClass.Formatting, TriageTier.Skip, ["first"]));
-        var second = new Fixed(_ => new(ChangeClass.Rename, TriageTier.Skip, ["second"]));
+        var first = new Fixed(_ => new(ChangeClass.Formatting, FoldKind.Mechanical, ["first"]));
+        var second = new Fixed(_ => new(ChangeClass.Rename, FoldKind.Mechanical, ["second"]));
 
         var hunk = Assert.Single(new TriagePipeline([first, second]).Run(snapshot).Hunks);
 
@@ -74,7 +74,7 @@ public class TriagePipelineTests
     {
         var snapshot = Snapshot(TestDiffs.RewrittenFile("src/A.cs", "a", "b"));
         var decline = new Fixed(_ => null);
-        var claim = new Fixed(_ => new(ChangeClass.CommentsOnly, TriageTier.Skip, ["comments"]));
+        var claim = new Fixed(_ => new(ChangeClass.CommentsOnly, FoldKind.Mechanical, ["comments"]));
 
         var hunk = Assert.Single(new TriagePipeline([decline, claim]).Run(snapshot).Hunks);
 
@@ -90,7 +90,7 @@ public class TriagePipelineTests
         var hunk = Assert.Single(new TriagePipeline([boom]).Run(snapshot).Hunks);
 
         Assert.Equal(ChangeClass.BehaviourChange, hunk.Class);
-        Assert.NotEqual(TriageTier.Skip, hunk.Tier);
+        Assert.NotEqual(FoldKind.Mechanical, hunk.Fold);
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public class TriagePipelineTests
             TestDiffs.RewrittenFile("src/C.cs", "other", "changed"));
         var rename = new Fixed(c => c.File.Path == "src/C.cs"
             ? null
-            : new(ChangeClass.Rename, TriageTier.Skip, ["pure rename `Foo`→`Bar`"], new GroupClaim("Foo>Bar", "Renamed `Foo`→`Bar`")));
+            : new(ChangeClass.Rename, FoldKind.Mechanical, ["pure rename `Foo`→`Bar`"], new GroupClaim("Foo>Bar", "Renamed `Foo`→`Bar`")));
 
         var result = new TriagePipeline([rename]).Run(snapshot);
 
@@ -117,7 +117,7 @@ public class TriagePipelineTests
     [Fact]
     public void GroupIdsComeFromWhatTheGroupIsNotItsPosition()
     {
-        var claim = new Fixed(c => new(ChangeClass.Rename, TriageTier.Skip, ["r"], new GroupClaim(c.File.Path == "src/A.cs" ? "k1" : "k2", "t")));
+        var claim = new Fixed(c => new(ChangeClass.Rename, FoldKind.Mechanical, ["r"], new GroupClaim(c.File.Path == "src/A.cs" ? "k1" : "k2", "t")));
         var both = new TriagePipeline([claim]).Run(Snapshot(TestDiffs.RewrittenFile("src/A.cs", "a", "b"), TestDiffs.RewrittenFile("src/B.cs", "a", "b")));
         var onlyB = new TriagePipeline([claim]).Run(Snapshot(TestDiffs.RewrittenFile("src/B.cs", "a", "b")));
 

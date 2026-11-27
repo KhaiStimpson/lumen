@@ -12,7 +12,7 @@
       <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
         <Path Data="{StaticResource Icon.Comment}" Stroke="{DynamicResource Accent}" Classes="stroke" Width="13" Height="13" VerticalAlignment="Center" />
         <TextBlock Grid.Column="1" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center">
-          <Run Text="Comment on " /><Run Text="{Binding Draft.RangeLabel}" />
+          <Run Text="Comment on " /><Run Text="{Binding Draft.RangeLabel, Mode=OneWay}" />
         </TextBlock>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
           <Button Name="SuggestChange" Classes="ghost" Padding="8,3" IsVisible="{Binding Draft.CanSuggest}"
