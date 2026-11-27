@@ -20,23 +20,7 @@ public sealed partial class MainWindow : Window
         // Tunnel so review shortcuts win over the read-only editor, but never over text input.
         AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
 
-        // The title bar is ours (extended client area): empty space drags, double-click maximises.
-        TitleBar.PointerPressed += (_, e) =>
-        {
-            if (e.Source is not (Grid or StackPanel or TextBlock) || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-            {
-                return;
-            }
-
-            if (e.ClickCount == 2)
-            {
-                WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-            }
-            else
-            {
-                BeginMoveDrag(e);
-            }
-        };
+        // Dragging, double-click to maximise and snapping come from the system: the title bar has the TitleBar role.
 
         // Back in the foreground: the inbox refreshes (plan v2 M1: polled, and on focus).
         Activated += async (_, _) =>
